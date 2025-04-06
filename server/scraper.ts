@@ -1,15 +1,47 @@
 import puppeteer from 'puppeteer';
+import { execSync } from 'child_process';
 import { ScrapedPriceResult } from '@shared/types';
+
+// Get the path to the Chromium executable
+function getChromiumPath(): string {
+  try {
+    // Try to find chromium using which command
+    return execSync('which chromium').toString().trim();
+  } catch (error) {
+    // Fallback paths
+    const possiblePaths = [
+      '/nix/store/*/bin/chromium',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser'
+    ];
+    
+    for (const pattern of possiblePaths) {
+      try {
+        const path = execSync(`ls ${pattern} 2>/dev/null | head -1`).toString().trim();
+        if (path) return path;
+      } catch (error) {
+        // Continue to next pattern
+      }
+    }
+    
+    // Last resort, return a common path and hope it works
+    return '/nix/store/chromium/bin/chromium';
+  }
+}
 
 // Scrape price from a URL
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
   let browser = null;
   
   try {
-    // Launch browser in headless mode
+    const chromiumPath = getChromiumPath();
+    console.log(`Using Chromium at path: ${chromiumPath}`);
+    
+    // Launch browser in headless mode with explicit executable path
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      executablePath: chromiumPath,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
     
     const page = await browser.newPage();
@@ -21,7 +53,7 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     
     // Wait for the page to load
-    await page.waitForTimeout(2000);
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Extract price using various common price selectors
     const priceSelectors = [
@@ -48,8 +80,11 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
       try {
         const element = await page.$(selector);
         if (element) {
-          priceText = await page.evaluate(el => el.textContent, element);
-          if (priceText) break;
+          const text = await page.evaluate(el => el.textContent, element);
+          if (text) {
+            priceText = text;
+            break;
+          }
         }
       } catch (error) {
         // Continue trying other selectors
@@ -115,17 +150,99 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
       price
     };
   } catch (error) {
-    console.error(`Error scraping price from ${url}:`, error);
+    console.error(`Error scraping price with Puppeteer from ${url}:`, error);
+    
+    // Attempt fallback with fetch-based approach
+    console.log(`Attempting fallback fetch-based scraping for ${url}`);
+    try {
+      return await fetchBasedScraper(url);
+    } catch (fetchError) {
+      console.error(`Fallback scraping also failed for ${url}:`, fetchError);
+      return {
+        sku: url.split('/').pop() || url,
+        url,
+        price: null,
+        error: (error as Error).message || 'Failed to scrape price with all methods'
+      };
+    }
+  } finally {
+    // Close browser
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError);
+      }
+    }
+  }
+}
+
+// Fallback scraper using fetch instead of Puppeteer
+async function fetchBasedScraper(url: string): Promise<ScrapedPriceResult> {
+  try {
+    // Fetch the page content
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    }
+    
+    const html = await response.text();
+    
+    // Use regex patterns to find prices in the HTML
+    const pricePatterns = [
+      // Price with currency symbol
+      /[₹$£€¥]?\s?(\d{1,3}(,\d{3})*(\.\d{2})?)([^\d]|$)/,
+      // Price with currency code
+      /(USD|EUR|GBP|INR|AUD|CAD)\s?(\d{1,3}(,\d{3})*(\.\d{2})?)([^\d]|$)/,
+      // Structured data in JSON-LD
+      /"price":\s*"?(\d{1,3}(,\d{3})*(\.\d{2})?)("|\s|,|$)/,
+      // Generic price pattern
+      /price"?\s*:?\s*"?(\d{1,3}(,\d{3})*(\.\d{2})?)("|\s|,|$)/i
+    ];
+    
+    let priceText = null;
+    
+    // Try each pattern until we find a match
+    for (const pattern of pricePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        priceText = match[1].trim();
+        break;
+      }
+    }
+    
+    if (!priceText) {
+      throw new Error('No price found in the page content');
+    }
+    
+    // Clean and parse the price
+    priceText = priceText.replace(/[^\d.,]/g, '');
+    priceText = priceText.replace(',', '.');
+    const price = parseFloat(priceText);
+    
+    if (isNaN(price) || price <= 0) {
+      throw new Error('Invalid price format');
+    }
+    
+    return {
+      sku: url.split('/').pop() || url,
+      url,
+      price
+    };
+  } catch (error) {
+    console.error(`Error in fetch-based scraper for ${url}:`, error);
     return {
       sku: url.split('/').pop() || url,
       url,
       price: null,
-      error: (error as Error).message || 'Failed to scrape price'
+      error: (error as Error).message || 'Failed to scrape price with fetch method'
     };
-  } finally {
-    // Close browser
-    if (browser) {
-      await browser.close();
-    }
   }
 }
