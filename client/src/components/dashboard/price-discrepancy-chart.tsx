@@ -13,6 +13,14 @@ import {
 } from 'recharts';
 import type { PriceDiscrepancy } from "@shared/types";
 
+// Function to format price with commas
+const formatPrice = (price: number): string => {
+  return price.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 export function PriceDiscrepancyChart() {
   // Fetch dashboard stats from API
   const { data: stats = { totalRevenue: 0 }, isLoading } = useQuery<{ totalRevenue: number }>({
@@ -33,6 +41,22 @@ export function PriceDiscrepancyChart() {
     { month: '5th', netSales: 75, cost: 125 },
     { month: '6th', netSales: 60, cost: 120 },
   ];
+
+  // Calculate average difference with proper formatting
+  const calculateAverageDifference = (): string => {
+    if (discrepancies.length === 0) return '$0.00';
+    
+    const avgDiff = discrepancies.reduce((sum: number, d: PriceDiscrepancy) => 
+      sum + Math.abs(d.difference), 0) / discrepancies.length;
+    
+    return `$${formatPrice(avgDiff)}`;
+  };
+
+  const formatTotalRevenue = (): string => {
+    if (isLoading) return '...';
+    const revenueInK = (stats as any).totalRevenue / 1000;
+    return `$${formatPrice(revenueInK)}K`;
+  };
 
   return (
     <Card className="shadow-md">
@@ -60,7 +84,7 @@ export function PriceDiscrepancyChart() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">Total Revenue</h3>
                 <div className="text-3xl font-bold text-gray-900">
-                  {isLoading ? '...' : `$${((stats as any).totalRevenue / 1000).toFixed(2)}K`}
+                  {formatTotalRevenue()}
                 </div>
                 <div className="flex items-center mt-1">
                   <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -83,10 +107,7 @@ export function PriceDiscrepancyChart() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">Avg. Difference</h3>
                 <div className="text-3xl font-bold text-gray-900">
-                  {discrepancies.length > 0 
-                    ? `$${(discrepancies.reduce((sum: number, d: PriceDiscrepancy) => sum + Math.abs(d.difference), 0) / discrepancies.length).toFixed(2)}`
-                    : '$0.00'
-                  }
+                  {calculateAverageDifference()}
                 </div>
               </div>
             </div>
@@ -119,7 +140,7 @@ export function PriceDiscrepancyChart() {
                     tickFormatter={(value) => `$${value}`}
                   />
                   <Tooltip 
-                    formatter={(value: number) => [`$${value}`, '']}
+                    formatter={(value: number) => [`$${formatPrice(value)}`, '']}
                     labelFormatter={(label) => `Month: ${label}`}
                     contentStyle={{ 
                       borderRadius: '8px', 

@@ -424,12 +424,20 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
                 const user = await storage.getUser(1); // Simplified: using first user
                 
                 if (user?.telegramChatId) {
+                  // Format prices with commas for better readability
+                  const formatPrice = (price: number): string => {
+                    return price.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    });
+                  };
+                  
                   const message = `🚨 Price Discrepancy Alert!\n\n` +
                     `Product: ${product.title}\n` +
                     `SKU: ${product.sku}\n` +
-                    `Current Price: $${product.shopifyPrice.toFixed(2)}\n` +
-                    `Supplier Price: $${scrapeResult.price.toFixed(2)}\n` +
-                    `Difference: $${(scrapeResult.price - product.shopifyPrice).toFixed(2)}`;
+                    `Current Price: $${formatPrice(product.shopifyPrice)}\n` +
+                    `Supplier Price: $${formatPrice(scrapeResult.price)}\n` +
+                    `Difference: $${formatPrice(scrapeResult.price - product.shopifyPrice)}`;
                   
                   await sendTelegramNotification(user.telegramChatId, message);
                   

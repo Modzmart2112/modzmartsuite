@@ -22,10 +22,18 @@ import { Search, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
+// Function to format price with commas
+const formatPrice = (price: number): string => {
+  return price.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 export function ProductList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
-  const limit = 10;
+  const limit = 50; // Changed from 10 to 50 products per page
   
   // Fetch products from API
   const { data, isLoading, refetch } = useQuery({
@@ -51,12 +59,20 @@ export function ProductList() {
   ) || [];
   
   const totalPages = data?.total ? Math.ceil(data.total / limit) : 0;
+  const totalProducts = data?.total || 0;
   
   return (
     <Card>
       <CardContent className="p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Products</h2>
+          <div>
+            <h2 className="text-2xl font-bold">Products</h2>
+            {!isLoading && (
+              <p className="text-gray-500 mt-1">
+                Total: {totalProducts} products
+              </p>
+            )}
+          </div>
           
           <div className="flex items-center space-x-2">
             <div className="relative">
@@ -93,8 +109,8 @@ export function ProductList() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              // Skeleton loader
-              Array.from({ length: 5 }).map((_, i) => (
+              // Skeleton loader - increased to match new limit
+              Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-52" /></TableCell>
@@ -109,10 +125,10 @@ export function ProductList() {
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.sku}</TableCell>
                   <TableCell>{product.title}</TableCell>
-                  <TableCell>${product.shopifyPrice.toFixed(2)}</TableCell>
+                  <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
                   <TableCell>
                     {product.supplierPrice 
-                      ? `$${product.supplierPrice.toFixed(2)}`
+                      ? `$${formatPrice(product.supplierPrice)}`
                       : <span className="text-gray-400">Not available</span>
                     }
                   </TableCell>
