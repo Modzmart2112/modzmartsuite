@@ -31,10 +31,11 @@ export default function Navbar() {
           <div className="flex items-center space-x-4 flex-1 mr-6">
             {/* Logo */}
             <div className="flex items-center flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-              <span className="ml-2 text-xl font-bold">PriceSync</span>
+              <img 
+                src="/logo.png" 
+                alt="MODZ MART" 
+                className="h-10" 
+              />
             </div>
             
             {/* Search */}
