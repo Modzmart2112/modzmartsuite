@@ -38,8 +38,11 @@ export default function Navbar() {
               />
             </div>
             
+            {/* Divider between logo and search */}
+            <div className="h-8 w-px bg-white/25 mx-4"></div>
+            
             {/* Search */}
-            <div className="relative hidden md:block flex-1 ml-6">
+            <div className="relative hidden md:block flex-1">
               <Input
                 type="text"
                 placeholder="Search..."
@@ -60,6 +63,9 @@ export default function Navbar() {
             <button className="text-gray-300 hover:text-white">
               <Settings className="h-6 w-6" />
             </button>
+            
+            {/* Divider between settings and notifications */}
+            <div className="h-8 w-px bg-white/25"></div>
             
             <button className="text-gray-300 hover:text-white relative">
               <Bell className="h-6 w-6" />
