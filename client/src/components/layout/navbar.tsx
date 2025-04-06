@@ -28,9 +28,9 @@ export default function Navbar() {
       {/* Top navigation bar */}
       <div className="bg-primary text-white">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 flex-1 mr-6">
             {/* Logo */}
-            <div className="flex items-center">
+            <div className="flex items-center flex-shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
@@ -38,7 +38,7 @@ export default function Navbar() {
             </div>
             
             {/* Search */}
-            <div className="relative hidden md:block w-96">
+            <div className="relative hidden md:block flex-1 ml-6">
               <Input
                 type="text"
                 placeholder="Search..."
