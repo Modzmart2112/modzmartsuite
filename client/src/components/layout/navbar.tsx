@@ -90,9 +90,9 @@ export default function Navbar() {
               <Link 
                 key={item.path} 
                 href={item.path}
-                className={`flex items-center px-6 py-4 text-white font-medium ${
+                className={`flex items-center px-6 py-4 text-white font-medium relative ${
                   location === item.path 
-                    ? "border-b-2 border-white" 
+                    ? "after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:border-l-[8px] after:border-r-[8px] after:border-l-transparent after:border-r-transparent after:border-b-[8px] after:border-b-white" 
                     : "opacity-80 hover:opacity-100"
                 }`}
               >

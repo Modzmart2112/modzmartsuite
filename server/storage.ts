@@ -7,7 +7,7 @@ import {
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
-import { eq, desc, and, asc } from "drizzle-orm";
+import { eq, desc, and, asc, isNotNull, sql } from "drizzle-orm";
 
 // Define the storage interface
 export interface IStorage {
@@ -343,22 +343,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductCount(): Promise<number> {
-    const result = await db.select({ count: db.fn.count() }).from(products);
+    const result = await db.select({ count: sql`count(*)` }).from(products);
     return Number(result[0].count);
   }
 
   async getActiveProductCount(): Promise<number> {
-    const result = await db.select({ count: db.fn.count() })
+    const result = await db.select({ count: sql`count(*)` })
       .from(products)
       .where(eq(products.status, 'active'));
     return Number(result[0].count);
   }
 
   async getProductsBySku(skus: string[]): Promise<Product[]> {
-    // Using an 'in' clause for multiple SKUs
+    // Using the SQL in operator for multiple SKUs
+    if (skus.length === 0) return [];
     return await db.select()
       .from(products)
-      .where(products.sku.in(skus));
+      .where(sql`${products.sku} IN (${sql.join(skus)})`);
   }
 
   async getProductById(id: number): Promise<Product | undefined> {
@@ -505,7 +506,7 @@ export class DatabaseStorage implements IStorage {
       .from(products)
       .where(and(
         eq(products.hasPriceDiscrepancy, true),
-        products.supplierPrice.isNotNull()
+        isNotNull(products.supplierPrice)
       ));
     
     for (const product of discrepancyProducts) {
