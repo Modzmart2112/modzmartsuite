@@ -40,8 +40,8 @@ interface PriceAdjustment {
 
 const siteAdjustments: Record<string, PriceAdjustment> = {
   'prospeedracing.com.au': {
-    gstFactor: 1.1,        // 10% GST
-    markupFactor: 1.62     // Additional markup to match retail prices
+    gstFactor: 1.0,        // No additional GST needed as we're getting retail price now
+    markupFactor: 1.0      // No additional markup needed as we're extracting displayed retail price
   },
   // Add more sites as needed with their specific adjustment factors
 };
@@ -287,48 +287,39 @@ async function enhancedPuppeteerScraper(url: string): Promise<ScrapedPriceResult
 }
 
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
-  // Check if this is a ProSpeedRacing URL - if so, use all available scrapers in order
+  // Check if this is a ProSpeedRacing URL - if so, use specialized scrapers
   if (url.includes('prospeedracing.com.au')) {
     try {
-      // First try GraphQL/JSON method
+      // First try the improved Puppeteer-based method - most likely to get the correct retail price
+      console.log(`Using Puppeteer scraper for ProSpeedRacing URL: ${url}`);
       const result = await proSpeedRacingScraper(url);
       if (result.price !== null) {
+        // ProSpeedRacing already has markup applied on their website, so no need to adjust price
         return result;
       }
-    } catch (proSpeedError) {
-      console.error(`ProSpeedRacing web scraper failed for ${url}:`, proSpeedError);
+    } catch (puppeteerError) {
+      console.error(`Puppeteer-based ProSpeedRacing scraper failed for ${url}:`, puppeteerError);
       // Continue with other methods
     }
     
     try {
-      // Then try enhanced puppeteer method for ProSpeedRacing
-      const puppeteerResult = await enhancedPuppeteerScraper(url);
-      if (puppeteerResult.price !== null) {
-        return puppeteerResult;
+      // Then try enhanced puppeteer method as backup
+      const enhancedResult = await enhancedPuppeteerScraper(url);
+      if (enhancedResult.price !== null) {
+        return enhancedResult;
       }
-    } catch (puppeteerError) {
-      console.error(`Enhanced puppeteer scraper failed for ${url}:`, puppeteerError);
+    } catch (enhancedError) {
+      console.error(`Enhanced puppeteer scraper failed for ${url}:`, enhancedError);
       // Continue with next method
     }
   }
   
   // For non-ProSpeedRacing URLs or if the specialized scrapers failed
-  // Try fetch-based approach first which is more lightweight
+  // Try general scrapers as fallback
+  
+  // First try Puppeteer for better accuracy with JavaScript-rendered sites
   try {
-    const result = await fetchBasedScraper(url);
-    
-    // If we got a price, apply any needed adjustments based on the site
-    if (result.price !== null) {
-      const originalPrice = result.price;
-      result.price = adjustPrice(result.price, url);
-      console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
-    }
-    
-    return result;
-  } catch (fetchError) {
-    console.error(`Fetch-based scraping failed for ${url}:`, fetchError);
-    
-    // Only try regular Puppeteer as a last resort
+    console.log(`Using generic Puppeteer scraper for URL: ${url}`);
     const result = await puppeteerScraper(url);
     
     // If we got a price, apply any needed adjustments based on the site
@@ -339,6 +330,31 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     }
     
     return result;
+  } catch (puppeteerError) {
+    console.error(`Generic Puppeteer scraping failed for ${url}:`, puppeteerError);
+    
+    // Fall back to fetch-based approach as last resort
+    try {
+      console.log(`Using fetch-based scraper for URL: ${url}`);
+      const result = await fetchBasedScraper(url);
+      
+      // If we got a price, apply any needed adjustments based on the site
+      if (result.price !== null) {
+        const originalPrice = result.price;
+        result.price = adjustPrice(result.price, url);
+        console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
+      }
+      
+      return result;
+    } catch (fetchError) {
+      console.error(`All scraping methods failed for ${url}`, fetchError);
+      return {
+        sku: url.split('/').pop() || url,
+        url,
+        price: null,
+        error: "All scraping methods failed to extract price"
+      };
+    }
   }
 }
 
@@ -494,10 +510,12 @@ async function puppeteerScraper(url: string): Promise<ScrapedPriceResult> {
 
 // Specialized scraper for ProSpeedRacing websites
 async function proSpeedRacingScraper(url: string): Promise<ScrapedPriceResult> {
+  let browser = null;
+  
   try {
-    console.log(`Starting ProSpeedRacing web scraper for ${url}`);
+    console.log(`Starting ProSpeedRacing web scraper with Puppeteer for ${url}`);
     
-    // Extract the handle (product path) from the URL to use for API calls
+    // Extract the handle (product path) from the URL
     const urlObj = new URL(url);
     const pathParts = urlObj.pathname.split('/');
     // The last part of the path should be the product handle
@@ -507,180 +525,283 @@ async function proSpeedRacingScraper(url: string): Promise<ScrapedPriceResult> {
       throw new Error('Could not extract product handle from URL');
     }
     
-    // First try to get price via GraphQL API
-    try {
-      const graphqlUrl = `${urlObj.origin}/api/unstable/graphql`;
-      const handle = pathParts[pathParts.length - 1]; 
-      
-      const graphqlQuery = {
-        query: `
-          query ProductDetails($handle: String!) {
-            product(handle: $handle) {
-              id
-              handle
-              title
-              variants(first: 1) {
-                nodes {
-                  id
-                  sku
-                  price {
-                    amount
-                    currencyCode
-                  }
-                  compareAtPrice {
-                    amount
-                    currencyCode
-                  }
-                }
-              }
-            }
-          }
-        `,
-        variables: {
-          handle: handle
-        }
-      };
-      
-      const graphqlResponse = await fetch(graphqlUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        },
-        body: JSON.stringify(graphqlQuery)
-      });
-      
-      if (graphqlResponse.ok) {
-        const graphqlData = await graphqlResponse.json();
-        
-        if (graphqlData.data?.product?.variants?.nodes?.length > 0) {
-          const variant = graphqlData.data.product.variants.nodes[0];
-          const sku = variant.sku;
-          const price = parseFloat(variant.price.amount);
-          
-          if (!isNaN(price) && price > 0) {
-            console.log(`Found GraphQL price for ${url}: $${price}, SKU: ${sku}`);
-            return {
-              sku: sku || handle,
-              url,
-              price
-            };
-          }
-        }
-      }
-    } catch (graphqlError) {
-      console.error(`GraphQL approach failed, falling back to HTML scraping: ${graphqlError}`);
-    }
+    // Launch a headless browser to fully render the page
+    const executablePath = getChromiumPath();
     
-    // If GraphQL fails, fall back to HTML scraping
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml',
-        'Accept-Language': 'en-US,en;q=0.9'
+    browser = await launch({
+      headless: true, // Use boolean instead of 'new' to avoid type errors
+      executablePath,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1280,1024'
+      ]
+    });
+    
+    const page = await browser.newPage();
+    
+    // Set a desktop viewport and realistic user agent
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36');
+    
+    // Capture network requests to monitor API calls (but prioritize what's visually on the page)
+    await page.setRequestInterception(true);
+    
+    // Skip unnecessary resources to speed up load time
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      if (resourceType === 'image' || resourceType === 'media' || resourceType === 'font') {
+        request.abort();
+      } else {
+        request.continue();
       }
     });
     
-    if (!response.ok) {
-      throw new Error(`Page request failed: ${response.status} ${response.statusText}`);
-    }
+    // Navigate to page and wait for it to be fully loaded
+    console.log(`Navigating to ${url}`);
+    await page.goto(url, { 
+      waitUntil: 'networkidle2',  // Wait until network is idle (very important for JS-heavy sites)
+      timeout: 30000 
+    });
     
-    // Get the HTML content
-    const html = await response.text();
+    // Wait for possible lazy-loaded price elements
+    await page.waitForSelector('body', { timeout: 5000 });
     
-    // Extract the SKU from various possible locations
-    let sku = '';
+    // Add a small delay to ensure any lazy-loaded content or JavaScript updates complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    // Try to find SKU in meta tags or script tags
-    const skuRegex = /"sku"\s*:\s*"([^"]+)"/;
-    const skuMatch = html.match(skuRegex);
-    if (skuMatch && skuMatch[1]) {
-      sku = skuMatch[1];
-    } else {
-      // Fallback: extract from the URL
-      sku = handle;
-    }
+    // Extract SKU and price directly from the visible page elements
+    const result = await page.evaluate(() => {
+      // Helper function to extract number from price string
+      const extractPrice = (str: string): number | null => {
+        if (!str) return null;
+        // Look for standard price format: $X,XXX.XX or $XXX.XX
+        const match = str.match(/\$\s*([\d,]+\.\d{2})/);
+        if (match && match[1]) {
+          return parseFloat(match[1].replace(/,/g, ''));
+        }
+        return null;
+      };
+      
+      // 1. FIND SKU - Try various methods
+      let sku = '';
+      
+      // Look for SKU in dedicated elements
+      const skuElements = document.querySelectorAll('.product-meta__sku, .product__sku, [itemprop="sku"], .sku');
+      for (const el of skuElements) {
+        const text = el.textContent?.trim();
+        if (text) {
+          // Extract just the SKU value, removing labels like "SKU:"
+          const skuValue = text.replace(/^sku:?\s*/i, '').trim();
+          if (skuValue) {
+            sku = skuValue;
+            break;
+          }
+        }
+      }
+      
+      // If no SKU found in elements, try JSON-LD structured data
+      if (!sku) {
+        const jsonLdElements = document.querySelectorAll('script[type="application/ld+json"]');
+        for (const script of jsonLdElements) {
+          try {
+            const data = JSON.parse(script.textContent || '');
+            if (data.sku) {
+              sku = data.sku;
+              break;
+            }
+            // Check if it's in a @graph array
+            if (data['@graph']) {
+              for (const item of data['@graph']) {
+                if (item.sku) {
+                  sku = item.sku;
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore JSON parse errors
+          }
+        }
+      }
+      
+      // 2. FIND RETAIL PRICE - Focus on visible elements first
+      // This is the key improvement - we're looking at what a customer would see on the page
+      
+      // First try the most common Shopify price selectors
+      const priceSelectors = [
+        // Theme Dawn and similar current Shopify themes
+        '.price__current', 
+        '.price .price__regular', 
+        '.price .price__sale',
+        '.product__price .price-item--regular',
+        '.product-single__prices .product-single__price',
+        
+        // Other common Shopify themes
+        '.product-single__price', 
+        '.product__price',
+        '.price-item--regular',
+        '[data-product-price]',
+        
+        // Common across many e-commerce platforms
+        '[itemprop="price"]',
+        '.current-price .money',
+        '.product-price',
+        '.price-area',
+        
+        // Generic classes that might contain price
+        '.price',
+        '.product-price'
+      ];
+      
+      // Track all potential prices found on the page
+      const allPrices: {value: number, element: string, priority: number}[] = [];
+      
+      // Look for prices using specific selectors first
+      for (const selector of priceSelectors) {
+        const elements = document.querySelectorAll(selector);
+        for (const el of elements) {
+          // Skip hidden elements
+          const style = window.getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            continue;
+          }
+          
+          const text = el.textContent?.trim();
+          if (!text) continue;
+          
+          const price = extractPrice(text);
+          if (price && price > 0) {
+            allPrices.push({
+              value: price,
+              element: selector,
+              // Higher priority for likely retail price elements
+              priority: selector.includes('regular') || selector.includes('current') ? 10 : 5
+            });
+          }
+        }
+      }
+      
+      // If we didn't find any prices with specific selectors, look for $ signs in visible elements
+      if (allPrices.length === 0) {
+        // Find all visible text with dollar signs
+        const allElements = document.querySelectorAll('*');
+        for (const el of allElements) {
+          // Skip script, style and hidden elements
+          if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+          
+          const style = window.getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+            continue;
+          }
+          
+          const text = el.textContent?.trim();
+          if (!text || !text.includes('$')) continue;
+          
+          const price = extractPrice(text);
+          if (price && price > 0) {
+            allPrices.push({
+              value: price,
+              element: el.tagName,
+              priority: 1 // Lower priority for generic elements
+            });
+          }
+        }
+      }
+      
+      // If we still don't have any prices, check meta tags
+      if (allPrices.length === 0) {
+        const metaPrice = document.querySelector('meta[property="product:price:amount"], meta[property="og:price:amount"]');
+        if (metaPrice) {
+          const priceContent = metaPrice.getAttribute('content');
+          if (priceContent) {
+            const price = parseFloat(priceContent);
+            if (!isNaN(price) && price > 0) {
+              allPrices.push({
+                value: price,
+                element: 'meta tag',
+                priority: 3
+              });
+            }
+          }
+        }
+      }
+      
+      // Return all the data we've collected
+      return {
+        sku,
+        allPrices,
+        pageTitle: document.title,
+        // Provide info on Shopify meta data too (for debugging)
+        hasMeta: typeof (window as any).meta !== 'undefined' && !!(window as any).meta.product
+      };
+    });
     
-    console.log(`Found SKU for ${url}: ${sku}`);
+    console.log('Page data extracted:', result);
     
-    // Extract the price from various methods
+    // If SKU wasn't found on page, use the handle from URL as fallback
+    const sku = result.sku || handle;
+    
+    // Process the prices we found
     let price: number | null = null;
     
-    // Check for Shopify product JSON data
-    const shopifyDataMatch = html.match(/var meta\s*=\s*(\{[\s\S]*?product[\s\S]*?\});/);
-    if (shopifyDataMatch && shopifyDataMatch[1]) {
-      try {
-        const metaJson = JSON.parse(shopifyDataMatch[1]);
-        if (metaJson.product && metaJson.product.variants && metaJson.product.variants.length > 0) {
-          // In Shopify, price is often stored in cents
-          const variantPrice = parseInt(metaJson.product.variants[0].price);
-          if (!isNaN(variantPrice) && variantPrice > 0) {
-            price = variantPrice / 100;
-            console.log(`Found Shopify JSON price for ${url}: $${price}`);
-          }
-        }
-      } catch (jsonError) {
-        console.error('Error parsing Shopify meta JSON:', jsonError);
-      }
-    }
-    
-    // If JSON approach didn't work, look for the price in the HTML
-    if (!price || isNaN(price)) {
-      // First look for the price in the price__current class element
-      const priceCurrentIndex = html.indexOf('<strong class="price__current">');
-      if (priceCurrentIndex !== -1) {
-        const endIndex = html.indexOf('</strong>', priceCurrentIndex);
-        if (endIndex !== -1) {
-          const priceCurrentContent = html.substring(priceCurrentIndex, endIndex);
-          const priceMatch = priceCurrentContent.match(/\$\s*([0-9,]+\.[0-9]{2})/);
-          if (priceMatch && priceMatch[1]) {
-            price = parseFloat(priceMatch[1].replace(/,/g, ''));
-            console.log(`Found price__current match for ${url}: $${price}`);
-          }
-        }
-      }
-    }
-    
-    // If we still don't have a price, check meta tags
-    if (!price || isNaN(price)) {
-      const metaPriceRegex = /<meta\s+property="og:price:amount"\s+content="([^"]+)">/i;
-      const metaPriceMatch = html.match(metaPriceRegex);
+    if (result.allPrices && result.allPrices.length > 0) {
+      // First try: use the price with highest priority (likely retail price elements)
+      result.allPrices.sort((a, b) => b.priority - a.priority);
       
-      if (metaPriceMatch && metaPriceMatch[1]) {
-        price = parseFloat(metaPriceMatch[1].replace(/,/g, ''));
-        console.log(`Found price in meta tag for ${url}: $${price}`);
-      }
-    }
-    
-    // As a last resort, find any price-like pattern in the HTML
-    if (!price || isNaN(price)) {
-      const anyPriceRegex = /\$\s*([0-9,]+\.[0-9]{2})/;
-      const allPriceMatches = html.match(new RegExp(anyPriceRegex, 'g'));
+      // If there are multiple prices with same priority, use the highest value
+      // (assuming retail prices shown on page are higher than wholesale)
+      const highestPriorityPrices = result.allPrices.filter(p => p.priority === result.allPrices[0].priority);
+      highestPriorityPrices.sort((a, b) => b.value - a.value);
       
-      if (allPriceMatches && allPriceMatches.length > 0) {
-        // Take the first price we find
-        const firstPrice = allPriceMatches[0].match(anyPriceRegex);
-        if (firstPrice && firstPrice[1]) {
-          price = parseFloat(firstPrice[1].replace(/,/g, ''));
-          console.log(`Found general price pattern for ${url}: $${price}`);
-        }
-      }
+      price = highestPriorityPrices[0].value;
+      console.log(`Using retail price from page element '${highestPriorityPrices[0].element}': $${price}`);
     }
     
-    // Check if we found a valid price
-    if (price && !isNaN(price) && price > 0) {
+    // If no price was found, take a screenshot for debugging
+    if (!price) {
+      console.log('No price found. Taking screenshot for debugging...');
+      await page.screenshot({ path: './debug-screenshot.png' });
+      
+      // Get page HTML for debugging
+      const htmlSample = await page.evaluate(() => document.body.innerHTML.substring(0, 10000));
+      
       return {
         sku,
         url,
-        price
+        price: null,
+        error: 'Could not extract retail price from page',
+        htmlSample
       };
     }
     
-    throw new Error('No valid price found on the page');
+    // Return the scraped data
+    return {
+      sku,
+      url,
+      price
+    };
     
   } catch (error) {
     console.error(`Error in ProSpeedRacing web scraper for ${url}:`, error);
-    throw error; // Rethrow so the main function can try other methods
+    return {
+      sku: url.split('/').pop() || url,
+      url,
+      price: null,
+      error: (error as Error).message || 'Failed to scrape price with Puppeteer'
+    };
+  } finally {
+    // Close browser
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error('Error closing browser:', closeError);
+      }
+    }
   }
 }
 
