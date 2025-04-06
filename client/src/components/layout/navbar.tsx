@@ -5,11 +5,7 @@ import { Input } from "@/components/ui/input";
 import { 
   LayoutDashboard, 
   ShoppingBag, 
-  ClipboardList, 
-  Truck, 
   Users, 
-  UserCircle,
-  BarChart3, 
   Search,
   HelpCircle, 
   Settings, 
@@ -23,11 +19,8 @@ export default function Navbar() {
   const navItems = [
     { path: "/", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5 mr-2" /> },
     { path: "/products", label: "Products", icon: <ShoppingBag className="h-5 w-5 mr-2" /> },
-    { path: "/orders", label: "Orders", icon: <ClipboardList className="h-5 w-5 mr-2" /> },
-    { path: "/shipments", label: "Shipments", icon: <Truck className="h-5 w-5 mr-2" /> },
     { path: "/suppliers", label: "Suppliers", icon: <Users className="h-5 w-5 mr-2" /> },
-    { path: "/customers", label: "Customers", icon: <UserCircle className="h-5 w-5 mr-2" /> },
-    { path: "/reports", label: "Reports", icon: <BarChart3 className="h-5 w-5 mr-2" /> },
+    { path: "/settings", label: "Settings", icon: <Settings className="h-5 w-5 mr-2" /> },
   ];
 
   return (
