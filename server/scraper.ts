@@ -29,25 +29,97 @@ function getChromiumPath(): string {
 }
 
 // Main scraping function with multiple fallback mechanisms
+// Define site-specific price adjustment factors
+interface PriceAdjustment {
+  gstFactor: number;       // Tax factor (e.g., 1.1 for 10% GST in Australia)
+  markupFactor: number;    // Retail markup factor
+}
+
+const siteAdjustments: Record<string, PriceAdjustment> = {
+  'prospeedracing.com.au': {
+    gstFactor: 1.1,        // 10% GST
+    markupFactor: 1.62     // Additional markup to match retail prices
+  },
+  // Add more sites as needed with their specific adjustment factors
+};
+
+// Helper function to apply site-specific price adjustments
+function adjustPrice(price: number, url: string): number {
+  // Find the domain from the URL
+  let domain = '';
+  try {
+    const urlObj = new URL(url);
+    domain = urlObj.hostname;
+  } catch (e) {
+    console.error(`Failed to parse URL ${url}:`, e);
+    return price; // Return original price if URL parsing fails
+  }
+  
+  // Find matching site adjustment
+  let adjustment: PriceAdjustment | undefined;
+  
+  // Look for exact match or partial match in domain
+  for (const site in siteAdjustments) {
+    if (domain.includes(site)) {
+      adjustment = siteAdjustments[site];
+      break;
+    }
+  }
+  
+  if (!adjustment) {
+    return price; // No adjustment needed
+  }
+  
+  // Apply the adjustments
+  let adjustedPrice = price;
+  
+  // Apply GST if needed
+  adjustedPrice *= adjustment.gstFactor;
+  
+  // Apply markup
+  adjustedPrice *= adjustment.markupFactor;
+  
+  // Round to 2 decimal places for currency
+  return Math.round(adjustedPrice * 100) / 100;
+}
+
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
-  // Check if this is a ProSpeedRacing URL - if so, use their API
+  // Check if this is a ProSpeedRacing URL - if so, use specialized scraper
   if (url.includes('prospeedracing.com.au')) {
     try {
-      return await proSpeedRacingApiScraper(url);
+      return await proSpeedRacingScraper(url);
     } catch (proSpeedError) {
-      console.error(`ProSpeedRacing API scraper failed for ${url}:`, proSpeedError);
-      // Continue with other scraping methods if the API scraper fails
+      console.error(`ProSpeedRacing web scraper failed for ${url}:`, proSpeedError);
+      // Continue with other scraping methods if the specialized scraper fails
     }
   }
   
   // Try fetch-based approach first which is more lightweight
   try {
-    return await fetchBasedScraper(url);
+    const result = await fetchBasedScraper(url);
+    
+    // If we got a price, apply any needed adjustments based on the site
+    if (result.price !== null) {
+      const originalPrice = result.price;
+      result.price = adjustPrice(result.price, url);
+      console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
+    }
+    
+    return result;
   } catch (fetchError) {
     console.error(`Fetch-based scraping failed for ${url}:`, fetchError);
     
     // Only try Puppeteer as a last resort, since it's having issues in the current environment
-    return await puppeteerScraper(url);
+    const result = await puppeteerScraper(url);
+    
+    // If we got a price, apply any needed adjustments based on the site
+    if (result.price !== null) {
+      const originalPrice = result.price;
+      result.price = adjustPrice(result.price, url);
+      console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
+    }
+    
+    return result;
   }
 }
 
@@ -201,71 +273,91 @@ async function puppeteerScraper(url: string): Promise<ScrapedPriceResult> {
   }
 }
 
-// Specialized scraper for ProSpeedRacing using their JSON API
-async function proSpeedRacingApiScraper(url: string): Promise<ScrapedPriceResult> {
+// Specialized scraper for ProSpeedRacing websites
+async function proSpeedRacingScraper(url: string): Promise<ScrapedPriceResult> {
   try {
-    console.log(`Starting ProSpeedRacing API scraper for ${url}`);
+    console.log(`Starting ProSpeedRacing web scraper for ${url}`);
     
-    // Extract the handle (product path) from the URL
-    const urlObj = new URL(url);
-    const pathParts = urlObj.pathname.split('/');
-    // The last part of the path should be the product handle
-    const handle = pathParts[pathParts.length - 1];
-    
-    if (!handle) {
-      throw new Error('Could not extract product handle from URL');
-    }
-    
-    // Form the API URL using the product handle
-    const apiUrl = `${urlObj.origin}/products/${handle}.json`;
-    console.log(`Using ProSpeedRacing API URL: ${apiUrl}`);
-    
-    // Fetch the product data
-    const response = await fetch(apiUrl, {
+    // Instead of using the API, fetch the actual product page
+    const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
+        'Accept': 'text/html,application/xhtml+xml,application/xml',
         'Accept-Language': 'en-US,en;q=0.9'
       }
     });
     
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      throw new Error(`Page request failed: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
+    // Get the HTML content
+    const html = await response.text();
     
-    if (!data.product) {
-      throw new Error('Invalid API response: product data missing');
-    }
-    
-    // Get the product information
-    const product = data.product;
-    
-    // Get the first variant (or default variant)
+    // Extract the SKU from various possible locations
     let sku = '';
-    let price = null;
     
-    if (product.variants && product.variants.length > 0) {
-      const variant = product.variants[0]; // Use the first variant
-      sku = variant.sku;
-      price = parseFloat(variant.price);
+    // Try to find SKU in meta tags or script tags
+    const skuRegex = /"sku"\s*:\s*"([^"]+)"/;
+    const skuMatch = html.match(skuRegex);
+    if (skuMatch && skuMatch[1]) {
+      sku = skuMatch[1];
+    } else {
+      // Fallback: extract from the URL
+      const urlParts = url.split('/');
+      sku = urlParts[urlParts.length - 1];
+    }
+    
+    console.log(`Found SKU for ${url}: ${sku}`);
+    
+    // Extract the price from meta tags
+    let price: number | null = null;
+    
+    // Try to find price in meta tags
+    const metaPriceRegex = /<meta\s+property="og:price:amount"\s+content="([^"]+)">/i;
+    const metaPriceMatch = html.match(metaPriceRegex);
+    
+    if (metaPriceMatch && metaPriceMatch[1]) {
+      // Convert price string to number, removing any commas
+      price = parseFloat(metaPriceMatch[1].replace(/,/g, ''));
+      console.log(`Found price in meta tag for ${url}: $${price}`);
+    }
+    
+    // If meta tag approach didn't work, look for price in script tags
+    if (!price || isNaN(price)) {
+      const scriptPriceRegex = /"price"\s*:\s*"([^"]+)"/;
+      const scriptPriceMatch = html.match(scriptPriceRegex);
       
-      console.log(`Found ProSpeedRacing API price for ${url}: $${price}, SKU: ${sku}`);
-      
-      if (!isNaN(price) && price > 0) {
-        return {
-          sku: sku || handle,
-          url,
-          price
-        };
+      if (scriptPriceMatch && scriptPriceMatch[1]) {
+        price = parseFloat(scriptPriceMatch[1].replace(/,/g, ''));
+        console.log(`Found price in script tag for ${url}: $${price}`);
       }
     }
     
-    throw new Error('No valid price found in API response');
+    // If we still don't have a price, try any text that looks like price
+    if (!price || isNaN(price)) {
+      const anyPriceRegex = /\$\s*([0-9,]+\.[0-9]{2})/;
+      const anyPriceMatch = html.match(anyPriceRegex);
+      
+      if (anyPriceMatch && anyPriceMatch[1]) {
+        price = parseFloat(anyPriceMatch[1].replace(/,/g, ''));
+        console.log(`Found general price for ${url}: $${price}`);
+      }
+    }
+    
+    // Check if we found a valid price
+    if (price && !isNaN(price) && price > 0) {
+      return {
+        sku,
+        url,
+        price
+      };
+    }
+    
+    throw new Error('No valid price found on the page');
     
   } catch (error) {
-    console.error(`Error in ProSpeedRacing API scraper for ${url}:`, error);
+    console.error(`Error in ProSpeedRacing web scraper for ${url}:`, error);
     throw error; // Rethrow so the main function can try other methods
   }
 }

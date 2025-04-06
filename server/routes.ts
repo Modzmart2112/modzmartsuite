@@ -107,6 +107,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(discrepancies);
   }));
   
+  // Debug route to test price scraping
+  app.get("/api/scrape-test", asyncHandler(async (req, res) => {
+    const url = req.query.url as string;
+    
+    if (!url) {
+      return res.status(400).json({ message: "URL parameter is required" });
+    }
+    
+    try {
+      console.log(`Testing scrape for URL: ${url}`);
+      const result = await scrapePriceFromUrl(url);
+      
+      // Log the raw HTML content if needed for debugging
+      if (req.query.debug === 'true') {
+        try {
+          const response = await fetch(url);
+          const html = await response.text();
+          
+          // Return first 1000 chars of HTML for diagnosis
+          result.htmlSample = html.substring(0, 1000);
+        } catch (error) {
+          console.error(`Failed to fetch HTML content: ${error}`);
+        }
+      }
+      
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ 
+        message: "Scraping failed", 
+        error: (error as Error).message,
+        stack: (error as Error).stack
+      });
+    }
+  }));
+  
   // Manual scraping of a URL for testing
   app.post("/api/products/scrape-price", asyncHandler(async (req, res) => {
     const { url } = req.body;
@@ -124,6 +159,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to scrape price", 
         error: (error as Error).message,
         url 
+      });
+    }
+  }));
+  
+  // Rescrape a product's supplier price
+  app.post("/api/products/:id/rescrape", asyncHandler(async (req, res) => {
+    const productId = parseInt(req.params.id);
+    
+    if (isNaN(productId)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+    
+    const product = await storage.getProductById(productId);
+    
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    
+    if (!product.supplierUrl) {
+      return res.status(400).json({ message: "Product has no supplier URL to scrape" });
+    }
+    
+    try {
+      // Scrape the price
+      const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
+      
+      if (scrapeResult.price === null) {
+        return res.status(400).json({ 
+          message: "Failed to extract price from supplier website",
+          error: scrapeResult.error || "No price found"
+        });
+      }
+      
+      // Check for price discrepancy
+      const hasPriceDiscrepancy = Math.abs(scrapeResult.price - product.shopifyPrice) > 0.01;
+      
+      // Update the product with the scraped price
+      const updatedProduct = await storage.updateProduct(product.id, {
+        supplierPrice: scrapeResult.price,
+        lastScraped: new Date(),
+        hasPriceDiscrepancy
+      });
+      
+      // Record the price history
+      await storage.createPriceHistory({
+        productId: product.id,
+        shopifyPrice: product.shopifyPrice,
+        supplierPrice: scrapeResult.price
+      });
+      
+      res.json({
+        success: true,
+        product: updatedProduct,
+        originalPrice: product.supplierPrice,
+        newPrice: scrapeResult.price,
+        hasPriceDiscrepancy
+      });
+    } catch (error) {
+      console.error(`Error rescraping product ${productId}:`, error);
+      res.status(500).json({ 
+        message: "Failed to rescrape product", 
+        error: (error as Error).message,
       });
     }
   }));
