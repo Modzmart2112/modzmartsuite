@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ShopifyConnectionInfo, TelegramConnectionInfo } from "@shared/types";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 export default function Settings() {
@@ -23,6 +23,25 @@ export default function Settings() {
   const [telegramInfo, setTelegramInfo] = useState<TelegramConnectionInfo>({
     telegramChatId: "",
   });
+  
+  // Query to check the connection status
+  const connectionStatusQuery = useQuery({
+    queryKey: ['/api/shopify/status'],
+    queryFn: async () => {
+      const response = await fetch('/api/shopify/status');
+      if (!response.ok) {
+        throw new Error('Failed to fetch connection status');
+      }
+      return response.json();
+    }
+  });
+  
+  // Update isConnected when the query data changes
+  useEffect(() => {
+    if (connectionStatusQuery.data) {
+      setIsConnected(connectionStatusQuery.data.connected);
+    }
+  }, [connectionStatusQuery.data]);
 
   const shopifyMutation = useMutation({
     mutationFn: async (data: ShopifyConnectionInfo) => {
@@ -137,13 +156,26 @@ export default function Settings() {
                   <h4 className="font-medium text-blue-700 mb-2">How to get your Shopify credentials</h4>
                   <ol className="space-y-2 text-sm text-blue-700">
                     <li>1. Log in to your Shopify admin panel</li>
-                    <li>2. Go to Apps &gt; App and sales channel settings</li>
-                    <li>3. Click "Develop apps for your store" and follow the prompts</li>
+                    <li>2. Go to Settings &gt; Apps and sales channels</li>
+                    <li>3. Click "Develop apps" (or "Develop apps for your store")</li>
                     <li>4. Create a new app and name it "PriceSync"</li>
-                    <li>5. Go to API credentials and create Admin API access token</li>
-                    <li>6. Copy the API Key and API Secret</li>
+                    <li>5. In your app, go to "API credentials" and click "Configure Admin API access scopes"</li>
+                    <li>6. Select <strong>read_products</strong> and <strong>write_products</strong> permissions</li>
+                    <li>7. Install the app in your store when prompted</li>
+                    <li>8. After installation, you will see your "Admin API access token" (this is the API Secret)</li>
                   </ol>
                 </div>
+                {isConnected && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-100 rounded-md">
+                    <p className="text-sm text-green-700 flex items-center">
+                      <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 6L9 17L4 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Your Shopify store is connected
+                    </p>
+                  </div>
+                )}
+                
                 <form onSubmit={handleShopifySubmit}>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
@@ -170,21 +202,21 @@ export default function Settings() {
                           onChange={handleShopifyChange}
                           required
                         />
-                        <p className="text-xs text-gray-500">Example: 7d5f36d57d5f36d57d5f36d57d5f36d5</p>
+                        <p className="text-xs text-gray-500">Example: 7d5f36d57d5f36d57d5f36d57d5f36d5 (found in the API credentials section)</p>
                       </div>
                       
                       <div className="space-y-2">
-                        <Label htmlFor="shopifyApiSecret">API Secret</Label>
+                        <Label htmlFor="shopifyApiSecret">Admin API Access Token</Label>
                         <Input
                           id="shopifyApiSecret"
                           name="shopifyApiSecret"
                           type="password"
-                          placeholder="Your Shopify API Secret"
+                          placeholder="Your Admin API Access Token"
                           value={shopifyInfo.shopifyApiSecret}
                           onChange={handleShopifyChange}
                           required
                         />
-                        <p className="text-xs text-gray-500">Example: shpss_a123456789abcdef123456789abcdef</p>
+                        <p className="text-xs text-gray-500">Example: shpat_a123456789abcdef123456789abcdef</p>
                       </div>
                     </div>
                     

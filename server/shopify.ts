@@ -7,14 +7,15 @@ class ShopifyClient {
     try {
       const baseUrl = this.buildApiUrl(storeUrl);
       const response = await fetch(`${baseUrl}/shop.json`, {
-        headers: this.buildHeaders(apiKey, apiSecret)
+        headers: this.buildHeaders(apiSecret) // Use API Secret (Access Token)
       });
       
       if (!response.ok) {
+        console.error(`Shopify API returned status ${response.status}`);
         throw new Error(`Shopify API returned ${response.status}`);
       }
       
-      const data = await response.json();
+      const data = await response.json() as { shop: any };
       return !!data.shop;
     } catch (error) {
       console.error("Shopify connection test failed:", error);
@@ -33,14 +34,14 @@ class ShopifyClient {
       
       while (hasNextPage) {
         const response = await fetch(`${baseUrl}/products.json${params}`, {
-          headers: this.buildHeaders(apiKey, apiSecret)
+          headers: this.buildHeaders(apiSecret)
         });
         
         if (!response.ok) {
           throw new Error(`Shopify API returned ${response.status}`);
         }
         
-        const data = await response.json();
+        const data = await response.json() as { products: any[] };
         
         // Process products
         for (const product of data.products) {
@@ -87,14 +88,14 @@ class ShopifyClient {
     try {
       const baseUrl = this.buildApiUrl(storeUrl);
       const response = await fetch(`${baseUrl}/products.json?limit=250`, {
-        headers: this.buildHeaders(apiKey, apiSecret)
+        headers: this.buildHeaders(apiSecret)
       });
       
       if (!response.ok) {
         throw new Error(`Shopify API returned ${response.status}`);
       }
       
-      const data = await response.json();
+      const data = await response.json() as { products: any[] };
       
       for (const product of data.products) {
         for (const variant of product.variants) {
@@ -133,10 +134,10 @@ class ShopifyClient {
     return `https://${normalizedUrl}/admin/api/2022-10`;
   }
   
-  private buildHeaders(apiKey: string, apiSecret: string): { [key: string]: string } {
-    const token = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+  // Shopify expects the Access Token as a bearer token
+  private buildHeaders(accessToken: string): { [key: string]: string } {
     return {
-      'Authorization': `Basic ${token}`,
+      'X-Shopify-Access-Token': accessToken,
       'Content-Type': 'application/json'
     };
   }

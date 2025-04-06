@@ -271,6 +271,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Get Shopify connection status
+  app.get("/api/shopify/status", asyncHandler(async (req, res) => {
+    try {
+      const user = await storage.getUser(1); // Simplified: using first user
+      
+      if (!user) {
+        return res.status(404).json({ connected: false });
+      }
+      
+      const isConnected = !!(user.shopifyApiKey && user.shopifyApiSecret && user.shopifyStoreUrl);
+      res.json({ connected: isConnected });
+    } catch (error) {
+      console.error("Error getting Shopify connection status:", error);
+      res.status(500).json({ message: "Failed to get connection status" });
+    }
+  }));
+  
   // Sync products from Shopify
   app.post("/api/shopify/sync", asyncHandler(async (req, res) => {
     try {
