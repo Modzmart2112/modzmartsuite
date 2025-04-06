@@ -128,14 +128,38 @@ export function PriceDiscrepancyChart() {
                       padding: '10px'
                     }}
                   />
+                  <defs>
+                    <linearGradient id="gradient1" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="gradient2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#38BDF8" stopOpacity={0}/>
+                    </linearGradient>
+                    <filter id="shadow1" x="-2" y="-2" width="104%" height="104%">
+                      <feOffset dx="0" dy="2" />
+                      <feGaussianBlur stdDeviation="2" />
+                      <feColorMatrix type="matrix" values="0 0 0 0 0.3 0 0 0 0 0.1 0 0 0 0 0.7 0 0 0 0.3 0" />
+                    </filter>
+                    <filter id="shadow2" x="-2" y="-2" width="104%" height="104%">
+                      <feOffset dx="0" dy="2" />
+                      <feGaussianBlur stdDeviation="2" />
+                      <feColorMatrix type="matrix" values="0 0 0 0 0.2 0 0 0 0 0.5 0 0 0 0 0.9 0 0 0 0.3 0" />
+                    </filter>
+                  </defs>
+                  
+                  {/* Main lines */}
                   <Line 
                     type="monotone" 
                     dataKey="netSales" 
                     name="Supplier Price"
                     stroke="hsl(var(--primary))" 
                     strokeWidth={3}
-                    dot={{ r: 4, strokeWidth: 3 }}
-                    activeDot={{ r: 6 }}
+                    style={{ filter: 'url(#shadow-primary)' }}
+                    dot={{ r: 4, strokeWidth: 3, fill: "#fff" }}
+                    activeDot={{ r: 6, strokeWidth: 3 }}
+                    connectNulls
                   />
                   <Line 
                     type="monotone" 
@@ -143,8 +167,10 @@ export function PriceDiscrepancyChart() {
                     name="Shopify Price"
                     stroke="#38BDF8" 
                     strokeWidth={3}
-                    dot={{ r: 4, strokeWidth: 3 }}
-                    activeDot={{ r: 6 }}
+                    style={{ filter: 'url(#shadow-blue)' }}
+                    dot={{ r: 4, strokeWidth: 3, fill: "#fff" }}
+                    activeDot={{ r: 6, strokeWidth: 3 }}
+                    connectNulls
                   />
                 </LineChart>
               </ResponsiveContainer>
