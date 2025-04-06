@@ -1,6 +1,7 @@
 import { pgTable, text, serial, integer, boolean, jsonb, timestamp, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { relations } from "drizzle-orm";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -33,7 +34,7 @@ export const products = pgTable("products", {
 
 export const priceHistories = pgTable("price_histories", {
   id: serial("id").primaryKey(),
-  productId: integer("product_id").notNull(),
+  productId: integer("product_id").notNull().references(() => products.id),
   shopifyPrice: real("shopify_price").notNull(),
   supplierPrice: real("supplier_price"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -50,7 +51,7 @@ export const csvUploads = pgTable("csv_uploads", {
 
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
-  productId: integer("product_id").notNull(),
+  productId: integer("product_id").notNull().references(() => products.id),
   message: text("message").notNull(),
   status: text("status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -80,6 +81,20 @@ export const insertPriceHistorySchema = createInsertSchema(priceHistories).omit(
 export const insertCsvUploadSchema = createInsertSchema(csvUploads).omit({ id: true, createdAt: true });
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true, sentAt: true });
 export const insertStatsSchema = createInsertSchema(stats).omit({ id: true, lastUpdated: true });
+
+// Define relations
+export const productsRelations = relations(products, ({ many }) => ({
+  priceHistories: many(priceHistories),
+  notifications: many(notifications),
+}));
+
+export const priceHistoriesRelations = relations(priceHistories, ({ one }) => ({
+  product: one(products, { fields: [priceHistories.productId], references: [products.id] }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  product: one(products, { fields: [notifications.productId], references: [products.id] }),
+}));
 
 // Export types
 export type User = typeof users.$inferSelect;

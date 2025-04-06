@@ -2,9 +2,12 @@ import {
   User, InsertUser, Product, InsertProduct, 
   PriceHistory, InsertPriceHistory, CsvUpload, 
   InsertCsvUpload, Notification, InsertNotification,
-  Stats, InsertStats
+  Stats, InsertStats, users, products, priceHistories,
+  csvUploads, notifications, stats
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
+import { db } from "./db";
+import { eq, desc, and, asc } from "drizzle-orm";
 
 // Define the storage interface
 export interface IStorage {
