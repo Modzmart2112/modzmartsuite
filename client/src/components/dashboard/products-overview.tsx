@@ -13,9 +13,9 @@ export function ProductsOverview() {
     : "0.00";
 
   return (
-    <Card className="shadow-sm">
-      <CardContent className="p-6">
-        <div className="flex items-center">
+    <Card className="shadow-sm flex justify-center">
+      <CardContent className="p-6 max-w-4xl w-full">
+        <div className="flex items-center justify-center">
           {/* Left side: Pie chart - centered horizontally */}
           <div className="w-[300px] flex-shrink-0 flex justify-center">
             <div className="relative w-[250px] h-[250px]">
