@@ -1,13 +1,15 @@
 import { ScrapedPriceResult } from '@shared/types';
 import { launch } from 'puppeteer';
 import { join } from 'path';
+import { URL } from 'url';
 
 // Utility function to get the path to the Chrome executable
 function getChromiumPath(): string {
   try {
-    // In Replit environment, Chromium is installed system-wide
+    // For Replit environment, use the default browser - no need to specify path
+    // Puppeteer will use the system-installed one
     if (process.env.REPL_ID) {
-      return '/nix/store/x205pbkd5xh5g4iv0x2hm2shayd25ci7-chromium-114.0.5735.198/bin/chromium';
+      return ''; // Let Puppeteer find the browser
     }
     
     // Default paths for different operating systems as fallback
@@ -28,6 +30,29 @@ function getChromiumPath(): string {
 
 // Main scraping function with multiple fallback mechanisms
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
+  // Check if this is a ProSpeedRacing URL - if so, use their API
+  if (url.includes('prospeedracing.com.au')) {
+    try {
+      return await proSpeedRacingApiScraper(url);
+    } catch (proSpeedError) {
+      console.error(`ProSpeedRacing API scraper failed for ${url}:`, proSpeedError);
+      // Continue with other scraping methods if the API scraper fails
+    }
+  }
+  
+  // Try fetch-based approach first which is more lightweight
+  try {
+    return await fetchBasedScraper(url);
+  } catch (fetchError) {
+    console.error(`Fetch-based scraping failed for ${url}:`, fetchError);
+    
+    // Only try Puppeteer as a last resort, since it's having issues in the current environment
+    return await puppeteerScraper(url);
+  }
+}
+
+// Puppeteer-based scraper as a fallback
+async function puppeteerScraper(url: string): Promise<ScrapedPriceResult> {
   let browser = null;
   
   try {
@@ -158,20 +183,12 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     };
   } catch (error) {
     console.error(`Error scraping price with Puppeteer from ${url}:`, error);
-    
-    // Attempt fallback with fetch-based approach
-    console.log(`Attempting fallback fetch-based scraping for ${url}`);
-    try {
-      return await fetchBasedScraper(url);
-    } catch (fetchError) {
-      console.error(`Fallback scraping also failed for ${url}:`, fetchError);
-      return {
-        sku: url.split('/').pop() || url,
-        url,
-        price: null,
-        error: (error as Error).message || 'Failed to scrape price with all methods'
-      };
-    }
+    return {
+      sku: url.split('/').pop() || url,
+      url,
+      price: null,
+      error: (error as Error).message || 'Failed to scrape price with Puppeteer'
+    };
   } finally {
     // Close browser
     if (browser) {
@@ -181,6 +198,75 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
         console.error('Error closing browser:', closeError);
       }
     }
+  }
+}
+
+// Specialized scraper for ProSpeedRacing using their JSON API
+async function proSpeedRacingApiScraper(url: string): Promise<ScrapedPriceResult> {
+  try {
+    console.log(`Starting ProSpeedRacing API scraper for ${url}`);
+    
+    // Extract the handle (product path) from the URL
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    // The last part of the path should be the product handle
+    const handle = pathParts[pathParts.length - 1];
+    
+    if (!handle) {
+      throw new Error('Could not extract product handle from URL');
+    }
+    
+    // Form the API URL using the product handle
+    const apiUrl = `${urlObj.origin}/products/${handle}.json`;
+    console.log(`Using ProSpeedRacing API URL: ${apiUrl}`);
+    
+    // Fetch the product data
+    const response = await fetch(apiUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.product) {
+      throw new Error('Invalid API response: product data missing');
+    }
+    
+    // Get the product information
+    const product = data.product;
+    
+    // Get the first variant (or default variant)
+    let sku = '';
+    let price = null;
+    
+    if (product.variants && product.variants.length > 0) {
+      const variant = product.variants[0]; // Use the first variant
+      sku = variant.sku;
+      price = parseFloat(variant.price);
+      
+      console.log(`Found ProSpeedRacing API price for ${url}: $${price}, SKU: ${sku}`);
+      
+      if (!isNaN(price) && price > 0) {
+        return {
+          sku: sku || handle,
+          url,
+          price
+        };
+      }
+    }
+    
+    throw new Error('No valid price found in API response');
+    
+  } catch (error) {
+    console.error(`Error in ProSpeedRacing API scraper for ${url}:`, error);
+    throw error; // Rethrow so the main function can try other methods
   }
 }
 
@@ -220,10 +306,25 @@ async function fetchBasedScraper(url: string): Promise<ScrapedPriceResult> {
     }
     
     // Next try to find JSON-LD product data
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s);
-    if (jsonLdMatch && jsonLdMatch[1]) {
+    // Use a safer approach to extract JSON-LD data without relying on regex 's' flag
+    let jsonLdData = null;
+    // First try to find the opening tag
+    const openTagIndex = html.indexOf('<script type="application/ld+json">');
+    if (openTagIndex >= 0) {
+      // Then find the closing tag
+      const closeTagIndex = html.indexOf('</script>', openTagIndex);
+      if (closeTagIndex > openTagIndex) {
+        // Extract the content between tags
+        jsonLdData = html.substring(
+          openTagIndex + '<script type="application/ld+json">'.length, 
+          closeTagIndex
+        );
+      }
+    }
+    
+    if (jsonLdData) {
       try {
-        const jsonData = JSON.parse(jsonLdMatch[1]);
+        const jsonData = JSON.parse(jsonLdData);
         if (jsonData.offers && jsonData.offers.price) {
           const price = parseFloat(jsonData.offers.price);
           console.log(`Found JSON-LD price for ${url}: $${price}`);

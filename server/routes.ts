@@ -107,6 +107,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(discrepancies);
   }));
   
+  // Manual scraping of a URL for testing
+  app.post("/api/products/scrape-price", asyncHandler(async (req, res) => {
+    const { url } = req.body;
+    
+    if (!url) {
+      return res.status(400).json({ message: "URL is required" });
+    }
+    
+    try {
+      const result = await scrapePriceFromUrl(url);
+      res.json(result);
+    } catch (error) {
+      console.error("Error scraping price:", error);
+      res.status(500).json({ 
+        message: "Failed to scrape price", 
+        error: (error as Error).message,
+        url 
+      });
+    }
+  }));
+  
   app.post("/api/products/update-price", asyncHandler(async (req, res) => {
     const { productId, newPrice } = req.body;
     
