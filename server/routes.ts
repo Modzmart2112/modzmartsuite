@@ -264,13 +264,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Sync Shopify products (in background)
-      syncShopifyProducts(shopifyApiKey, shopifyApiSecret, shopifyStoreUrl).catch(console.error);
-      
       res.json({ success: true, message: "Shopify connection successful" });
     } catch (error) {
       console.error("Shopify connection error:", error);
       res.status(500).json({ message: "Failed to connect to Shopify" });
+    }
+  }));
+  
+  // Sync products from Shopify
+  app.post("/api/shopify/sync", asyncHandler(async (req, res) => {
+    try {
+      // Get the user's Shopify credentials
+      const user = await storage.getUser(1); // Simplified: using first user
+      
+      if (!user || !user.shopifyApiKey || !user.shopifyApiSecret || !user.shopifyStoreUrl) {
+        return res.status(400).json({ message: "Shopify connection not configured" });
+      }
+      
+      // Start syncing products in the background
+      syncShopifyProducts(user.shopifyApiKey, user.shopifyApiSecret, user.shopifyStoreUrl).catch(console.error);
+      
+      res.json({ success: true, message: "Product sync initiated" });
+    } catch (error) {
+      console.error("Error syncing products:", error);
+      res.status(500).json({ message: "Failed to sync products" });
     }
   }));
   
