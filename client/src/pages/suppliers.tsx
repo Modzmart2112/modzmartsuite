@@ -9,7 +9,10 @@ import {
   CheckCircle2, 
   Loader2, 
   FileText,
-  Info
+  Info,
+  Trash2,
+  X,
+  MoreHorizontal
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,6 +20,22 @@ import { Progress } from "@/components/ui/progress";
 import { CsvUploadModal } from "@/modals/csv-upload-modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CsvUpload {
   id: number;
@@ -31,6 +50,8 @@ export default function Suppliers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadToDelete, setUploadToDelete] = useState<number | null>(null);
+  const [uploadToCancel, setUploadToCancel] = useState<number | null>(null);
   
   // Query recent CSV uploads
   const { data: recentUploads, isLoading } = useQuery({
@@ -71,6 +92,62 @@ export default function Suppliers() {
         description: error.message || "There was an error uploading your files.",
         variant: "destructive",
       });
+    },
+  });
+  
+  // Delete CSV upload mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/csv/uploads/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Upload deleted",
+        description: "The CSV upload has been successfully deleted.",
+      });
+      
+      setUploadToDelete(null);
+      
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['/api/csv/uploads'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message || "There was an error deleting the upload.",
+        variant: "destructive",
+      });
+      
+      setUploadToDelete(null);
+    },
+  });
+  
+  // Cancel CSV processing mutation
+  const cancelMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/csv/uploads/${id}/cancel`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Processing cancelled",
+        description: "The CSV processing has been cancelled.",
+      });
+      
+      setUploadToCancel(null);
+      
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ['/api/csv/uploads'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Cancel failed",
+        description: error.message || "There was an error cancelling the processing.",
+        variant: "destructive",
+      });
+      
+      setUploadToCancel(null);
     },
   });
 
@@ -260,9 +337,37 @@ export default function Suppliers() {
                           <FileText className="h-5 w-5 text-gray-400 mr-2" />
                           <span className="font-medium">{upload.filename}</span>
                         </div>
-                        <div className="flex items-center">
-                          {getStatusIcon(upload.status)}
-                          <span className="ml-2 capitalize">{upload.status}</span>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center">
+                            {getStatusIcon(upload.status)}
+                            <span className="ml-2 capitalize">{upload.status}</span>
+                          </div>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {upload.status === 'processing' && (
+                                <DropdownMenuItem 
+                                  onClick={() => setUploadToCancel(upload.id)}
+                                  className="text-red-500 focus:text-red-500"
+                                >
+                                  <X className="h-4 w-4 mr-2" />
+                                  Cancel Processing
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem 
+                                onClick={() => setUploadToDelete(upload.id)}
+                                className="text-red-500 focus:text-red-500"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Upload
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                       
@@ -301,6 +406,72 @@ export default function Suppliers() {
 
       {/* Render the CSV upload modal */}
       <CsvUploadModal />
+      
+      {/* Delete upload confirmation dialog */}
+      <AlertDialog open={uploadToDelete !== null} onOpenChange={(open) => !open && setUploadToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete CSV Upload</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this CSV upload? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (uploadToDelete) {
+                  deleteMutation.mutate(uploadToDelete);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Cancel processing confirmation dialog */}
+      <AlertDialog open={uploadToCancel !== null} onOpenChange={(open) => !open && setUploadToCancel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Processing</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel the processing of this CSV upload? This will stop any remaining records from being processed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, Continue Processing</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (uploadToCancel) {
+                  cancelMutation.mutate(uploadToCancel);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={cancelMutation.isPending}
+            >
+              {cancelMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                  Cancelling...
+                </>
+              ) : (
+                'Yes, Cancel Processing'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

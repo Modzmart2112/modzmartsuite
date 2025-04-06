@@ -5,9 +5,14 @@ import { join } from 'path';
 // Utility function to get the path to the Chrome executable
 function getChromiumPath(): string {
   try {
-    // Default paths for different operating systems
+    // In Replit environment, Chromium is installed system-wide
+    if (process.env.REPL_ID) {
+      return '/nix/store/x205pbkd5xh5g4iv0x2hm2shayd25ci7-chromium-114.0.5735.198/bin/chromium';
+    }
+    
+    // Default paths for different operating systems as fallback
     const defaultPaths = {
-      linux: '/usr/bin/chromium-browser',
+      linux: '/usr/bin/chromium',
       darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
       win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
     };
@@ -28,7 +33,7 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
   try {
     // Launch browser with appropriate configuration
     browser = await launch({
-      headless: 'new',
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -182,6 +187,8 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
 // Fallback scraper using fetch instead of Puppeteer
 async function fetchBasedScraper(url: string): Promise<ScrapedPriceResult> {
   try {
+    console.log(`Starting fetch-based scraping for ${url}`);
+    
     // Fetch the page content
     const response = await fetch(url, {
       headers: {
@@ -196,48 +203,91 @@ async function fetchBasedScraper(url: string): Promise<ScrapedPriceResult> {
     }
     
     const html = await response.text();
+    console.log(`Received HTML content for ${url} (${html.length} characters)`);
+    
+    // Look for the price__current class first (from the example)
+    const priceCurrent = html.match(/<div class="price__default">[^<]*<strong class="price__current">[^<]*\$([0-9,]+\.[0-9]{2})<\/strong>/i);
+    if (priceCurrent && priceCurrent[1]) {
+      const price = parseFloat(priceCurrent[1].replace(/,/g, ''));
+      console.log(`Found price__current match for ${url}: $${price}`);
+      if (!isNaN(price) && price > 0) {
+        return {
+          sku: url.split('/').pop() || url,
+          url,
+          price
+        };
+      }
+    }
+    
+    // Next try to find JSON-LD product data
+    const jsonLdMatch = html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s);
+    if (jsonLdMatch && jsonLdMatch[1]) {
+      try {
+        const jsonData = JSON.parse(jsonLdMatch[1]);
+        if (jsonData.offers && jsonData.offers.price) {
+          const price = parseFloat(jsonData.offers.price);
+          console.log(`Found JSON-LD price for ${url}: $${price}`);
+          if (!isNaN(price) && price > 0) {
+            return {
+              sku: url.split('/').pop() || url,
+              url,
+              price
+            };
+          }
+        }
+      } catch (e) {
+        console.log(`Error parsing JSON-LD for ${url}: ${e}`);
+      }
+    }
     
     // Use regex patterns to find prices in the HTML
     const pricePatterns = [
-      // Price with currency symbol
-      /[₹$£€¥]?\s?(\d{1,3}(,\d{3})*(\.\d{2})?)([^\d]|$)/,
-      // Price with currency code
-      /(USD|EUR|GBP|INR|AUD|CAD)\s?(\d{1,3}(,\d{3})*(\.\d{2})?)([^\d]|$)/,
-      // Structured data in JSON-LD
-      /"price":\s*"?(\d{1,3}(,\d{3})*(\.\d{2})?)("|\s|,|$)/,
-      // Generic price pattern
-      /price"?\s*:?\s*"?(\d{1,3}(,\d{3})*(\.\d{2})?)("|\s|,|$)/i
+      // Price with currency symbol - the most common pattern
+      /[\$\£\€\¥]([0-9,]+\.[0-9]{2})/,
+      // Variants with spaces
+      /[\$\£\€\¥]\s*([0-9,]+\.[0-9]{2})/,
+      // Price as a number in a data attribute
+      /data-(?:product-)?price="([0-9.]+)"/,
+      // Price in a structured format with currency code
+      /"price":\s*"?([0-9.]+)"?/,
+      // More general pattern
+      /price"?\s*:?\s*"?([0-9.]+)"?/i
     ];
-    
-    let priceText = null;
     
     // Try each pattern until we find a match
     for (const pattern of pricePatterns) {
       const match = html.match(pattern);
       if (match && match[1]) {
-        priceText = match[1].trim();
-        break;
+        const price = parseFloat(match[1].replace(/,/g, ''));
+        console.log(`Found price match (${pattern}) for ${url}: $${price}`);
+        if (!isNaN(price) && price > 0) {
+          return {
+            sku: url.split('/').pop() || url,
+            url,
+            price
+          };
+        }
       }
     }
     
-    if (!priceText) {
-      throw new Error('No price found in the page content');
+    // If we got here, try finding any number that looks like a price
+    const anyPriceMatch = html.match(/\$\s*([0-9,]+\.[0-9]{2})/);
+    if (anyPriceMatch && anyPriceMatch[1]) {
+      const price = parseFloat(anyPriceMatch[1].replace(/,/g, ''));
+      console.log(`Found general price match for ${url}: $${price}`);
+      if (!isNaN(price) && price > 0) {
+        return {
+          sku: url.split('/').pop() || url,
+          url,
+          price
+        };
+      }
     }
     
-    // Clean and parse the price
-    priceText = priceText.replace(/[^\d.,]/g, '');
-    priceText = priceText.replace(',', '.');
-    const price = parseFloat(priceText);
+    // Last resort: Log a small sample of the HTML for debugging
+    console.log(`No price found for ${url}. HTML sample: ${html.substring(0, 500)}...`);
+    throw new Error('No price found in the page content');
     
-    if (isNaN(price) || price <= 0) {
-      throw new Error('Invalid price format');
-    }
-    
-    return {
-      sku: url.split('/').pop() || url,
-      url,
-      price
-    };
   } catch (error) {
     console.error(`Error in fetch-based scraper for ${url}:`, error);
     return {

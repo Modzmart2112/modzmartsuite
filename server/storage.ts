@@ -35,6 +35,7 @@ export interface IStorage {
   createCsvUpload(upload: InsertCsvUpload): Promise<CsvUpload>;
   updateCsvUpload(id: number, upload: Partial<CsvUpload>): Promise<CsvUpload | undefined>;
   getRecentCsvUploads(limit: number): Promise<CsvUpload[]>;
+  deleteCsvUpload(id: number): Promise<boolean>;
   
   // Notification operations
   createNotification(notification: InsertNotification): Promise<Notification>;
@@ -238,6 +239,10 @@ export class MemStorage implements IStorage {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit);
   }
+  
+  async deleteCsvUpload(id: number): Promise<boolean> {
+    return this.csvUploads.delete(id);
+  }
 
   // Notification operations
   async createNotification(notificationData: InsertNotification): Promise<Notification> {
@@ -419,6 +424,18 @@ export class DatabaseStorage implements IStorage {
       .from(csvUploads)
       .orderBy(desc(csvUploads.createdAt))
       .limit(limit);
+  }
+  
+  async deleteCsvUpload(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(csvUploads)
+        .where(eq(csvUploads.id, id))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting CSV upload ${id}:`, error);
+      return false;
+    }
   }
 
   // Notification operations

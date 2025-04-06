@@ -224,6 +224,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ uploads: recentUploads });
   }));
   
+  // Delete a CSV upload
+  app.delete("/api/csv/uploads/:id", asyncHandler(async (req, res) => {
+    const uploadId = parseInt(req.params.id);
+    
+    if (isNaN(uploadId)) {
+      return res.status(400).json({ message: "Invalid upload ID" });
+    }
+    
+    const result = await storage.deleteCsvUpload(uploadId);
+    
+    if (!result) {
+      return res.status(404).json({ message: "Upload not found" });
+    }
+    
+    res.json({ success: true, message: "Upload deleted successfully" });
+  }));
+  
+  // Cancel processing a CSV upload
+  app.post("/api/csv/uploads/:id/cancel", asyncHandler(async (req, res) => {
+    const uploadId = parseInt(req.params.id);
+    
+    if (isNaN(uploadId)) {
+      return res.status(400).json({ message: "Invalid upload ID" });
+    }
+    
+    const upload = await storage.updateCsvUpload(uploadId, { 
+      status: 'cancelled',
+      processedCount: 0
+    });
+    
+    if (!upload) {
+      return res.status(404).json({ message: "Upload not found" });
+    }
+    
+    res.json({ success: true, message: "Processing cancelled successfully" });
+  }));
+  
   app.get("/api/csv/status/:id", asyncHandler(async (req, res) => {
     const uploadId = parseInt(req.params.id);
     
