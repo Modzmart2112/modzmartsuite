@@ -133,6 +133,17 @@ export default function Settings() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="mb-6 p-4 bg-blue-50 rounded-md border border-blue-100">
+                  <h4 className="font-medium text-blue-700 mb-2">How to get your Shopify credentials</h4>
+                  <ol className="space-y-2 text-sm text-blue-700">
+                    <li>1. Log in to your Shopify admin panel</li>
+                    <li>2. Go to Apps &gt; App and sales channel settings</li>
+                    <li>3. Click "Develop apps for your store" and follow the prompts</li>
+                    <li>4. Create a new app and name it "PriceSync"</li>
+                    <li>5. Go to API credentials and create Admin API access token</li>
+                    <li>6. Copy the API Key and API Secret</li>
+                  </ol>
+                </div>
                 <form onSubmit={handleShopifySubmit}>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
@@ -146,6 +157,7 @@ export default function Settings() {
                           onChange={handleShopifyChange}
                           required
                         />
+                        <p className="text-xs text-gray-500">Example: mystore.myshopify.com (without https://)</p>
                       </div>
                       
                       <div className="space-y-2">
@@ -158,6 +170,7 @@ export default function Settings() {
                           onChange={handleShopifyChange}
                           required
                         />
+                        <p className="text-xs text-gray-500">Example: 7d5f36d57d5f36d57d5f36d57d5f36d5</p>
                       </div>
                       
                       <div className="space-y-2">
@@ -171,6 +184,7 @@ export default function Settings() {
                           onChange={handleShopifyChange}
                           required
                         />
+                        <p className="text-xs text-gray-500">Example: shpss_a123456789abcdef123456789abcdef</p>
                       </div>
                     </div>
                     
