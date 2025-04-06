@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Upload, Check, Trash2, FileText } from "lucide-react";
+import { X, Upload, Check, Trash2, FileText, AlertCircle, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +7,7 @@ import { validateCSVFile } from "@/lib/utils/csv-parser";
 import { CsvRecord } from "@shared/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type SelectedFile = {
   file: File;
@@ -33,17 +34,26 @@ export function CsvUploadModal() {
       const res = await apiRequest("POST", "/api/csv/upload", formData);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Files uploaded successfully",
-        description: "Your supplier price data is being processed.",
+        description: "Your supplier price data is being permanently saved.",
       });
       
-      // Close modal
+      // Display detailed information about the upload
+      if (data?.uploads?.length > 0) {
+        toast({
+          title: `Processing ${data.uploads.length} files`,
+          description: `${data.uploads.reduce((total: number, upload: {recordsCount: number}) => total + upload.recordsCount, 0)} records will be processed.`,
+        });
+      }
+      
+      // Close modal and reset state
       setOpen(false);
       setSelectedFiles([]);
       
-      // Invalidate relevant queries
+      // Invalidate relevant queries to update the UI
+      queryClient.invalidateQueries({ queryKey: ['/api/csv/uploads'] });
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
@@ -177,6 +187,13 @@ export function CsvUploadModal() {
             Upload your supplier CSV files with SKU and Origin URL columns. The system will compare prices and alert you of any discrepancies.
           </DialogDescription>
         </DialogHeader>
+        
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Your CSV files must contain <strong>SKU</strong> and <strong>Origin URL</strong> columns. This data will be permanently stored and products will be updated automatically.
+          </AlertDescription>
+        </Alert>
         
         <div className="mt-4">
           <div 

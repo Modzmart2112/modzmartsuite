@@ -178,20 +178,56 @@ export function validateCSVFile(file: File): Promise<{
           return;
         }
         
-        // Check if required columns exist in at least one record
-        const hasRequiredFields = records.some(record => record.sku && record.originUrl);
+        // Get total record count from the file before SKU/URL filtering
+        const totalRecords = records.length;
         
-        if (!hasRequiredFields) {
+        // Check each record for required fields and count valid ones
+        const validRecords = records.filter(record => record.sku && record.originUrl);
+        const validRecordsCount = validRecords.length;
+        
+        // If no records have both SKU and Origin URL
+        if (validRecordsCount === 0) {
+          // Check which columns might be missing
+          const hasSku = records.some(record => record.sku);
+          const hasOriginUrl = records.some(record => record.originUrl);
+          
+          if (!hasSku && !hasOriginUrl) {
+            resolve({
+              valid: false,
+              message: "CSV must contain both SKU and Origin URL columns"
+            });
+          } else if (!hasSku) {
+            resolve({
+              valid: false,
+              message: "CSV is missing the SKU column"
+            });
+          } else if (!hasOriginUrl) {
+            resolve({
+              valid: false,
+              message: "CSV is missing the Origin URL column"
+            });
+          } else {
+            resolve({
+              valid: false,
+              message: "No records contain both SKU and Origin URL values"
+            });
+          }
+          return;
+        }
+        
+        // If some records are missing required fields, show a warning
+        if (validRecordsCount < totalRecords) {
           resolve({
-            valid: false,
-            message: "CSV must contain SKU and Origin URL columns"
+            valid: true,
+            message: `${validRecordsCount} valid records found. ${totalRecords - validRecordsCount} rows will be ignored (missing SKU or Origin URL).`,
+            recordCount: validRecordsCount
           });
           return;
         }
         
         resolve({
           valid: true,
-          recordCount: records.length
+          recordCount: validRecordsCount
         });
       })
       .catch(error => {

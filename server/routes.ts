@@ -64,8 +64,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Format stats for the frontend
-    const salesChannels = stats.salesChannels.channels || [];
-    const geoDistribution = stats.geoDistribution.countries || [];
+    const salesChannels = stats.salesChannels ? (stats.salesChannels as any).channels || [] : [];
+    const geoDistribution = stats.geoDistribution ? (stats.geoDistribution as any).countries || [] : [];
     
     res.json({
       totalOrders: stats.totalOrders,
@@ -86,7 +86,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       activeProductCount,
       offMarketCount: productCount - activeProductCount,
       newProductsCount: 400, // Example value
-      lastUpdated: stats.lastUpdated.toISOString()
+      lastUpdated: stats.lastUpdated ? stats.lastUpdated.toISOString() : new Date().toISOString()
     });
   }));
   
@@ -218,6 +218,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ uploads: uploadResults });
   }));
   
+  app.get("/api/csv/uploads", asyncHandler(async (req, res) => {
+    const limit = parseInt(req.query.limit as string || "10");
+    const recentUploads = await storage.getRecentCsvUploads(limit);
+    res.json({ uploads: recentUploads });
+  }));
+  
   app.get("/api/csv/status/:id", asyncHandler(async (req, res) => {
     const uploadId = parseInt(req.params.id);
     
@@ -225,7 +231,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid upload ID" });
     }
     
-    const upload = await storage.csvUploads.get(uploadId);
+    const uploads = await storage.getRecentCsvUploads(100);
+    const upload = uploads.find(u => u.id === uploadId);
     
     if (!upload) {
       return res.status(404).json({ message: "Upload not found" });
@@ -349,9 +356,17 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
     });
     
     let processedCount = 0;
+    let updatedProductCount = 0;
+    let newProductCount = 0;
     
     for (const record of records) {
       try {
+        // Ensure we have both SKU and Origin URL - these are required
+        if (!record.sku || !record.originUrl) {
+          console.warn(`Skipping record: Missing required SKU or Origin URL`);
+          continue;
+        }
+        
         // Check if product exists
         let product = await storage.getProductBySku(record.sku);
         
@@ -361,6 +376,8 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
             product = await storage.updateProduct(product.id, {
               supplierUrl: record.originUrl
             });
+            console.log(`Updated existing product SKU ${record.sku} with Origin URL: ${record.originUrl}`);
+            updatedProductCount++;
           }
         } else {
           // If product doesn't exist in our database, try to find it in Shopify
@@ -379,16 +396,37 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
                 // Create product in our database
                 product = await storage.createProduct({
                   sku: record.sku,
-                  title: shopifyProduct.title,
-                  description: shopifyProduct.description,
+                  title: shopifyProduct.title || record.title || `Product ${record.sku}`,
+                  description: shopifyProduct.description || record.description || '',
                   shopifyId: shopifyProduct.id,
                   shopifyPrice: shopifyProduct.price,
                   supplierUrl: record.originUrl,
                   images: shopifyProduct.images,
                   status: "active",
-                  vendor: shopifyProduct.vendor,
-                  productType: shopifyProduct.productType
+                  vendor: shopifyProduct.vendor || record.Vendor || '',
+                  productType: shopifyProduct.productType || record["Product Type"] || ''
                 });
+                console.log(`Created new product from Shopify: SKU ${record.sku} with Origin URL: ${record.originUrl}`);
+                newProductCount++;
+              } else if (record.title && record.price) {
+                // If not found in Shopify but we have basic data, create a placeholder product
+                const price = parseFloat(record.price.replace(/[^0-9.]/g, ''));
+                const cost = record.cost ? parseFloat(record.cost.replace(/[^0-9.]/g, '')) : null;
+                
+                product = await storage.createProduct({
+                  sku: record.sku,
+                  title: record.title,
+                  description: record.description || '',
+                  shopifyId: `local-${record.sku}`, // Placeholder ID
+                  shopifyPrice: price || 0,
+                  supplierPrice: cost || null,
+                  supplierUrl: record.originUrl,
+                  status: "inactive", // Mark as inactive since it's not in Shopify yet
+                  vendor: record.Vendor || '',
+                  productType: record["Product Type"] || ''
+                });
+                console.log(`Created placeholder product: SKU ${record.sku} with Origin URL: ${record.originUrl}`);
+                newProductCount++;
               }
             }
           } catch (error) {
@@ -445,9 +483,16 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
                   await storage.createNotification({
                     productId: product.id,
                     message,
-                    status: "sent",
-                    sentAt: new Date()
+                    status: "sent"
                   });
+                  
+                  // Update the sentAt field (which is not part of insertNotificationSchema)
+                  const [notification] = await storage.getPendingNotifications();
+                  if (notification) {
+                    await storage.updateNotification(notification.id, {
+                      sentAt: new Date()
+                    });
+                  }
                 }
               }
             }
@@ -458,8 +503,8 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
         
         processedCount++;
         
-        // Update progress every 10 records
-        if (processedCount % 10 === 0) {
+        // Update progress every 5 records for more frequent updates
+        if (processedCount % 5 === 0) {
           await storage.updateCsvUpload(uploadId, {
             processedCount
           });
@@ -469,7 +514,8 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
       }
     }
     
-    // Update final status
+    // Update final status with detailed logs
+    console.log(`CSV Upload ${uploadId} processing complete. Total records: ${records.length}, Processed: ${processedCount}, Updated: ${updatedProductCount}, New: ${newProductCount}`);
     await storage.updateCsvUpload(uploadId, {
       processedCount,
       status: "completed"
