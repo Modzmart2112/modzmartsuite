@@ -86,20 +86,24 @@ export default function Navbar() {
       {/* Navigation Tabs */}
       <div className="bg-primary/90 border-t border-gray-700">
         <div className="container mx-auto px-4">
-          <nav className="flex overflow-x-auto no-scrollbar justify-between">
-            {navItems.map((item) => (
-              <Link 
-                key={item.path} 
-                href={item.path}
-                className={`flex items-center px-6 py-4 text-white font-medium relative ${
-                  location === item.path 
-                    ? "after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:border-l-[8px] after:border-r-[8px] after:border-l-transparent after:border-r-transparent after:border-b-[8px] after:border-b-white" 
-                    : "opacity-80 hover:opacity-100"
-                }`}
-              >
-                <span className="mr-2">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
+          <nav className="flex overflow-x-auto no-scrollbar">
+            {navItems.map((item, index) => (
+              <div key={item.path} className="relative flex items-center">
+                {index > 0 && (
+                  <div className="absolute h-8 w-px bg-white/25 left-0 top-1/2 -translate-y-1/2"></div>
+                )}
+                <Link 
+                  href={item.path}
+                  className={`flex items-center px-6 py-4 text-white font-medium relative ${
+                    location === item.path 
+                      ? "after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-0 after:h-0 after:border-l-[6px] after:border-r-[6px] after:border-b-[6px] after:border-l-transparent after:border-r-transparent after:border-b-white" 
+                      : "opacity-80 hover:opacity-100"
+                  }`}
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              </div>
             ))}
           </nav>
         </div>
