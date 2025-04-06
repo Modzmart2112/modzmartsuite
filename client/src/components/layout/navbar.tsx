@@ -26,19 +26,19 @@ export default function Navbar() {
   return (
     <header>
       {/* Top navigation bar */}
-      <div className="bg-secondary text-white">
+      <div className="bg-primary text-white">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             {/* Logo */}
             <div className="flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
               <span className="ml-2 text-xl font-bold">PriceSync</span>
             </div>
             
             {/* Search */}
-            <div className="relative hidden md:block w-64">
+            <div className="relative hidden md:block w-96">
               <Input
                 type="text"
                 placeholder="Search..."
@@ -83,7 +83,7 @@ export default function Navbar() {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="bg-primary">
+      <div className="bg-primary/90 border-t border-gray-700">
         <div className="container mx-auto px-4">
           <nav className="flex overflow-x-auto no-scrollbar justify-between">
             {navItems.map((item) => (
