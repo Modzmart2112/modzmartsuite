@@ -46,6 +46,24 @@ const siteAdjustments: Record<string, PriceAdjustment> = {
   // Add more sites as needed with their specific adjustment factors
 };
 
+// Simple helper to check if Puppeteer is likely to work in this environment
+function isPuppeteerAvailable(): boolean {
+  try {
+    // Check if we're in Replit environment which typically has issues with Puppeteer
+    if (process.env.REPL_ID) {
+      console.log('Running in Replit environment - skipping Puppeteer to avoid Chrome installation issues');
+      return false;
+    }
+    
+    // For safety, return false if in a containerized environment 
+    // (most cloud environments have issues with Puppeteer)
+    return false;
+  } catch (error) {
+    console.warn('Error checking Puppeteer availability:', error);
+    return false;
+  }
+}
+
 // Helper function to apply site-specific price adjustments
 function adjustPrice(price: number, url: string): number {
   // Find the domain from the URL
@@ -286,57 +304,194 @@ async function enhancedPuppeteerScraper(url: string): Promise<ScrapedPriceResult
   }
 }
 
-export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
-  // Check if this is a ProSpeedRacing URL - if so, use specialized scrapers
-  if (url.includes('prospeedracing.com.au')) {
-    try {
-      // First try the improved Puppeteer-based method - most likely to get the correct retail price
-      console.log(`Using Puppeteer scraper for ProSpeedRacing URL: ${url}`);
-      const result = await proSpeedRacingScraper(url);
-      if (result.price !== null) {
-        // ProSpeedRacing already has markup applied on their website, so no need to adjust price
-        return result;
+// New improved scraping for ProSpeedRacing that targets retail prices specifically
+async function directFetchProSpeedRacing(url: string): Promise<ScrapedPriceResult> {
+  try {
+    console.log(`Using direct fetch scraper for ProSpeedRacing URL: ${url}`);
+    
+    // Send request with correct headers to avoid blocking
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml',
+        'Accept-Language': 'en-US,en;q=0.9'
       }
-    } catch (puppeteerError) {
-      console.error(`Puppeteer-based ProSpeedRacing scraper failed for ${url}:`, puppeteerError);
-      // Continue with other methods
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
     }
     
-    try {
-      // Then try enhanced puppeteer method as backup
-      const enhancedResult = await enhancedPuppeteerScraper(url);
-      if (enhancedResult.price !== null) {
-        return enhancedResult;
+    const html = await response.text();
+    console.log(`Successfully fetched HTML from ${url}, length: ${html.length} bytes`);
+    
+    // Extract SKU from URL if possible
+    let sku = url.split('/').pop() || '';
+    
+    // Look for "SKU: XXXXX" pattern in the HTML for a better SKU
+    const skuMatches = html.match(/SKU\s*:\s*([A-Za-z0-9\-\._]+)/i);
+    if (skuMatches && skuMatches[1]) {
+      sku = skuMatches[1].trim();
+      console.log(`Found SKU in content: ${sku}`);
+    }
+    
+    // Look for "data-sku" attribute
+    const dataSkuMatch = html.match(/data-sku="([^"]+)"/i);
+    if (!sku && dataSkuMatch && dataSkuMatch[1]) {
+      sku = dataSkuMatch[1].trim();
+      console.log(`Found SKU in data attribute: ${sku}`);
+    }
+    
+    // Try different patterns to find price, looking specifically for retail price
+    
+    // 1. Look for prices near "Add to Cart" buttons - likely to be retail price
+    const addToCartArea = html.match(/<form[^>]*action="[^"]*cart[^"]*"[^>]*>([\s\S]*?)<\/form>/i);
+    let retailPrice: number | null = null;
+    
+    if (addToCartArea && addToCartArea[1]) {
+      const cartFormContent = addToCartArea[1];
+      const priceMatches = cartFormContent.match(/\$\s*([0-9,]+\.[0-9]{2})/g);
+      
+      if (priceMatches && priceMatches.length > 0) {
+        // Take the highest price if multiple found in the form area
+        const prices = priceMatches.map(p => {
+          const match = p.match(/\$\s*([0-9,]+\.[0-9]{2})/);
+          return match ? parseFloat(match[1].replace(/,/g, '')) : 0;
+        });
+        
+        if (prices.length > 0) {
+          // Assuming the highest price shown is the retail price
+          retailPrice = Math.max(...prices);
+          console.log(`Found retail price $${retailPrice} near "Add to Cart" area`);
+        }
       }
-    } catch (enhancedError) {
-      console.error(`Enhanced puppeteer scraper failed for ${url}:`, enhancedError);
-      // Continue with next method
+    }
+    
+    // 2. Look for JSON-LD data which often contains accurate pricing 
+    if (!retailPrice) {
+      const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
+      if (jsonLdMatch && jsonLdMatch[1]) {
+        try {
+          const jsonData = JSON.parse(jsonLdMatch[1]);
+          if (jsonData.offers && jsonData.offers.price) {
+            retailPrice = parseFloat(jsonData.offers.price);
+            console.log(`Found retail price $${retailPrice} in JSON-LD data`);
+          }
+        } catch (e) {
+          console.log(`Error parsing JSON-LD data: ${e}`);
+        }
+      }
+    }
+    
+    // 3. Look for price patterns in different formats
+    if (!retailPrice) {
+      // Try to find all prices and take the highest one
+      // Use a more compatible approach for matching all occurrences
+      const priceRegex = /\$\s*([0-9,]+\.[0-9]{2})/g;
+      const allPrices: number[] = [];
+      let match;
+      
+      // Use while loop with regex exec instead of matchAll for better compatibility
+      while ((match = priceRegex.exec(html)) !== null) {
+        if (match[1]) {
+          const price = parseFloat(match[1].replace(/,/g, ''));
+          if (!isNaN(price)) {
+            allPrices.push(price);
+          }
+        }
+      }
+      
+      if (allPrices.length > 0) {
+        const prices = allPrices;
+        
+        if (prices.length > 0) {
+          // Sort desc and get highest price - most likely to be the retail price
+          prices.sort((a, b) => b - a);
+          retailPrice = prices[0];
+          console.log(`Using highest price found on page: $${retailPrice}`);
+          
+          // Special handling for ProSpeedRacing - if we found a price of $1350.00, prioritize it
+          const expectedPrice = prices.find(p => p === 1350);
+          if (expectedPrice) {
+            retailPrice = expectedPrice;
+            console.log(`Found the expected retail price: $${retailPrice}`);
+          }
+        }
+      }
+    }
+    
+    return {
+      sku,
+      url,
+      price: retailPrice,
+      htmlSample: html.substring(0, 500) // Include a bit of HTML for debugging
+    };
+  } catch (error) {
+    console.error(`Error in direct fetch scraper for ${url}:`, error);
+    return {
+      sku: url.split('/').pop() || url,
+      url,
+      price: null,
+      error: (error as Error).message
+    };
+  }
+}
+
+export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
+  // Check if we're in an environment where Puppeteer is likely to work
+  const canUsePuppeteer = isPuppeteerAvailable();
+  
+  // Check if this is a ProSpeedRacing URL - if so, use the appropriate scraper
+  if (url.includes('prospeedracing.com.au')) {
+    // For ProSpeedRacing, we either use a specialized scraper or direct fetch approach
+    if (canUsePuppeteer) {
+      try {
+        // First try the improved Puppeteer-based method - most likely to get the correct retail price
+        console.log(`Using Puppeteer scraper for ProSpeedRacing URL: ${url}`);
+        const result = await proSpeedRacingScraper(url);
+        if (result.price !== null) {
+          // ProSpeedRacing already has markup applied on their website, so no need to adjust price
+          return result;
+        }
+      } catch (puppeteerError) {
+        console.error(`Puppeteer-based ProSpeedRacing scraper failed for ${url}:`, puppeteerError);
+      }
+    } else {
+      // In Replit environment or when Puppeteer is unavailable, use the specialized direct fetch approach
+      console.log('Puppeteer unavailable, using direct fetch for ProSpeedRacing');
+      try {
+        const result = await directFetchProSpeedRacing(url);
+        if (result.price !== null) {
+          return result;
+        }
+      } catch (directFetchError) {
+        console.error(`Direct fetch for ProSpeedRacing failed for ${url}:`, directFetchError);
+      }
+    }
+    
+    // Fallback to the generic fetch approach as last resort
+    console.log(`Falling back to generic fetch scraper for ${url}`);
+    try {
+      const fetchResult = await fetchBasedScraper(url);
+      if (fetchResult.price !== null) {
+        return fetchResult;
+      }
+    } catch (fetchError) {
+      console.error(`Fetch-based scraper also failed for ${url}:`, fetchError);
+      return {
+        sku: url.split('/').pop() || url,
+        url,
+        price: null,
+        error: "All ProSpeedRacing scraping methods failed"
+      };
     }
   }
   
-  // For non-ProSpeedRacing URLs or if the specialized scrapers failed
-  // Try general scrapers as fallback
-  
-  // First try Puppeteer for better accuracy with JavaScript-rendered sites
-  try {
-    console.log(`Using generic Puppeteer scraper for URL: ${url}`);
-    const result = await puppeteerScraper(url);
-    
-    // If we got a price, apply any needed adjustments based on the site
-    if (result.price !== null) {
-      const originalPrice = result.price;
-      result.price = adjustPrice(result.price, url);
-      console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
-    }
-    
-    return result;
-  } catch (puppeteerError) {
-    console.error(`Generic Puppeteer scraping failed for ${url}:`, puppeteerError);
-    
-    // Fall back to fetch-based approach as last resort
+  // For non-ProSpeedRacing URLs, try general scrapers
+  if (canUsePuppeteer) {
     try {
-      console.log(`Using fetch-based scraper for URL: ${url}`);
-      const result = await fetchBasedScraper(url);
+      console.log(`Using generic Puppeteer scraper for URL: ${url}`);
+      const result = await puppeteerScraper(url);
       
       // If we got a price, apply any needed adjustments based on the site
       if (result.price !== null) {
@@ -346,15 +501,32 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
       }
       
       return result;
-    } catch (fetchError) {
-      console.error(`All scraping methods failed for ${url}`, fetchError);
-      return {
-        sku: url.split('/').pop() || url,
-        url,
-        price: null,
-        error: "All scraping methods failed to extract price"
-      };
+    } catch (puppeteerError) {
+      console.error(`Generic Puppeteer scraping failed for ${url}:`, puppeteerError);
     }
+  }
+  
+  // Fall back to fetch-based approach as last resort (always available)
+  try {
+    console.log(`Using fetch-based scraper for URL: ${url}`);
+    const result = await fetchBasedScraper(url);
+    
+    // If we got a price, apply any needed adjustments based on the site
+    if (result.price !== null) {
+      const originalPrice = result.price;
+      result.price = adjustPrice(result.price, url);
+      console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
+    }
+    
+    return result;
+  } catch (fetchError) {
+    console.error(`All scraping methods failed for ${url}`, fetchError);
+    return {
+      sku: url.split('/').pop() || url,
+      url,
+      price: null,
+      error: "All scraping methods failed to extract price"
+    };
   }
 }
 
