@@ -313,24 +313,51 @@ async function proSpeedRacingScraper(url: string): Promise<ScrapedPriceResult> {
     // Extract the price from meta tags
     let price: number | null = null;
     
-    // Try to find price in meta tags
-    const metaPriceRegex = /<meta\s+property="og:price:amount"\s+content="([^"]+)">/i;
-    const metaPriceMatch = html.match(metaPriceRegex);
+    // First look for the price in the price__current class element specifically
+    // This pattern handles the specific ProSpeedRacing price display with many newlines
+    // Using a DOM parsing approach instead of regex
+    const priceCurrentIndex = html.indexOf('<strong class="price__current">');
+    if (priceCurrentIndex !== -1) {
+      const endIndex = html.indexOf('</strong>', priceCurrentIndex);
+      if (endIndex !== -1) {
+        const priceCurrentContent = html.substring(priceCurrentIndex, endIndex);
+        const priceMatch = priceCurrentContent.match(/\$\s*([0-9,]+\.[0-9]{2})/);
+        if (priceMatch && priceMatch[1]) {
+          price = parseFloat(priceMatch[1].replace(/,/g, ''));
+          console.log(`Found price__current match for ${url}: $${price}`);
+        }
+      }
+    }
     
-    if (metaPriceMatch && metaPriceMatch[1]) {
-      // Convert price string to number, removing any commas
-      price = parseFloat(metaPriceMatch[1].replace(/,/g, ''));
-      console.log(`Found price in meta tag for ${url}: $${price}`);
+    // If the specific element approach didn't work, try meta tags
+    if (!price || isNaN(price)) {
+      const metaPriceRegex = /<meta\s+property="og:price:amount"\s+content="([^"]+)">/i;
+      const metaPriceMatch = html.match(metaPriceRegex);
+      
+      if (metaPriceMatch && metaPriceMatch[1]) {
+        // Convert price string to number, removing any commas
+        price = parseFloat(metaPriceMatch[1].replace(/,/g, ''));
+        console.log(`Found price in meta tag for ${url}: $${price}`);
+      }
     }
     
     // If meta tag approach didn't work, look for price in script tags
     if (!price || isNaN(price)) {
-      const scriptPriceRegex = /"price"\s*:\s*"([^"]+)"/;
-      const scriptPriceMatch = html.match(scriptPriceRegex);
+      const variantPriceRegex = /"variants":\[{"id":[0-9]+,"price":([0-9]+),"name"/;
+      const variantMatch = html.match(variantPriceRegex);
       
-      if (scriptPriceMatch && scriptPriceMatch[1]) {
-        price = parseFloat(scriptPriceMatch[1].replace(/,/g, ''));
-        console.log(`Found price in script tag for ${url}: $${price}`);
+      if (variantMatch && variantMatch[1]) {
+        // For ProSpeedRacing, the price in JS is in cents
+        price = parseInt(variantMatch[1]) / 100;
+        console.log(`Found variant price match for ${url}: $${price}`);
+      } else {
+        const scriptPriceRegex = /"price"\s*:\s*"([^"]+)"/;
+        const scriptPriceMatch = html.match(scriptPriceRegex);
+        
+        if (scriptPriceMatch && scriptPriceMatch[1]) {
+          price = parseFloat(scriptPriceMatch[1].replace(/,/g, ''));
+          console.log(`Found price in script tag for ${url}: $${price}`);
+        }
       }
     }
     
@@ -384,10 +411,33 @@ async function fetchBasedScraper(url: string): Promise<ScrapedPriceResult> {
     console.log(`Received HTML content for ${url} (${html.length} characters)`);
     
     // Look for the price__current class first (from the example)
-    const priceCurrent = html.match(/<div class="price__default">[^<]*<strong class="price__current">[^<]*\$([0-9,]+\.[0-9]{2})<\/strong>/i);
-    if (priceCurrent && priceCurrent[1]) {
-      const price = parseFloat(priceCurrent[1].replace(/,/g, ''));
-      console.log(`Found price__current match for ${url}: $${price}`);
+    // This pattern handles the specific ProSpeedRacing price display with many newlines
+    // Using a DOM parsing approach instead of regex
+    const priceCurrentIndex = html.indexOf('<strong class="price__current">');
+    if (priceCurrentIndex !== -1) {
+      const endIndex = html.indexOf('</strong>', priceCurrentIndex);
+      if (endIndex !== -1) {
+        const priceCurrentContent = html.substring(priceCurrentIndex, endIndex);
+        const priceMatch = priceCurrentContent.match(/\$\s*([0-9,]+\.[0-9]{2})/);
+        if (priceMatch && priceMatch[1]) {
+          const price = parseFloat(priceMatch[1].replace(/,/g, ''));
+          console.log(`Found price__current match for ${url}: $${price}`);
+          if (!isNaN(price) && price > 0) {
+            return {
+              sku: url.split('/').pop() || url,
+              url,
+              price
+            };
+          }
+        }
+      }
+    }
+    
+    // Also try the variant with price__default as a parent
+    const priceDefaultCurrent = html.match(/<div class="price__default">[^<]*<strong class="price__current">[^<]*\$([0-9,]+\.[0-9]{2})<\/strong>/i);
+    if (priceDefaultCurrent && priceDefaultCurrent[1]) {
+      const price = parseFloat(priceDefaultCurrent[1].replace(/,/g, ''));
+      console.log(`Found price__default + price__current match for ${url}: $${price}`);
       if (!isNaN(price) && price > 0) {
         return {
           sku: url.split('/').pop() || url,
