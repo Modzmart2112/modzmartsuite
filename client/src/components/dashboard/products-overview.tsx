@@ -15,10 +15,10 @@ export function ProductsOverview() {
   return (
     <Card className="shadow-sm">
       <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          {/* Left side: Pie chart */}
-          <div className="w-[280px] flex-shrink-0 flex items-center justify-center">
-            <div className="relative w-[240px] h-[240px]">
+        <div className="flex items-center">
+          {/* Left side: Pie chart - centered horizontally */}
+          <div className="w-[300px] flex-shrink-0 flex justify-center">
+            <div className="relative w-[250px] h-[250px]">
               <svg viewBox="0 0 100 100" className="w-full h-full">
                 {/* Blue circle */}
                 <circle 
@@ -59,7 +59,7 @@ export function ProductsOverview() {
                 <div className="text-sm text-gray-500 font-medium">
                   {activePercentage}% Active
                 </div>
-                <div className="w-3/4 border-t border-gray-200 my-2"></div>
+                <div className="w-2/3 border-t border-gray-200 my-2"></div>
                 <div className="text-2xl font-bold text-gray-900">
                   {isLoading ? "..." : stats?.offMarketCount || 0}
                 </div>
@@ -71,12 +71,14 @@ export function ProductsOverview() {
           </div>
           
           {/* Right side: Stats */}
-          <div className="flex-1 pl-4 flex flex-col justify-center">
+          <div className="flex-1 pl-8 flex flex-col justify-center">
             <div className="flex items-baseline">
-              <div className="text-5xl font-bold text-gray-900">
+              <span className="text-5xl font-bold text-gray-900">
                 {isLoading ? "..." : stats?.productCount.toLocaleString()}
-              </div>
-              <div className="text-2xl text-gray-600 ml-2">products</div>
+              </span>
+              <span className="text-3xl font-semibold text-gray-800 ml-3 tracking-tight">
+                products
+              </span>
             </div>
             
             <div className="text-lg text-gray-500 mt-3 mb-8">
