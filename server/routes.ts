@@ -232,6 +232,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid upload ID" });
     }
     
+    // First, get products associated with this upload
+    // Since we don't explicitly track which products came from which upload,
+    // we'll need to reset all products with supplier URLs/prices
+    const products = await storage.getProducts(1000, 0);
+    const productsWithSupplierInfo = products.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
+    
+    // Reset supplier info for these products
+    for (const product of productsWithSupplierInfo) {
+      await storage.updateProduct(product.id, {
+        supplierUrl: null,
+        supplierPrice: null,
+        hasPriceDiscrepancy: false
+      });
+    }
+    
+    // Now delete the CSV upload
     const result = await storage.deleteCsvUpload(uploadId);
     
     if (!result) {
@@ -249,6 +265,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid upload ID" });
     }
     
+    // First, reset any products that might have been updated
+    // Similar to delete, we'll need to reset all products with supplier URLs/prices
+    // since we don't track which products came from which upload
+    const products = await storage.getProducts(1000, 0);
+    const productsWithSupplierInfo = products.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
+    
+    // Reset supplier info for these products
+    for (const product of productsWithSupplierInfo) {
+      await storage.updateProduct(product.id, {
+        supplierUrl: null,
+        supplierPrice: null,
+        hasPriceDiscrepancy: false
+      });
+    }
+    
+    // Now update the CSV upload status
     const upload = await storage.updateCsvUpload(uploadId, { 
       status: 'cancelled',
       processedCount: 0

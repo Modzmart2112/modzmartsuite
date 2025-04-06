@@ -104,13 +104,15 @@ export default function Suppliers() {
     onSuccess: () => {
       toast({
         title: "Upload deleted",
-        description: "The CSV upload has been successfully deleted.",
+        description: "The CSV upload has been successfully deleted and supplier prices reset.",
       });
       
       setUploadToDelete(null);
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['/api/csv/uploads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
     },
     onError: (error) => {
       toast({
@@ -132,13 +134,15 @@ export default function Suppliers() {
     onSuccess: () => {
       toast({
         title: "Processing cancelled",
-        description: "The CSV processing has been cancelled.",
+        description: "The CSV processing has been cancelled and supplier prices reset.",
       });
       
       setUploadToCancel(null);
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['/api/csv/uploads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
     },
     onError: (error) => {
       toast({
