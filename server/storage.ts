@@ -360,11 +360,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductsBySku(skus: string[]): Promise<Product[]> {
-    // Using the SQL in operator for multiple SKUs
+    // Using case-insensitive matching for multiple SKUs
     if (skus.length === 0) return [];
+    
+    // Normalize all the SKUs by trimming and converting to uppercase
+    const normalizedSkus = skus.map(sku => sku.trim().toUpperCase());
+    
+    // Build a query that uses UPPER() function for case-insensitive matching
     return await db.select()
       .from(products)
-      .where(sql`${products.sku} IN (${sql.join(skus)})`);
+      .where(sql`UPPER(${products.sku}) IN (${sql.join(normalizedSkus)})`);
   }
 
   async getProductById(id: number): Promise<Product | undefined> {
@@ -373,7 +378,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductBySku(sku: string): Promise<Product | undefined> {
-    const result = await db.select().from(products).where(eq(products.sku, sku));
+    // Normalize the SKU by trimming and converting to uppercase for consistent matching
+    const normalizedSku = sku.trim().toUpperCase();
+    
+    // First try exact matching
+    let result = await db.select().from(products).where(sql`UPPER(${products.sku}) = ${normalizedSku}`);
+    
+    if (result.length > 0) {
+      return result[0];
+    }
+    
+    // If no exact match, try a more fuzzy match (removing any spaces)
+    const noSpaceSku = normalizedSku.replace(/\s+/g, '');
+    result = await db.select().from(products).where(sql`REPLACE(UPPER(${products.sku}), ' ', '') = ${noSpaceSku}`);
+    
+    if (result.length > 0) {
+      console.log(`Found product by fuzzy SKU match: "${sku}" matched with "${result[0].sku}"`);
+    }
+    
     return result[0];
   }
 
