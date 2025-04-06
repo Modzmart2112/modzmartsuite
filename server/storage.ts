@@ -307,4 +307,229 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database storage implementation
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [createdUser] = await db.insert(users).values(user).returning();
+    return createdUser;
+  }
+
+  async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db.update(users)
+      .set(userData)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  // Product operations
+  async getProducts(limit: number, offset: number): Promise<Product[]> {
+    return await db.select()
+      .from(products)
+      .orderBy(desc(products.id))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getProductCount(): Promise<number> {
+    const result = await db.select({ count: db.fn.count() }).from(products);
+    return Number(result[0].count);
+  }
+
+  async getActiveProductCount(): Promise<number> {
+    const result = await db.select({ count: db.fn.count() })
+      .from(products)
+      .where(eq(products.status, 'active'));
+    return Number(result[0].count);
+  }
+
+  async getProductsBySku(skus: string[]): Promise<Product[]> {
+    // Using an 'in' clause for multiple SKUs
+    return await db.select()
+      .from(products)
+      .where(products.sku.in(skus));
+  }
+
+  async getProductById(id: number): Promise<Product | undefined> {
+    const result = await db.select().from(products).where(eq(products.id, id));
+    return result[0];
+  }
+
+  async getProductBySku(sku: string): Promise<Product | undefined> {
+    const result = await db.select().from(products).where(eq(products.sku, sku));
+    return result[0];
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [createdProduct] = await db.insert(products).values(product).returning();
+    return createdProduct;
+  }
+
+  async updateProduct(id: number, productData: Partial<Product>): Promise<Product | undefined> {
+    const now = new Date();
+    const [updatedProduct] = await db.update(products)
+      .set({ ...productData, updatedAt: now })
+      .where(eq(products.id, id))
+      .returning();
+    return updatedProduct;
+  }
+
+  // Price history operations
+  async createPriceHistory(history: InsertPriceHistory): Promise<PriceHistory> {
+    const [createdHistory] = await db.insert(priceHistories).values(history).returning();
+    return createdHistory;
+  }
+
+  async getPriceHistoryByProductId(productId: number, limit: number): Promise<PriceHistory[]> {
+    return await db.select()
+      .from(priceHistories)
+      .where(eq(priceHistories.productId, productId))
+      .orderBy(desc(priceHistories.createdAt))
+      .limit(limit);
+  }
+
+  // CSV upload operations
+  async createCsvUpload(upload: InsertCsvUpload): Promise<CsvUpload> {
+    const [createdUpload] = await db.insert(csvUploads).values(upload).returning();
+    return createdUpload;
+  }
+
+  async updateCsvUpload(id: number, uploadData: Partial<CsvUpload>): Promise<CsvUpload | undefined> {
+    const [updatedUpload] = await db.update(csvUploads)
+      .set(uploadData)
+      .where(eq(csvUploads.id, id))
+      .returning();
+    return updatedUpload;
+  }
+
+  async getRecentCsvUploads(limit: number): Promise<CsvUpload[]> {
+    return await db.select()
+      .from(csvUploads)
+      .orderBy(desc(csvUploads.createdAt))
+      .limit(limit);
+  }
+
+  // Notification operations
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [createdNotification] = await db.insert(notifications).values(notification).returning();
+    return createdNotification;
+  }
+
+  async updateNotification(id: number, notificationData: Partial<Notification>): Promise<Notification | undefined> {
+    const [updatedNotification] = await db.update(notifications)
+      .set(notificationData)
+      .where(eq(notifications.id, id))
+      .returning();
+    return updatedNotification;
+  }
+
+  async getPendingNotifications(): Promise<Notification[]> {
+    return await db.select()
+      .from(notifications)
+      .where(eq(notifications.status, 'pending'))
+      .orderBy(asc(notifications.createdAt));
+  }
+
+  // Stats operations
+  async getStats(): Promise<Stats | undefined> {
+    const result = await db.select().from(stats).limit(1);
+    return result[0];
+  }
+
+  async updateStats(statsData: Partial<Stats>): Promise<Stats | undefined> {
+    // First check if stats exist
+    const existingStats = await this.getStats();
+    
+    if (existingStats) {
+      // Update existing stats
+      const now = new Date();
+      const [updatedStats] = await db.update(stats)
+        .set({ ...statsData, lastUpdated: now })
+        .where(eq(stats.id, existingStats.id))
+        .returning();
+      return updatedStats;
+    } else {
+      // Create new stats if they don't exist
+      const now = new Date();
+      const defaultStats = {
+        totalOrders: 49238,
+        todayOrders: 562,
+        averageOrderPrice: 89.23,
+        totalShipments: 12238,
+        todayShipments: 526,
+        totalShippingCost: 23.25,
+        totalRevenue: 298560,
+        totalProfit: 89390,
+        newCustomers: 4239,
+        salesChannels: {
+          channels: [
+            { name: "Amazon", percentage: 58.23, orders: 24126, shipments: 15239 },
+            { name: "eBay", percentage: 27.56, orders: 13294, shipments: 8392 },
+            { name: "Walmart", percentage: 15.92, orders: 7823, shipments: 3259 }
+          ]
+        },
+        geoDistribution: {
+          countries: [
+            { country: "USA", customers: 3538, position: { left: "23%", top: "30%" } },
+            { country: "Europe", customers: 8592, position: { left: "45%", top: "25%" } },
+            { country: "Russia", customers: 9223, position: { left: "60%", top: "20%" } },
+            { country: "UK", customers: 8926, position: { left: "27%", top: "22%" } },
+            { country: "Australia", customers: 5236, position: { left: "75%", top: "68%" } }
+          ]
+        },
+        lastUpdated: now,
+        ...statsData
+      };
+      
+      const [createdStats] = await db.insert(stats).values(defaultStats).returning();
+      return createdStats;
+    }
+  }
+
+  // Price discrepancy operations
+  async getPriceDiscrepancies(): Promise<PriceDiscrepancy[]> {
+    const discrepancies: PriceDiscrepancy[] = [];
+    
+    const discrepancyProducts = await db.select()
+      .from(products)
+      .where(and(
+        eq(products.hasPriceDiscrepancy, true),
+        products.supplierPrice.isNotNull()
+      ));
+    
+    for (const product of discrepancyProducts) {
+      if (product.supplierPrice !== null) {
+        const difference = product.supplierPrice - product.shopifyPrice;
+        const percentageDifference = (difference / product.shopifyPrice) * 100;
+        
+        discrepancies.push({
+          sku: product.sku,
+          title: product.title,
+          shopifyPrice: product.shopifyPrice,
+          supplierPrice: product.supplierPrice,
+          difference,
+          percentageDifference,
+          productId: product.id
+        });
+      }
+    }
+    
+    return discrepancies.sort((a, b) => 
+      Math.abs(b.percentageDifference) - Math.abs(a.percentageDifference)
+    );
+  }
+}
+
+// Use Database storage
+export const storage = new DatabaseStorage();

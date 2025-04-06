@@ -85,19 +85,19 @@ export default function Navbar() {
       {/* Navigation Tabs */}
       <div className="bg-primary">
         <div className="container mx-auto px-4">
-          <nav className="flex overflow-x-auto no-scrollbar">
+          <nav className="flex overflow-x-auto no-scrollbar justify-between">
             {navItems.map((item) => (
               <Link 
                 key={item.path} 
                 href={item.path}
-                className={`flex items-center px-4 py-4 text-white font-medium ${
+                className={`flex items-center px-6 py-4 text-white font-medium ${
                   location === item.path 
                     ? "border-b-2 border-white" 
                     : "opacity-80 hover:opacity-100"
                 }`}
               >
-                {item.icon}
-                {item.label}
+                <span className="mr-2">{item.icon}</span>
+                <span>{item.label}</span>
               </Link>
             ))}
           </nav>
