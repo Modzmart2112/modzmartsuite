@@ -33,6 +33,8 @@ const formatPrice = (price: number): string => {
 export function ProductList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [isSearching, setIsSearching] = useState(false);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
   const limit = 50; // Changed from 10 to 50 products per page
   
   // Fetch products from API
@@ -45,27 +47,51 @@ export function ProductList() {
     }
   });
   
+  // Fetch all products for search feature
+  const { data: allProductsData, isLoading: isLoadingAllProducts, refetch: refetchAll } = useQuery({
+    queryKey: ['/api/products', 'all'],
+    queryFn: async () => {
+      // Only fetch all products when searching
+      if (!searchQuery) return { products: [] };
+      
+      setIsSearching(true);
+      // Fetch with a high limit to get essentially all products
+      const res = await fetch(`/api/products?limit=5000&offset=0`);
+      if (!res.ok) throw new Error('Failed to fetch all products');
+      const result = await res.json();
+      setAllProducts(result.products);
+      setIsSearching(false);
+      return result;
+    },
+    enabled: searchQuery.length > 0, // Only run when there's a search query
+  });
+  
   // Handle search changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    // Reset to first page when searching
-    setPage(1);
+    setPage(1); // Reset to first page when searching
   };
   
   // Filter products by search query
-  const filteredProducts = data?.products?.filter((product: any) => 
-    product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.title.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const filteredProducts = searchQuery
+    ? (allProducts.length > 0 ? allProducts : data?.products || []).filter((product: any) => 
+        product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : data?.products || [];
   
-  const totalPages = data?.total ? Math.ceil(data.total / limit) : 0;
-  const totalProducts = data?.total || 0;
+  const displayedProducts = searchQuery ? filteredProducts.slice((page - 1) * limit, page * limit) : filteredProducts;
+  const totalFilteredProducts = filteredProducts.length;
+  const totalPages = searchQuery 
+    ? Math.ceil(totalFilteredProducts / limit) 
+    : (data?.total ? Math.ceil(data.total / limit) : 0);
+  const totalProducts = searchQuery ? totalFilteredProducts : (data?.total || 0);
   
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-full text-left mb-4">
             <h2 className="text-2xl font-bold">Products</h2>
             {!isLoading && (
               <p className="text-gray-500 mt-1">
@@ -74,21 +100,24 @@ export function ProductList() {
             )}
           </div>
           
-          <div className="flex items-center space-x-2">
-            <div className="relative">
+          <div className="flex items-center w-full max-w-3xl mx-auto">
+            <div className="relative flex-1 mr-2">
               <Input
-                placeholder="Search products..."
+                placeholder="Search products by SKU or title across all pages..."
                 value={searchQuery}
                 onChange={handleSearchChange}
-                className="pl-10"
+                className="pl-10 h-12"
               />
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-4 h-4 w-4 text-gray-400" />
             </div>
             
             <Button 
               variant="outline" 
-              onClick={() => refetch()}
-              className="flex items-center gap-1"
+              onClick={() => {
+                refetch();
+                if (searchQuery) refetchAll();
+              }}
+              className="flex items-center gap-1 h-12 px-4"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -108,7 +137,7 @@ export function ProductList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {isLoading || isSearching ? (
               // Skeleton loader - increased to match new limit
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
@@ -120,8 +149,8 @@ export function ProductList() {
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                 </TableRow>
               ))
-            ) : filteredProducts.length > 0 ? (
-              filteredProducts.map((product: any) => (
+            ) : displayedProducts.length > 0 ? (
+              displayedProducts.map((product: any) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.sku}</TableCell>
                   <TableCell>{product.title}</TableCell>
