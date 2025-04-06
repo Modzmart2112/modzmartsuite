@@ -1,52 +1,49 @@
-import puppeteer from 'puppeteer';
-import { execSync } from 'child_process';
 import { ScrapedPriceResult } from '@shared/types';
+import { launch } from 'puppeteer';
+import { join } from 'path';
 
-// Get the path to the Chromium executable
+// Utility function to get the path to the Chrome executable
 function getChromiumPath(): string {
   try {
-    // Try to find chromium using which command
-    return execSync('which chromium').toString().trim();
+    // Default paths for different operating systems
+    const defaultPaths = {
+      linux: '/usr/bin/chromium-browser',
+      darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      win32: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+    };
+    
+    // Get the platform-specific default path
+    const platform = process.platform as keyof typeof defaultPaths;
+    return defaultPaths[platform] || '';
   } catch (error) {
-    // Fallback paths
-    const possiblePaths = [
-      '/nix/store/*/bin/chromium',
-      '/usr/bin/chromium',
-      '/usr/bin/chromium-browser'
-    ];
-    
-    for (const pattern of possiblePaths) {
-      try {
-        const path = execSync(`ls ${pattern} 2>/dev/null | head -1`).toString().trim();
-        if (path) return path;
-      } catch (error) {
-        // Continue to next pattern
-      }
-    }
-    
-    // Last resort, return a common path and hope it works
-    return '/nix/store/chromium/bin/chromium';
+    console.error('Error determining Chromium path:', error);
+    return '';
   }
 }
 
-// Scrape price from a URL
+// Main scraping function with multiple fallback mechanisms
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
   let browser = null;
   
   try {
-    const chromiumPath = getChromiumPath();
-    console.log(`Using Chromium at path: ${chromiumPath}`);
-    
-    // Launch browser in headless mode with explicit executable path
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: chromiumPath,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    // Launch browser with appropriate configuration
+    browser = await launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1280,1024'
+      ],
+      executablePath: getChromiumPath() || undefined
     });
     
     const page = await browser.newPage();
     
-    // Set user agent to avoid bot detection
+    // Set viewport and user agent
+    await page.setViewport({ width: 1280, height: 1024 });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     
     // Navigate to URL with timeout
@@ -57,6 +54,7 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     
     // Extract price using various common price selectors
     const priceSelectors = [
+      '.price__current', // Added the selector from the example
       '.price', 
       '[data-price]', 
       '.product-price', 
@@ -94,7 +92,7 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     // If no price found, try evaluating scripts for JSON-LD or other structured data
     if (!priceText) {
       try {
-        priceText = await page.evaluate(() => {
+        const extractedText = await page.evaluate(() => {
           // Look for JSON-LD data
           const jsonLdScript = document.querySelector('script[type="application/ld+json"]');
           if (jsonLdScript) {
@@ -120,6 +118,10 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
           
           return textNodes[0] || '';
         });
+        
+        if (extractedText) {
+          priceText = extractedText;
+        }
       } catch (error) {
         console.error('Error extracting price from scripts:', error);
       }
