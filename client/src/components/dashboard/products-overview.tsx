@@ -15,10 +15,10 @@ export function ProductsOverview() {
   return (
     <Card className="shadow-sm">
       <CardContent className="p-6">
-        <div className="flex">
+        <div className="flex items-center justify-between">
           {/* Left side: Pie chart */}
-          <div className="w-[230px] flex-shrink-0">
-            <div className="relative w-[200px] h-[200px]">
+          <div className="w-[280px] flex-shrink-0 flex items-center justify-center">
+            <div className="relative w-[240px] h-[240px]">
               <svg viewBox="0 0 100 100" className="w-full h-full">
                 {/* Blue circle */}
                 <circle 
@@ -53,14 +53,14 @@ export function ProductsOverview() {
               
               {/* Overlay text in center */}
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-3xl font-bold text-gray-900">
                   {isLoading ? "..." : stats?.activeProductCount.toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-500 font-medium">
                   {activePercentage}% Active
                 </div>
-                <div className="w-3/4 border-t border-gray-200 my-1"></div>
-                <div className="text-xl font-bold text-gray-900">
+                <div className="w-3/4 border-t border-gray-200 my-2"></div>
+                <div className="text-2xl font-bold text-gray-900">
                   {isLoading ? "..." : stats?.offMarketCount || 0}
                 </div>
                 <div className="text-sm text-gray-500">
@@ -71,25 +71,25 @@ export function ProductsOverview() {
           </div>
           
           {/* Right side: Stats */}
-          <div className="flex-1 flex flex-col justify-center">
+          <div className="flex-1 pl-4 flex flex-col justify-center">
             <div className="flex items-baseline">
-              <div className="text-4xl font-bold text-gray-900">
+              <div className="text-5xl font-bold text-gray-900">
                 {isLoading ? "..." : stats?.productCount.toLocaleString()}
               </div>
               <div className="text-2xl text-gray-600 ml-2">products</div>
             </div>
             
-            <div className="text-lg text-gray-500 mt-2 mb-6">
+            <div className="text-lg text-gray-500 mt-3 mb-8">
               {isLoading ? "..." : `${stats?.newProductsCount || 0} new products will arrive on next Monday`}
             </div>
             
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-8">
               <div className="flex items-center">
-                <span className="w-3 h-3 bg-blue-400 rounded-full mr-2"></span>
+                <span className="w-4 h-4 bg-blue-400 rounded-full mr-2"></span>
                 <span className="text-base text-gray-700">Active listing</span>
               </div>
               <div className="flex items-center">
-                <span className="w-3 h-3 bg-gray-300 rounded-full mr-2"></span>
+                <span className="w-4 h-4 bg-gray-300 rounded-full mr-2"></span>
                 <span className="text-base text-gray-700">Off market</span>
               </div>
             </div>
