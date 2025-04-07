@@ -31,7 +31,7 @@ export function VendorSelect({
 }: VendorSelectProps) {
   const [open, setOpen] = useState(false);
 
-  const { data: vendors = [], isLoading } = useQuery({
+  const { data: vendors = [], isLoading } = useQuery<string[]>({
     queryKey: ["/api/products/vendors"],
     refetchOnWindowFocus: true,
     refetchInterval: 60000, // refetch every minute
@@ -63,7 +63,7 @@ export function VendorSelect({
           <CommandInput placeholder="Search vendors..." />
           <CommandEmpty>No vendor found.</CommandEmpty>
           <CommandGroup className="max-h-[300px] overflow-y-auto">
-            {vendors.map((vendor) => (
+            {vendors.map((vendor: string) => (
               <CommandItem
                 key={vendor}
                 value={vendor}

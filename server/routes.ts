@@ -121,20 +121,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const limit = parseInt(req.query.limit as string || "50");
     const offset = parseInt(req.query.offset as string || "0");
     const search = (req.query.search as string) || "";
+    const vendor = req.query.vendor as string || null;
+    const productType = req.query.productType as string || null;
+    
+    console.log(`Fetching products with filters - search: "${search}", vendor: "${vendor}", productType: "${productType}"`);
     
     let products: Product[];
     let total: number;
     
+    // Filter products based on the provided criteria
     if (search) {
       // If search term is provided, search in product titles and SKUs
       products = await storage.searchProducts(search, limit, offset);
       total = await storage.searchProductCount(search);
+      
+      // Apply additional filtering on search results if needed
+      if (vendor || productType) {
+        products = products.filter(product => {
+          let matches = true;
+          if (vendor) matches = matches && product.vendor === vendor;
+          if (productType) matches = matches && product.productType === productType;
+          return matches;
+        });
+        total = products.length;
+      }
+    } else if (vendor && productType) {
+      // If both vendor and productType are provided, filter by both
+      const vendorProducts = await storage.getProductsByVendor(vendor);
+      products = vendorProducts
+        .filter(product => product.productType === productType)
+        .slice(offset, offset + limit);
+      total = vendorProducts.filter(product => product.productType === productType).length;
+    } else if (vendor) {
+      // If only vendor is provided
+      products = await storage.getProductsByVendor(vendor, limit, offset);
+      // Count total for pagination
+      const allVendorProducts = await storage.getProductsByVendor(vendor);
+      total = allVendorProducts.length;
+    } else if (productType) {
+      // If only productType is provided
+      products = await storage.getProductsByProductType(productType, limit, offset);
+      // Count total for pagination
+      const allTypeProducts = await storage.getProductsByProductType(productType);
+      total = allTypeProducts.length;
     } else {
       // Otherwise get regular paginated products
       products = await storage.getProducts(limit, offset);
       total = await storage.getProductCount();
     }
     
+    console.log(`Found ${products.length} products, total: ${total}`);
     res.json({ products, total });
   }));
   

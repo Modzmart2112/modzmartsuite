@@ -31,7 +31,7 @@ export function ProductTypeSelect({
 }: ProductTypeSelectProps) {
   const [open, setOpen] = useState(false);
 
-  const { data: productTypes = [], isLoading } = useQuery({
+  const { data: productTypes = [], isLoading } = useQuery<string[]>({
     queryKey: ["/api/products/product-types"],
     refetchOnWindowFocus: true,
     refetchInterval: 60000, // refetch every minute
@@ -63,7 +63,7 @@ export function ProductTypeSelect({
           <CommandInput placeholder="Search product types..." />
           <CommandEmpty>No product type found.</CommandEmpty>
           <CommandGroup className="max-h-[300px] overflow-y-auto">
-            {productTypes.map((productType) => (
+            {productTypes.map((productType: string) => (
               <CommandItem
                 key={productType}
                 value={productType}
