@@ -264,10 +264,10 @@ export default function Suppliers() {
   const discrepancies = discrepanciesData || [];
   
   // Calculate supplier statistics
-  const totalProducts = products.length;
-  const withSupplierUrl = products.filter(p => p.supplierUrl).length;
-  const withSupplierPrice = products.filter(p => p.supplierPrice !== null && p.supplierPrice !== undefined).length;
-  const withDiscrepancies = products.filter(p => p.hasPriceDiscrepancy).length;
+  const totalProducts = isProductsLoading ? 0 : products.length || 0;  
+  const withSupplierUrl = isProductsLoading ? 0 : products.filter(p => p.supplierUrl).length || 0;
+  const withSupplierPrice = isProductsLoading ? 0 : products.filter(p => p.supplierPrice !== null && p.supplierPrice !== undefined).length || 0;
+  const withDiscrepancies = isDiscrepanciesLoading ? 0 : discrepancies.length || 0;
   
   // Process vendor distribution data for chart
   const vendorData = brandData || [];
@@ -537,10 +537,17 @@ export default function Suppliers() {
           </CardFooter>
         </Card>
         
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle>Supplier URLs Status</CardTitle>
-            <CardDescription>Overview of product link status</CardDescription>
+        <Card className="shadow-sm border border-gray-100 overflow-hidden">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Supplier URLs Status</CardTitle>
+                <CardDescription>Overview of product link status</CardDescription>
+              </div>
+              <div className="p-2 bg-blue-50 rounded-full">
+                <LinkIcon className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="pb-2">
             {isProductsLoading ? (
@@ -593,30 +600,46 @@ export default function Suppliers() {
                   </ResponsiveContainer>
                 </div>
                 
-                <div className="space-y-3 mt-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
-                      <span className="text-sm font-medium">With Supplier URL</span>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                        <span className="text-sm font-medium">With Supplier URL</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="text-sm font-bold">{formatNumber(withSupplierUrl)}</span>
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({calculatePercentage(withSupplierUrl, totalProducts)}%)
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-sm font-bold">{formatNumber(withSupplierUrl)}</span>
-                      <span className="text-xs text-gray-500 ml-1">
-                        ({calculatePercentage(withSupplierUrl, totalProducts)}%)
-                      </span>
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full" 
+                        style={{ width: `${calculatePercentage(withSupplierUrl, totalProducts)}%` }}
+                      ></div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <span className="w-3 h-3 rounded-full bg-gray-400 mr-2"></span>
-                      <span className="text-sm font-medium">Without Supplier URL</span>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center">
+                        <span className="w-3 h-3 rounded-full bg-gray-400 mr-2"></span>
+                        <span className="text-sm font-medium">Without Supplier URL</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="text-sm font-bold">{formatNumber(totalProducts - withSupplierUrl)}</span>
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({100 - calculatePercentage(withSupplierUrl, totalProducts)}%)
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-sm font-bold">{formatNumber(totalProducts - withSupplierUrl)}</span>
-                      <span className="text-xs text-gray-500 ml-1">
-                        ({100 - calculatePercentage(withSupplierUrl, totalProducts)}%)
-                      </span>
+                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-gray-300 to-gray-400 rounded-full" 
+                        style={{ width: `${100 - calculatePercentage(withSupplierUrl, totalProducts)}%` }}
+                      ></div>
                     </div>
                   </div>
                 </div>
@@ -625,9 +648,9 @@ export default function Suppliers() {
           </CardContent>
           <CardFooter className="border-t bg-gray-50 py-3">
             <div className="flex items-center justify-between w-full">
-              <span className="text-sm text-gray-500">
-                <Link2 className="h-4 w-4 inline-block mr-1 mb-1" />
-                Supplier URLs
+              <span className="text-sm text-gray-500 flex items-center">
+                <Link2 className="h-4 w-4 mr-1.5" />
+                <span>{calculatePercentage(withSupplierUrl, totalProducts)}% Coverage</span>
               </span>
               <Button variant="outline" size="sm" asChild>
                 <a href="/products">View All Products</a>
