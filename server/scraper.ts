@@ -763,27 +763,28 @@ async function proSpeedRacingScraper(url: string): Promise<ScrapedPriceResult> {
       
       // Look for SKU in dedicated elements
       const skuElements = document.querySelectorAll('.product-meta__sku, .product__sku, [itemprop="sku"], .sku');
-      for (const el of skuElements) {
+      // Convert NodeList to Array to avoid TS issues
+      Array.from(skuElements).forEach(el => {
         const text = el.textContent?.trim();
         if (text) {
           // Extract just the SKU value, removing labels like "SKU:"
           const skuValue = text.replace(/^sku:?\s*/i, '').trim();
           if (skuValue) {
             sku = skuValue;
-            break;
           }
         }
-      }
+      });
       
       // If no SKU found in elements, try JSON-LD structured data
       if (!sku) {
         const jsonLdElements = document.querySelectorAll('script[type="application/ld+json"]');
-        for (const script of jsonLdElements) {
+        // Convert NodeList to Array to avoid TS issues
+        Array.from(jsonLdElements).forEach(script => {
           try {
             const data = JSON.parse(script.textContent || '');
             if (data.sku) {
               sku = data.sku;
-              break;
+              return; // Similar to break in forEach
             }
             // Check if it's in a @graph array
             if (data['@graph']) {
