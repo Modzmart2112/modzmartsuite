@@ -110,15 +110,23 @@ export default function Navbar() {
     const fetchSearchResults = async () => {
       if (searchQuery.length < 2) {
         setSearchResults([]);
+        setShowSearchResults(false);
         return;
       }
       
       try {
-        const results = await apiRequest<SearchResult[]>('/api/products/search', { 
-          method: 'GET', 
-          queryParams: { q: searchQuery } 
-        });
+        // Use direct fetch to simplify debugging
+        const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}`);
+        if (!response.ok) {
+          throw new Error(`Search failed: ${response.status}`);
+        }
+        
+        const results = await response.json();
+        console.log('Search results:', results);
+        
         setSearchResults(results || []);
+        // Show results if we have any, or if the query is long enough to show "no results" message
+        setShowSearchResults(true);
       } catch (error) {
         console.error("Error searching products:", error);
         setSearchResults([]);
@@ -148,6 +156,7 @@ export default function Navbar() {
   
   // Show search results dropdown when user focuses on search input
   const handleSearchFocus = () => {
+    // Always show search results dropdown on focus if there's a query
     if (searchQuery.length >= 2) {
       setShowSearchResults(true);
     }
