@@ -33,6 +33,7 @@ class ShopifyClient {
       const baseUrl = this.buildApiUrl(storeUrl);
       
       while (hasNextPage) {
+        console.log(`Fetching products from Shopify: ${baseUrl}/products.json${params}`);
         const response = await fetch(`${baseUrl}/products.json${params}`, {
           headers: this.buildHeaders(apiSecret)
         });
@@ -45,15 +46,37 @@ class ShopifyClient {
         
         // Process products
         for (const product of data.products) {
-          // For each variant, create a separate product entry
+          // Need to fetch inventory item data to get cost price
           for (const variant of product.variants) {
+            // Get inventory item ID to fetch cost
+            const inventoryItemId = variant.inventory_item_id;
+            let costPrice = 0;
+            
+            if (inventoryItemId) {
+              try {
+                // Fetch the inventory item to get cost
+                const inventoryResponse = await fetch(`${baseUrl}/inventory_items/${inventoryItemId}.json`, {
+                  headers: this.buildHeaders(apiSecret)
+                });
+                
+                if (inventoryResponse.ok) {
+                  const inventoryData = await inventoryResponse.json();
+                  // Extract cost from inventory item data
+                  costPrice = parseFloat(inventoryData.inventory_item?.cost || '0');
+                  console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                }
+              } catch (error) {
+                console.error(`Failed to fetch cost for inventory item ${inventoryItemId}:`, error);
+              }
+            }
+            
             products.push({
               id: variant.id.toString(),
               title: `${product.title} - ${variant.title !== 'Default Title' ? variant.title : ''}`.trim(),
               description: product.body_html || "",
               sku: variant.sku || "",
               price: parseFloat(variant.price) || 0,
-              cost: parseFloat(variant.cost) || 0, // Add cost price from Shopify
+              cost: costPrice, // Add cost price from Shopify's inventory item
               images: product.images?.map((img: any) => img.src) || [],
               vendor: product.vendor || "",
               productType: product.product_type || ""
@@ -101,13 +124,35 @@ class ShopifyClient {
       for (const product of data.products) {
         for (const variant of product.variants) {
           if (variant.sku === sku) {
+            // Get inventory item data to fetch cost price
+            let costPrice = 0;
+            const inventoryItemId = variant.inventory_item_id;
+            
+            if (inventoryItemId) {
+              try {
+                // Fetch the inventory item to get cost
+                const inventoryResponse = await fetch(`${baseUrl}/inventory_items/${inventoryItemId}.json`, {
+                  headers: this.buildHeaders(apiSecret)
+                });
+                
+                if (inventoryResponse.ok) {
+                  const inventoryData = await inventoryResponse.json();
+                  // Extract cost from inventory item data
+                  costPrice = parseFloat(inventoryData.inventory_item?.cost || '0');
+                  console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                }
+              } catch (error) {
+                console.error(`Failed to fetch cost for inventory item ${inventoryItemId}:`, error);
+              }
+            }
+            
             return {
               id: variant.id.toString(),
               title: `${product.title} - ${variant.title !== 'Default Title' ? variant.title : ''}`.trim(),
               description: product.body_html || "",
               sku: variant.sku,
               price: parseFloat(variant.price) || 0,
-              cost: parseFloat(variant.cost) || 0, // Add cost price from Shopify
+              cost: costPrice, // Use the fetched cost price
               images: product.images?.map((img: any) => img.src) || [],
               vendor: product.vendor || "",
               productType: product.product_type || ""
