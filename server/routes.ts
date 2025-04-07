@@ -191,10 +191,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     // Update the product to clear the discrepancy flag
+    // IMPORTANT: We now preserve the supplierUrl but clear supplierPrice and discrepancy flag
     await storage.updateProduct(productId, {
       hasPriceDiscrepancy: false,
-      supplierPrice: null,
-      supplierUrl: null
+      supplierPrice: null
+      // Keep the supplierUrl intact
     });
     
     console.log(`Cleared price discrepancy for product ID ${productId}`);
@@ -203,6 +204,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       success: true, 
       message: `Successfully cleared price discrepancy for ${product.title}`, 
       productId
+    });
+  }));
+  
+  // New endpoint to clear ALL price discrepancies at once
+  app.post("/api/products/discrepancies/clear-all", asyncHandler(async (req, res) => {
+    // Get all products with price discrepancies
+    const discrepancies = await storage.getPriceDiscrepancies();
+    
+    if (discrepancies.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: "No price discrepancies to clear",
+        clearedCount: 0
+      });
+    }
+    
+    // Clear all discrepancies
+    const clearedCount = await storage.clearPriceDiscrepancies();
+    
+    console.log(`Cleared ${clearedCount} price discrepancies`);
+    
+    res.json({ 
+      success: true, 
+      message: `Successfully cleared ${clearedCount} price discrepancies`, 
+      clearedCount
     });
   }));
   
@@ -725,6 +751,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Process vendor CSVs - endpoint to process ARTEC and Bilstein CSV files
+  app.post("/api/process-vendor-csvs", asyncHandler(async (req, res) => {
+    const VENDOR_FILES = [
+      'processed_ARTEC BAI 1.csv',
+      'processed_Bilstein BAI 1.csv'
+    ];
+    
+    console.log('Starting vendor CSV processing from API endpoint...');
+    const results = [];
+    
+    for (const filename of VENDOR_FILES) {
+      try {
+        const filePath = path.join(process.cwd(), 'attached_assets', filename);
+        console.log(`Processing ${filename}...`);
+        
+        // Check if file exists
+        try {
+          await fs.promises.access(filePath, fs.constants.F_OK);
+        } catch (error) {
+          console.error(`File ${filename} does not exist. Skipping.`);
+          results.push({ filename, success: false, error: 'File not found' });
+          continue;
+        }
+        
+        // Process CSV file
+        const records = await processCsvFile(filePath);
+        console.log(`Processed ${records.length} records from ${filename}`);
+        
+        // Create CSV upload record
+        const csvUpload = await storage.createCsvUpload({
+          filename: filename,
+          recordsCount: records.length,
+          processedCount: 0,
+          status: 'pending'
+        });
+        
+        console.log(`Created CSV upload record with ID ${csvUpload.id}`);
+        
+        // Process records asynchronously
+        processRecords(records, csvUpload.id).catch(error => {
+          console.error(`Error processing records for ${filename}:`, error);
+        });
+        
+        results.push({ 
+          filename, 
+          success: true, 
+          recordCount: records.length, 
+          uploadId: csvUpload.id 
+        });
+      } catch (error) {
+        console.error(`Error processing ${filename}:`, error);
+        results.push({ 
+          filename, 
+          success: false, 
+          error: (error as Error).message 
+        });
+      }
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Vendor CSV processing initiated', 
+      results 
+    });
+  }));
+
   // Scheduler routes
   app.get("/api/scheduler/status", asyncHandler(async (req, res) => {
     const activeJobs = Array.from(scheduler["timers"].keys());
