@@ -25,6 +25,7 @@ export interface ScrapedPriceResult {
   price: number | null;
   error?: string;
   htmlSample?: string; // For debugging purposes only
+  note?: string; // Additional information about the result (e.g., hardcoded price explanation)
 }
 
 export interface SalesChannel {

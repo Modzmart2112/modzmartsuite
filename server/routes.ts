@@ -176,6 +176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Get the price from our scraper
       const result = await scrapePriceFromUrl(url);
       
       // Log the raw HTML content if needed for debugging
@@ -189,6 +190,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.error(`Failed to fetch HTML content: ${error}`);
         }
+      }
+      
+      // Add note about hardcoded prices for all ProSpeedRacing URLs
+      if (url.includes('prospeedracing.com.au')) {
+        result.note = "Using hardcoded price for ProSpeedRacing product due to scraping challenges";
       }
       
       res.json(result);
@@ -211,6 +217,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const result = await scrapePriceFromUrl(url);
+      
+      // Add note about hardcoded prices for all ProSpeedRacing URLs
+      if (url.includes('prospeedracing.com.au')) {
+        result.note = "Using hardcoded price for ProSpeedRacing product due to scraping challenges";
+      }
+      
       res.json(result);
     } catch (error) {
       console.error("Error scraping price:", error);
