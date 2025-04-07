@@ -94,7 +94,7 @@ export class MemStorage implements IStorage {
       totalRevenue: 298560,
       totalProfit: 89390,
       newCustomers: 4239,
-      newProductsCount: 400,
+      // newProductsCount has been removed from the schema
       salesChannels: {
         channels: [
           { name: "Amazon", percentage: 58.23, orders: 24126, shipments: 15239 },

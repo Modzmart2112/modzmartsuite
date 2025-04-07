@@ -1621,8 +1621,9 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
             // Update the stats with new product information
             await storage.updateStats({
               lastUpdated: new Date(),
-              // If we added new products via the CSV, update the new products count
-              newProductsCount: (stats.newProductsCount || 0) + newProductCount
+              // Only update fields that exist in the schema
+              totalPriceChecks: (stats.totalPriceChecks || 0)
+              // Note: newProductsCount was removed from the schema
             });
             console.log('Dashboard stats updated after CSV processing');
           }

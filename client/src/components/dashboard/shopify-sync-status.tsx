@@ -12,14 +12,20 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 export function ShopifySyncStatus() {
-  // Fetch scheduler status from API
+  // Fetch scheduler status from API with aggressive refresh
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/scheduler/status"],
+    refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
-  // Fetch Shopify connection status
+  // Fetch Shopify connection status with aggressive refresh
   const shopifyConnectionQuery = useQuery({
     queryKey: ["/api/shopify/status"],
+    refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   // Formatted last sync time

@@ -13,9 +13,15 @@ export function PriceDiscrepancyList() {
   const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Fetch price discrepancies data
+  // Fetch price discrepancies data with aggressive refresh settings
   const { data: discrepancies = [], isLoading } = useQuery<PriceDiscrepancy[]>({
     queryKey: ['/api/products/discrepancies'],
+    // Refetch frequently to keep data updated
+    refetchInterval: 5000,
+    // Fresh data
+    staleTime: 0,
+    // Enable automatic refetching when window regains focus
+    refetchOnWindowFocus: true,
   });
 
   // Mutation to clear all price discrepancies
