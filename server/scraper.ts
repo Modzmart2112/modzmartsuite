@@ -9,13 +9,51 @@ import fs from 'fs';
 // Set a longer timeout for puppeteer operations
 const PUPPETEER_TIMEOUT = 30000;
 
+// Import child_process for execSync
+import { execSync } from 'child_process';
+
 // Utility function to get the path to the Chrome executable
 function getChromiumPath(): string {
   try {
-    // For Replit environment, use the default browser - no need to specify path
-    // Puppeteer will use the system-installed one
+    // For Replit environment, we've installed Chromium via Nix
     if (process.env.REPL_ID) {
-      return ''; // Let Puppeteer find the browser
+      try {
+        // Check if we can find chromium in common system paths
+        try {
+          const chromePath = execSync('which chromium || which chromium-browser || echo ""').toString().trim();
+          
+          if (chromePath) {
+            console.log(`Found Chromium browser at: ${chromePath}`);
+            return chromePath;
+          }
+        } catch (error) {
+          console.error('Error checking for chromium in path:', error);
+        }
+        
+        // Check Nix specific paths (for Replit)
+        const nixPaths = [
+          '/nix/store/*/bin/chromium',
+          '/nix/store/*/bin/chromium-browser'
+        ];
+        
+        for (const pattern of nixPaths) {
+          try {
+            const found = execSync(`ls ${pattern} 2>/dev/null | head -1`).toString().trim();
+            if (found) {
+              console.log(`Found Chromium browser in Nix store: ${found}`);
+              return found;
+            }
+          } catch (e) {
+            // Ignore errors from ls command
+          }
+        }
+        
+        console.log('No system Chromium found, letting Puppeteer use its bundled browser');
+        return ''; // Let Puppeteer find/download the browser
+      } catch (e) {
+        console.error('Error finding Chromium in Replit:', e);
+        return ''; // Fallback to Puppeteer's bundled browser
+      }
     }
     
     // Default paths for different operating systems as fallback
@@ -52,15 +90,37 @@ const siteAdjustments: Record<string, PriceAdjustment> = {
 // Simple helper to check if Puppeteer is likely to work in this environment
 function isPuppeteerAvailable(): boolean {
   try {
-    // Check if we're in Replit environment which typically has issues with Puppeteer
+    // We've set up the environment to use Puppeteer, so allow it to run even in Replit
     if (process.env.REPL_ID) {
-      console.log('Running in Replit environment - skipping Puppeteer to avoid Chrome installation issues');
-      return false;
+      console.log('Running in Replit environment - Puppeteer should now be available');
+      
+      // Check if required Puppeteer packages are installed
+      try {
+        // Use dynamic import to check if the package is available
+        import('puppeteer').then(() => {
+          console.log('Puppeteer package can be imported');
+        }).catch(() => {
+          console.warn('Puppeteer package cannot be imported');
+        });
+        
+        import('puppeteer-core').then(() => {
+          console.log('Puppeteer-core package can be imported');
+        }).catch(() => {
+          console.warn('Puppeteer-core package cannot be imported');
+        });
+        
+        // For now, assume it's available if we're in a Replit environment
+        // since we've installed the necessary packages
+        return true;
+      } catch (packageError) {
+        console.warn('Error during Puppeteer package check:', packageError);
+        return false;
+      }
     }
     
-    // For safety, return false if in a containerized environment 
-    // (most cloud environments have issues with Puppeteer)
-    return false;
+    // For local development or other environments, assume Puppeteer is available
+    // The imports above will show in logs if there are issues
+    return true;
   } catch (error) {
     console.warn('Error checking Puppeteer availability:', error);
     return false;
@@ -76,35 +136,8 @@ function isSeleniumAvailable(): boolean {
       return false; // Prefer direct fetch in Replit
     }
     
-    // For other environments, do a thorough check
-    try {
-      // Check if selenium-webdriver is installed
-      require.resolve('selenium-webdriver');
-      require.resolve('selenium-webdriver/chrome');
-      console.log('Selenium WebDriver dependencies are available');
-      
-      // Try to find chromedriver
-      try {
-        // If chromedriver is installed as a module
-        require.resolve('chromedriver');
-        console.log('ChromeDriver module is available');
-        return true;
-      } catch (driverError) {
-        // ChromeDriver isn't available as a direct dependency
-        console.log('ChromeDriver module not found as dependency: ', driverError);
-        
-        // Check if running in a production environment setup by the admin
-        if (process.env.NODE_ENV === 'production') {
-          console.log('Production environment - assuming ChromeDriver is configured');
-          return true;
-        }
-      }
-    } catch (packageError) {
-      console.warn('Selenium WebDriver dependencies not available: ', packageError);
-      return false;
-    }
-    
-    // Default to false to be safe, as Selenium can be problematic
+    // For other environments, assume it's not available by default
+    // We're primarily using Puppeteer or direct fetch methods
     return false;
   } catch (error) {
     console.warn('Error checking Selenium availability:', error);
@@ -470,6 +503,15 @@ async function directFetchProSpeedRacing(url: string): Promise<ScrapedPriceResul
         if (!isNaN(price) && price > 0) {
           retailPrice = price;
           console.log(`Found price ${price} from OpenGraph meta tag for ${sku} (original: ${ogPriceMatch[1]})`);
+          
+          // Return immediately for OpenGraph data which is highly reliable
+          return {
+            sku,
+            url,
+            price,
+            htmlSample: `<meta property="og:price:amount" content="${ogPriceMatch[1]}">`,
+            note: "Price extracted from OpenGraph meta tag (reliable server-side data)"
+          };
         } else {
           console.log(`Failed to parse price from OpenGraph meta tag: "${ogPriceMatch[1]}" -> "${priceStr}" -> ${price}`);
         }
@@ -677,7 +719,8 @@ async function directFetchProSpeedRacing(url: string): Promise<ScrapedPriceResul
       sku,
       url,
       price: retailPrice,
-      htmlSample: html.substring(0, 500) // Include a bit of HTML for debugging
+      htmlSample: html.substring(0, 500), // Include a bit of HTML for debugging
+      note: "Price extracted from ProSpeedRacing using direct fetch method (fallback)"
     };
   } catch (error) {
     console.error(`Error in direct fetch scraper for ${url}:`, error);
@@ -685,7 +728,8 @@ async function directFetchProSpeedRacing(url: string): Promise<ScrapedPriceResul
       sku: url.split('/').pop() || url,
       url,
       price: null,
-      error: (error as Error).message
+      error: (error as Error).message,
+      note: "Error occurred during direct fetch scraping"
     };
   }
 }
@@ -856,17 +900,79 @@ async function seleniumProSpeedRacingScraper(url: string): Promise<ScrapedPriceR
 }
 
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
-  // Note: We've removed all special case handlers in favor of a more robust general approach
-  // that can extract prices correctly from all ProSpeedRacing URLs, handling comma formatting properly
+  // Note: We've enhanced our scraper to handle JavaScript-rendered prices
+  // which often differ from the server-side HTML prices
   
   // Check if our scraping tools are available in this environment
   const canUsePuppeteer = isPuppeteerAvailable();
   const canUseSelenium = isSeleniumAvailable();
   const isReplit = process.env.REPL_ID ? true : false;
   
-  // Special handling for ProSpeedRacing URLs using direct fetch method
+  console.log(`Scraping price from URL: ${url}`);
+  console.log(`Environment checks: Puppeteer=${canUsePuppeteer}, Selenium=${canUseSelenium}, Replit=${isReplit}`);
+  
+  // Special handling for ProSpeedRacing URLs
   if (url.includes('prospeedracing.com.au')) {
     console.log(`ProSpeedRacing URL detected: ${url} - using improved extraction logic`);
+    
+    // For Replit environment, prioritize direct fetch which is faster and more reliable
+    if (isReplit) {
+      try {
+        // Use the specialized ProSpeedRacing direct fetch method
+        return await directFetchProSpeedRacing(url);
+      } catch (directFetchError) {
+        console.error(`Error during direct fetch for ProSpeedRacing: ${(directFetchError as Error).message}`);
+        // Continue to fallback methods
+      }
+    } else {
+      // For non-Replit environments, try Puppeteer first
+      if (canUsePuppeteer) {
+        try {
+          console.log(`Attempting Puppeteer-based scraping for URL: ${url}`);
+          const puppeteerResult = await enhancedPuppeteerScraper(url);
+          
+          // If we successfully extracted a price with Puppeteer, return that result
+          if (puppeteerResult.price !== null && !isNaN(puppeteerResult.price)) {
+            console.log(`Successfully extracted price ${puppeteerResult.price} using Puppeteer from ${url}`);
+            
+            // Apply any site-specific price adjustments
+            const adjustedPrice = adjustPrice(puppeteerResult.price, url);
+            if (adjustedPrice !== puppeteerResult.price) {
+              console.log(`Applied price adjustment: ${puppeteerResult.price} -> ${adjustedPrice}`);
+              puppeteerResult.price = adjustedPrice;
+            }
+            
+            return puppeteerResult;
+          } else {
+            console.log(`Puppeteer scraper failed to extract price from ${url}: ${puppeteerResult.error || 'No price found'}`);
+          }
+        } catch (puppeteerError) {
+          console.error(`Error during Puppeteer scraping: ${(puppeteerError as Error).message}`);
+        }
+      }
+      
+      // Then try Selenium scraper for non-Replit environments
+      if (canUseSelenium) {
+        try {
+          console.log(`Attempting Selenium-based scraping for ProSpeedRacing URL: ${url}`);
+          const seleniumResult = await seleniumProSpeedRacingScraper(url);
+          
+          if (seleniumResult.price !== null && !isNaN(seleniumResult.price)) {
+            console.log(`Successfully extracted price ${seleniumResult.price} using Selenium from ${url}`);
+            return seleniumResult;
+          }
+        } catch (seleniumError) {
+          console.error(`Error during Selenium scraping: ${(seleniumError as Error).message}`);
+        }
+      }
+      
+      // Try direct fetch as fallback for non-Replit environments
+      try {
+        return await directFetchProSpeedRacing(url);
+      } catch (directFetchError) {
+        console.error(`Error during direct fetch for ProSpeedRacing: ${(directFetchError as Error).message}`);
+      }
+    }
     
     // Extract SKU from URL
     let sku = url.split('/').pop() || '';
