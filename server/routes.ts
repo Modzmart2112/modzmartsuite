@@ -36,41 +36,7 @@ const asyncHandler = (fn: (req: Request, res: Response) => Promise<any>) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Ensure uploads directory exists
-  const uploadDir = path.join(process.cwd(), 'uploads');
-  try {
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-  } catch (err) {
-    console.error('Error creating uploads directory:', err);
-  }
-  
-  // Configure multer for file uploads
-  const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, uniqueSuffix + '-' + file.originalname);
-    }
-  });
-
-  const upload = multer({ 
-    storage,
-    limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB max file size
-    },
-    fileFilter: function (req, file, cb) {
-      // Accept only csv files
-      if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Only CSV files are allowed'));
-      }
-    }
-  });
+  const upload = multer({ dest: os.tmpdir() });
   
   // API Routes
   

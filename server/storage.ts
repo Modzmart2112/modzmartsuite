@@ -62,7 +62,6 @@ export class MemStorage implements IStorage {
   private csvUploads: Map<number, CsvUpload>;
   private notifications: Map<number, Notification>;
   private stats: Stats | undefined;
-  private additionalStats: Record<string, any>;
   
   private userIdCounter: number;
   private productIdCounter: number;
@@ -84,23 +83,6 @@ export class MemStorage implements IStorage {
     this.notificationIdCounter = 1;
     
     // Initialize with default stats
-    const now = new Date();
-    
-    // Initialize additionalStats with default values
-    this.additionalStats = {
-      newProductsCount: 235,
-      offMarketCount: 45,
-      withSupplierUrlCount: 859,
-      priceDiscrepancyCount: 12,
-      productCount: 1604,
-      activeProductCount: 1452,
-      // Add extra fields for connected apps/services
-      connected: false,
-      activeJobs: [],
-      scheduledTasks: []
-    };
-    
-    // Ensure we have default values for all required fields
     this.stats = {
       id: 1,
       totalOrders: 49238,
@@ -112,10 +94,6 @@ export class MemStorage implements IStorage {
       totalRevenue: 298560,
       totalProfit: 89390,
       newCustomers: 4239,
-      totalPriceChecks: 2384,
-      totalDiscrepanciesFound: 127,
-      lastPriceCheck: now,
-      lastShopifySync: now,
       salesChannels: {
         channels: [
           { name: "Amazon", percentage: 58.23, orders: 24126, shipments: 15239 },
@@ -132,7 +110,7 @@ export class MemStorage implements IStorage {
           { country: "Australia", customers: 5236, position: { left: "75%", top: "68%" } }
         ]
       },
-      lastUpdated: now
+      lastUpdated: new Date()
     };
   }
 
@@ -209,33 +187,15 @@ export class MemStorage implements IStorage {
   async createProduct(productData: InsertProduct): Promise<Product> {
     const id = this.productIdCounter++;
     const now = new Date();
-    
-    // Ensure images is properly converted to an array if it's not already
-    let images: string[] = [];
-    if (productData.images) {
-      if (Array.isArray(productData.images)) {
-        images = [...productData.images]; // Make a copy to ensure it's a new array
-      } else if (typeof productData.images === 'string') {
-        // Handle the case where images might be a comma-separated string
-        images = productData.images.split(',').map((img: string) => img.trim());
-      }
-    }
-    
-    // Create a properly typed product object with all required fields
     const product: Product = { 
+      ...productData, 
       id,
-      sku: productData.sku,
-      title: productData.title,
-      shopifyId: productData.shopifyId,
-      shopifyPrice: productData.shopifyPrice,
       status: productData.status || null,
       description: productData.description || null,
       supplierUrl: productData.supplierUrl || null,
       supplierPrice: productData.supplierPrice || null,
       lastScraped: productData.lastScraped || null,
-      lastChecked: productData.lastChecked || null,
-      hasPriceDiscrepancy: productData.hasPriceDiscrepancy || false,
-      images: images,
+      images: productData.images || [],
       vendor: productData.vendor || null,
       productType: productData.productType || null,
       createdAt: now,
@@ -306,21 +266,9 @@ export class MemStorage implements IStorage {
   // CSV upload operations
   async createCsvUpload(uploadData: InsertCsvUpload): Promise<CsvUpload> {
     const id = this.csvUploadIdCounter++;
-    
-    // Ensure updatedProductIds is properly handled as array
-    let updatedIds: number[] = [];
-    if (uploadData.updatedProductIds) {
-      if (Array.isArray(uploadData.updatedProductIds)) {
-        updatedIds = [...uploadData.updatedProductIds]; // Create a copy
-      } else if (typeof uploadData.updatedProductIds === 'string') {
-        updatedIds = uploadData.updatedProductIds.split(',').map((id: string) => parseInt(id.trim(), 10));
-      }
-    }
-    
     const upload: CsvUpload = { 
       ...uploadData, 
       id,
-      updatedProductIds: updatedIds,
       createdAt: new Date()
     };
     this.csvUploads.set(id, upload);
@@ -331,33 +279,9 @@ export class MemStorage implements IStorage {
     const existingUpload = this.csvUploads.get(id);
     if (!existingUpload) return undefined;
     
-    // Handle updatedProductIds properly if it exists in the update data
-    if (uploadData.updatedProductIds) {
-      // Ensure we have an array by properly handling various input types
-      let updatedIds: number[] = [];
-      
-      if (Array.isArray(uploadData.updatedProductIds)) {
-        updatedIds = [...uploadData.updatedProductIds]; // Create a copy
-      } else if (typeof uploadData.updatedProductIds === 'string') {
-        // Handle the case where it might be a comma-separated string
-        updatedIds = uploadData.updatedProductIds.split(',').map((id: string) => parseInt(id.trim(), 10));
-      }
-      
-      // Create a modified upload data object with the proper array
-      const modifiedUploadData = {
-        ...uploadData,
-        updatedProductIds: updatedIds
-      };
-      
-      const updatedUpload = { ...existingUpload, ...modifiedUploadData };
-      this.csvUploads.set(id, updatedUpload);
-      return updatedUpload;
-    } else {
-      // Regular update without touching updatedProductIds
-      const updatedUpload = { ...existingUpload, ...uploadData };
-      this.csvUploads.set(id, updatedUpload);
-      return updatedUpload;
-    }
+    const updatedUpload = { ...existingUpload, ...uploadData };
+    this.csvUploads.set(id, updatedUpload);
+    return updatedUpload;
   }
 
   async getRecentCsvUploads(limit: number): Promise<CsvUpload[]> {
@@ -408,12 +332,8 @@ export class MemStorage implements IStorage {
   }
 
   // Stats operations
-  async getStats(): Promise<Stats & Record<string, any>> {
-    // Combine standard stats with additional stats
-    return {
-      ...this.stats,
-      ...this.additionalStats
-    };
+  async getStats(): Promise<Stats | undefined> {
+    return this.stats;
   }
 
   async updateStats(statsData: Partial<Stats>): Promise<Stats | undefined> {
@@ -711,42 +631,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Stats operations
-  async getStats(): Promise<Stats & Record<string, any>> {
-    const existingStats = await db.select().from(stats).limit(1);
-    const baseStats = existingStats[0];
-    
-    if (!baseStats) return {} as Stats & Record<string, any>;
-    
-    // Get additional stats from the database
-    const [productCount] = await db.select({ count: sql`count(*)` }).from(products);
-    const [activeProductCount] = await db.select({ count: sql`count(*)` })
-      .from(products)
-      .where(eq(products.status, 'active'));
-    const [withSupplierUrlCount] = await db.select({ count: sql`count(*)` })
-      .from(products)
-      .where(and(isNotNull(products.supplierUrl), sql`${products.supplierUrl} != ''`));
-    const [priceDiscrepancyCount] = await db.select({ count: sql`count(*)` })
-      .from(products)
-      .where(eq(products.hasPriceDiscrepancy, true));
-    
-    // Calculate derived stats
-    const offMarketCount = Number(productCount.count) - Number(activeProductCount.count);
-    
-    // Add extra stats that aren't in the schema but needed for the UI
-    const additionalStats = {
-      newProductsCount: 235, // This could be calculated based on createdAt dates
-      offMarketCount: offMarketCount,
-      withSupplierUrlCount: Number(withSupplierUrlCount.count),
-      priceDiscrepancyCount: Number(priceDiscrepancyCount.count),
-      productCount: Number(productCount.count),
-      activeProductCount: Number(activeProductCount.count),
-    };
-    
-    // Return combined stats
-    return {
-      ...baseStats,
-      ...additionalStats
-    };
+  async getStats(): Promise<Stats | undefined> {
+    const result = await db.select().from(stats).limit(1);
+    return result[0];
   }
 
   async updateStats(statsData: Partial<Stats>): Promise<Stats | undefined> {
@@ -867,5 +754,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Use Memory storage for now
-export const storage = new MemStorage();
+// Use Database storage
+export const storage = new DatabaseStorage();
