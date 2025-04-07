@@ -1,51 +1,50 @@
-import { CsvUpload } from "@/components/dashboard/csv-upload";
 import { PriceDiscrepancyChart } from "@/components/dashboard/price-discrepancy-chart";
 import { PriceDiscrepancyList } from "@/components/dashboard/price-discrepancies-list";
 import { ProductsOverview } from "@/components/dashboard/products-overview";
 import { StatsRow } from "@/components/dashboard/stats-row";
-import { SalesChannels } from "@/components/dashboard/sales-channels";
-import { GeoDistribution } from "@/components/dashboard/geo-distribution";
 import { SchedulerStatus } from "@/components/dashboard/scheduler-status";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
+import { Upload, PlusCircle } from "lucide-react";
 
 export default function Dashboard() {
+  const handleOpenUploadModal = () => {
+    document.dispatchEvent(new CustomEvent('open-csv-upload-modal'));
+  };
+
   return (
     <div className="container mx-auto">
-      {/* Header Section with Date Selector */}
+      {/* Header Section with Action Buttons */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2 md:mb-0">Dashboard</h1>
         
         <div className="flex items-center space-x-4">
-          <div className="relative">
-            <button className="flex items-center bg-white border border-gray-300 rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary">
-              <span>All Warehouses</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
+          <Button 
+            variant="outline" 
+            onClick={handleOpenUploadModal}
+            className="flex items-center gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            <span>Upload Supplier Data</span>
+          </Button>
 
-          <div className="relative">
-            <button className="flex items-center bg-white border border-gray-300 rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary">
-              <span>Last 90 days: Oct 19, 2022 - Dec 4, 2023</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
+          <Link href="/suppliers">
+            <Button className="flex items-center gap-2">
+              <PlusCircle className="h-4 w-4" />
+              <span>Manage Suppliers</span>
+            </Button>
+          </Link>
         </div>
       </div>
 
-      {/* CSV Upload Section */}
-      <CsvUpload />
+      {/* Stats Row */}
+      <StatsRow />
 
       {/* Price Discrepancy Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <PriceDiscrepancyChart />
         <ProductsOverview />
       </div>
-
-      {/* Stats Row */}
-      <StatsRow />
       
       {/* Price Discrepancy List */}
       <div className="mb-6">
@@ -53,10 +52,35 @@ export default function Dashboard() {
       </div>
       
       {/* Bottom Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <GeoDistribution />
-        <SalesChannels />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <SchedulerStatus />
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+          <div className="p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
+            <div className="space-y-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Upload className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">CSV uploaded: processed_APR Performance BAI 6.csv</p>
+                  <p className="text-xs text-gray-500">58 products updated • Today at 7:18 AM</p>
+                </div>
+              </div>
+              <div className="flex items-start">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">Price check completed</p>
+                  <p className="text-xs text-gray-500">558 products checked, 319 updated • Today at 7:24 AM</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

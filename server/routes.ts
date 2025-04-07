@@ -131,6 +131,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Price history routes
+  app.get("/api/products/price-histories", asyncHandler(async (req, res) => {
+    // Get the 100 most recent price history entries
+    const priceHistories = [];
+    const products = await storage.getProducts(100, 0);
+    
+    for (const product of products) {
+      if (product.id) {
+        // Get the most recent price histories for each product
+        const productHistories = await storage.getPriceHistoryByProductId(product.id, 10);
+        priceHistories.push(...productHistories);
+      }
+    }
+    
+    // Sort by most recent first
+    priceHistories.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    // Limit to most recent 500 entries to prevent overloading the client
+    res.json(priceHistories.slice(0, 500));
+  }));
+  
   // Endpoint to clear a single price discrepancy by product ID
   app.post("/api/products/discrepancies/:productId/clear", asyncHandler(async (req, res) => {
     const productId = parseInt(req.params.productId);

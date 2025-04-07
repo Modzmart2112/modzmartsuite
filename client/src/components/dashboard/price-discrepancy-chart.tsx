@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import {
   Area
 } from 'recharts';
 import type { PriceDiscrepancy } from "@shared/types";
+import { useMemo } from "react";
 
 // Function to format price with commas
 const formatPrice = (price: number): string => {
@@ -24,6 +25,15 @@ const formatPrice = (price: number): string => {
     maximumFractionDigits: 2
   });
 };
+
+// Define type for price history records
+interface PriceHistoryRecord {
+  id: number;
+  productId: number;
+  shopifyPrice: number;
+  supplierPrice: number;
+  createdAt: string | Date;
+}
 
 export function PriceDiscrepancyChart() {
   const { toast } = useToast();
@@ -37,6 +47,11 @@ export function PriceDiscrepancyChart() {
   // Fetch price discrepancies data
   const { data: discrepancies = [], isLoading: isLoadingDiscrepancies } = useQuery<PriceDiscrepancy[]>({
     queryKey: ['/api/products/discrepancies'],
+  });
+  
+  // Fetch price history data
+  const { data: priceHistories = [] } = useQuery<PriceHistoryRecord[]>({
+    queryKey: ['/api/products/price-histories'],
   });
   
   // Mutation to clear price discrepancies
@@ -62,20 +77,69 @@ export function PriceDiscrepancyChart() {
       console.error("Error clearing price discrepancies:", error);
     }
   });
-  
-  // Sample chart data - would come from API in real implementation
-  const chartData = [
-    { month: '1st', netSales: 140, cost: 160 },
-    { month: '2nd', netSales: 120, cost: 150 },
-    { month: '3rd', netSales: 100, cost: 140 },
-    { month: '4th', netSales: 80, cost: 130 },
-    { month: '5th', netSales: 75, cost: 125 },
-    { month: '6th', netSales: 60, cost: 120 },
-  ];
+
+  // Process data for the chart
+  const chartData = useMemo(() => {
+    const now = new Date();
+    
+    // Define the date type
+    interface DateData {
+      date: Date;
+      dateString: string;
+      supplierPrice: number;
+      shopifyPrice: number;
+      count: number;
+    }
+    
+    const dates: DateData[] = [];
+    
+    // Create dates for the past 6 days
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      dates.push({
+        date,
+        dateString: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        supplierPrice: 0,
+        shopifyPrice: 0,
+        count: 0
+      });
+    }
+    
+    // Group price histories by date
+    if (Array.isArray(priceHistories) && priceHistories.length > 0) {
+      priceHistories.forEach((history: PriceHistoryRecord) => {
+        const historyDate = new Date(history.createdAt);
+        const dateString = historyDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        const matchingDay = dates.find(d => d.dateString === dateString);
+        if (matchingDay) {
+          matchingDay.supplierPrice += history.supplierPrice || 0;
+          matchingDay.shopifyPrice += history.shopifyPrice || 0;
+          matchingDay.count += 1;
+        }
+      });
+      
+      // Calculate averages
+      dates.forEach(day => {
+        if (day.count > 0) {
+          day.supplierPrice = day.supplierPrice / day.count;
+          day.shopifyPrice = day.shopifyPrice / day.count;
+        }
+      });
+    }
+    
+    // Format for chart component
+    return dates.map(day => ({
+      month: day.dateString,
+      netSales: day.supplierPrice,
+      cost: day.shopifyPrice
+    }));
+  }, [priceHistories]);
 
   // Calculate average difference with proper formatting
   const calculateAverageDifference = (): string => {
-    if (discrepancies.length === 0) return '$0.00';
+    if (!Array.isArray(discrepancies) || discrepancies.length === 0) return '$0.00';
     
     const avgDiff = discrepancies.reduce((sum: number, d: PriceDiscrepancy) => 
       sum + Math.abs(d.difference), 0) / discrepancies.length;
@@ -105,7 +169,7 @@ export function PriceDiscrepancyChart() {
                 <span className="text-xs text-gray-600">Shopify Price</span>
               </div>
               <span className="text-sm text-gray-500 ml-4">Last 90 days</span>
-              {discrepancies.length > 0 && (
+              {Array.isArray(discrepancies) && discrepancies.length > 0 && (
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -141,7 +205,7 @@ export function PriceDiscrepancyChart() {
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-1">Price Discrepancies</h3>
                 <div className="text-3xl font-bold text-gray-900">
-                  {discrepancies.length}
+                  {Array.isArray(discrepancies) ? discrepancies.length : 0}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
                   Products with price differences
