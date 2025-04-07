@@ -26,6 +26,8 @@ export interface IStorage {
   getProductBySku(sku: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<Product>): Promise<Product | undefined>;
+  searchProducts(query: string, limit: number, offset: number): Promise<Product[]>;
+  searchProductCount(query: string): Promise<number>;
   
   // Price history operations
   createPriceHistory(history: InsertPriceHistory): Promise<PriceHistory>;
@@ -208,6 +210,27 @@ export class MemStorage implements IStorage {
     };
     this.products.set(id, updatedProduct);
     return updatedProduct;
+  }
+  
+  // Search operations
+  async searchProducts(query: string, limit: number, offset: number): Promise<Product[]> {
+    const normalizedQuery = query.trim().toLowerCase();
+    return Array.from(this.products.values())
+      .filter(product => 
+        product.sku.toLowerCase().includes(normalizedQuery) || 
+        (product.title && product.title.toLowerCase().includes(normalizedQuery))
+      )
+      .sort((a, b) => b.id - a.id)
+      .slice(offset, offset + limit);
+  }
+  
+  async searchProductCount(query: string): Promise<number> {
+    const normalizedQuery = query.trim().toLowerCase();
+    return Array.from(this.products.values())
+      .filter(product => 
+        product.sku.toLowerCase().includes(normalizedQuery) || 
+        (product.title && product.title.toLowerCase().includes(normalizedQuery))
+      ).length;
   }
 
   // Price history operations
@@ -458,6 +481,32 @@ export class DatabaseStorage implements IStorage {
       .where(eq(products.id, id))
       .returning();
     return updatedProduct;
+  }
+  
+  // Search operations
+  async searchProducts(query: string, limit: number, offset: number): Promise<Product[]> {
+    const searchTerm = `%${query.trim()}%`;
+    
+    return await db.select()
+      .from(products)
+      .where(
+        sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm}) OR LOWER(${products.title}) LIKE LOWER(${searchTerm})`
+      )
+      .orderBy(desc(products.id))
+      .limit(limit)
+      .offset(offset);
+  }
+  
+  async searchProductCount(query: string): Promise<number> {
+    const searchTerm = `%${query.trim()}%`;
+    
+    const result = await db.select({ count: sql`count(*)` })
+      .from(products)
+      .where(
+        sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm}) OR LOWER(${products.title}) LIKE LOWER(${searchTerm})`
+      );
+      
+    return Number(result[0].count);
   }
 
   // Price history operations

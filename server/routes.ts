@@ -95,9 +95,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products", asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit as string || "50");
     const offset = parseInt(req.query.offset as string || "0");
+    const search = (req.query.search as string) || "";
     
-    const products = await storage.getProducts(limit, offset);
-    const total = await storage.getProductCount();
+    let products: Product[];
+    let total: number;
+    
+    if (search) {
+      // If search term is provided, search in product titles and SKUs
+      products = await storage.searchProducts(search, limit, offset);
+      total = await storage.searchProductCount(search);
+    } else {
+      // Otherwise get regular paginated products
+      products = await storage.getProducts(limit, offset);
+      total = await storage.getProductCount();
+    }
     
     res.json({ products, total });
   }));

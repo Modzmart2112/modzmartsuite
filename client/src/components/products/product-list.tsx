@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,37 +33,28 @@ const formatPrice = (price: number): string => {
 export function ProductList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [isSearching, setIsSearching] = useState(false);
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  const limit = 50; // Changed from 10 to 50 products per page
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const limit = 50; // Number of products per page
   
-  // Fetch products from API
+  // Debounce search query input to avoid too many requests
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  
+  // Fetch products from API - includes search functionality
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['/api/products', page, limit],
+    queryKey: ['/api/products', page, limit, debouncedSearch],
     queryFn: async () => {
-      const res = await fetch(`/api/products?limit=${limit}&offset=${(page - 1) * limit}`);
+      // Build URL with search parameter if needed
+      const url = `/api/products?limit=${limit}&offset=${(page - 1) * limit}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch products');
       return res.json();
     }
-  });
-  
-  // Fetch all products for search feature
-  const { data: allProductsData, isLoading: isLoadingAllProducts, refetch: refetchAll } = useQuery({
-    queryKey: ['/api/products', 'all'],
-    queryFn: async () => {
-      // Only fetch all products when searching
-      if (!searchQuery) return { products: [] };
-      
-      setIsSearching(true);
-      // Fetch with a high limit to get essentially all products
-      const res = await fetch(`/api/products?limit=5000&offset=0`);
-      if (!res.ok) throw new Error('Failed to fetch all products');
-      const result = await res.json();
-      setAllProducts(result.products);
-      setIsSearching(false);
-      return result;
-    },
-    enabled: searchQuery.length > 0, // Only run when there's a search query
   });
   
   // Handle search changes
@@ -72,20 +63,9 @@ export function ProductList() {
     setPage(1); // Reset to first page when searching
   };
   
-  // Filter products by search query
-  const filteredProducts = searchQuery
-    ? (allProducts.length > 0 ? allProducts : data?.products || []).filter((product: any) => 
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.title.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : data?.products || [];
-  
-  const displayedProducts = searchQuery ? filteredProducts.slice((page - 1) * limit, page * limit) : filteredProducts;
-  const totalFilteredProducts = filteredProducts.length;
-  const totalPages = searchQuery 
-    ? Math.ceil(totalFilteredProducts / limit) 
-    : (data?.total ? Math.ceil(data.total / limit) : 0);
-  const totalProducts = searchQuery ? totalFilteredProducts : (data?.total || 0);
+  const products = data?.products || [];
+  const totalPages = data?.total ? Math.ceil(data.total / limit) : 0;
+  const totalProducts = data?.total || 0;
   
   return (
     <Card>
@@ -115,7 +95,6 @@ export function ProductList() {
               variant="outline" 
               onClick={() => {
                 refetch();
-                if (searchQuery) refetchAll();
               }}
               className="flex items-center gap-1 h-12 px-4"
             >
@@ -137,8 +116,8 @@ export function ProductList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading || isSearching ? (
-              // Skeleton loader - increased to match new limit
+            {isLoading ? (
+              // Skeleton loader - show a reasonable number of rows
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-5 w-20" /></TableCell>
@@ -149,8 +128,8 @@ export function ProductList() {
                   <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                 </TableRow>
               ))
-            ) : displayedProducts.length > 0 ? (
-              displayedProducts.map((product: any) => (
+            ) : products.length > 0 ? (
+              products.map((product: any) => (
                 <TableRow key={product.id}>
                   <TableCell className="font-medium">{product.sku}</TableCell>
                   <TableCell>{product.title}</TableCell>
