@@ -21,7 +21,10 @@ import {
   Mail,
   AlertTriangle,
   Info,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Menu,
+  X,
+  Home
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -38,6 +41,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 type SearchResult = {
   id: number;
@@ -177,24 +181,100 @@ export default function Navbar() {
   };
 
   return (
-    <header>
-      {/* Top navigation bar */}
+    <header className="sticky top-0 z-40">
+      {/* Top navigation bar - Mobile Optimized */}
       <div className="bg-primary text-white">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4 flex-1 mr-6">
+          <div className="flex items-center space-x-2 md:space-x-4 flex-1">
+            {/* Mobile Menu Button */}
+            <div className="md:hidden">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" className="px-2 text-white hover:bg-primary-foreground/10">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[85%] sm:w-[350px] border-r">
+                  <SheetHeader className="mb-6">
+                    <SheetTitle className="flex items-center justify-center">
+                      <img src="/logo.png" alt="MODZ MART" className="h-10" />
+                    </SheetTitle>
+                  </SheetHeader>
+                  
+                  {/* Mobile Search */}
+                  <div className="mb-6 px-1">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="Search products by SKU or name..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-gray-100 rounded-lg py-2 px-4 pl-10 text-sm text-gray-800 placeholder-gray-500"
+                      />
+                      <Search className="w-5 h-5 text-gray-500 absolute left-3 top-2.5" />
+                    </div>
+                  </div>
+                  
+                  {/* Mobile Navigation Links */}
+                  <div className="space-y-1">
+                    {navItems.map((item) => (
+                      <Link 
+                        key={item.path}
+                        href={item.path}
+                        className={`flex items-center px-4 py-3 rounded-lg font-medium ${
+                          location === item.path 
+                            ? "bg-primary text-white" 
+                            : "text-gray-800 hover:bg-gray-100"
+                        }`}
+                      >
+                        <div className={`${location === item.path ? "text-white" : "text-primary"}`}>
+                          {item.icon}
+                        </div>
+                        <span>{item.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                  
+                  {/* Mobile User Profile */}
+                  <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 py-4 px-6">
+                    <div className="flex items-center">
+                      <Avatar>
+                        <AvatarImage src="https://github.com/shadcn.png" alt="User" />
+                        <AvatarFallback>JD</AvatarFallback>
+                      </Avatar>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">John Doe</p>
+                        <p className="text-xs text-gray-500">admin@modz-mart.com</p>
+                      </div>
+                      <div className="ml-auto">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-gray-500 hover:text-gray-800"
+                          onClick={() => toast({ title: "Logged Out", description: "You have been logged out" })}
+                        >
+                          <LogOut className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+            
             {/* Logo */}
             <div className="flex items-center flex-shrink-0">
               <img 
                 src="/logo.png" 
                 alt="MODZ MART" 
-                className="h-10" 
+                className="h-8 md:h-10" 
               />
             </div>
             
-            {/* Divider between logo and search */}
-            <div className="h-8 w-px bg-white/25 mx-4"></div>
+            {/* Divider between logo and search - hidden on mobile */}
+            <div className="h-8 w-px bg-white/25 mx-4 hidden md:block"></div>
             
-            {/* Search with dropdown results */}
+            {/* Search with dropdown results - hidden on mobile */}
             <div className="relative hidden md:block flex-1" ref={searchRef}>
               <Input
                 type="text"
@@ -248,13 +328,74 @@ export default function Navbar() {
           </div>
           
           {/* Right Side Icons */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 md:space-x-4">
+            {/* Mobile Search Toggle */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" className="md:hidden px-2 text-white hover:bg-primary-foreground/10">
+                  <Search className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="top" className="w-full h-auto">
+                <div className="pt-6 pb-4">
+                  <div className="relative">
+                    <Input
+                      type="text"
+                      placeholder="Search products by SKU or name..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-gray-100 rounded-lg py-2 px-4 pl-10 text-sm text-gray-800 placeholder-gray-500"
+                      autoFocus
+                    />
+                    <Search className="w-5 h-5 text-gray-500 absolute left-3 top-2.5" />
+                  </div>
+                  {searchQuery.length >= 2 && (
+                    <div className="mt-4">
+                      {searchResults.length > 0 ? (
+                        <div className="space-y-3">
+                          {searchResults.slice(0, 5).map((result) => (
+                            <Link 
+                              key={result.id}
+                              href={`/products/${result.id}`}
+                              className="flex justify-between items-center p-2 rounded hover:bg-gray-100"
+                            >
+                              <div>
+                                <div className="font-medium line-clamp-1">{result.title}</div>
+                                <div className="text-xs text-gray-500">SKU: {result.sku}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-medium">{formatPrice(result.shopifyPrice)}</div>
+                                {result.hasPriceDiscrepancy && (
+                                  <Badge variant="destructive" className="text-xs">Price Discrepancy</Badge>
+                                )}
+                              </div>
+                            </Link>
+                          ))}
+                          {searchResults.length > 5 && (
+                            <div className="text-center mt-2">
+                              <Button variant="link" size="sm">
+                                View all {searchResults.length} results
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="py-4 text-center text-gray-500">
+                          No products found matching "{searchQuery}"
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+            
             {/* Help Button */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
-                    className="text-gray-300 hover:text-white"
+                    className="text-gray-300 hover:text-white hidden md:block"
                     onClick={() => setHelpDialogOpen(true)}
                   >
                     <HelpCircle className="h-6 w-6" />
@@ -272,7 +413,7 @@ export default function Navbar() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
-                      <button className="text-gray-300 hover:text-white">
+                      <button className="text-gray-300 hover:text-white hidden md:block">
                         <Settings className="h-6 w-6" />
                       </button>
                     </DropdownMenuTrigger>
@@ -313,8 +454,8 @@ export default function Navbar() {
               </DropdownMenuContent>
             </DropdownMenu>
             
-            {/* Divider between settings and notifications */}
-            <div className="h-8 w-px bg-white/25"></div>
+            {/* Divider between settings and notifications - hidden on mobile */}
+            <div className="h-8 w-px bg-white/25 hidden md:block"></div>
             
             {/* Notifications Dropdown */}
             <DropdownMenu>
@@ -336,7 +477,7 @@ export default function Navbar() {
                 </Tooltip>
               </TooltipProvider>
               
-              <DropdownMenuContent align="end" className="w-80">
+              <DropdownMenuContent align="end" className="w-[90vw] sm:w-80">
                 <DropdownMenuLabel className="flex justify-between">
                   <span>Notifications</span>
                   {notifications.filter(n => !n.read).length > 0 && (
@@ -408,7 +549,7 @@ export default function Navbar() {
                     <AvatarFallback>JD</AvatarFallback>
                   </Avatar>
                   <span className="ml-2 hidden md:block">John Doe</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1 hidden md:block" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 </button>
