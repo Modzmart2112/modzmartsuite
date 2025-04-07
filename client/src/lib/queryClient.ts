@@ -15,12 +15,12 @@ interface ApiRequestOptions {
 }
 
 export async function apiRequest<T = any>(
+  method: string,
   url: string, 
+  data?: any,
   options: ApiRequestOptions = {}
 ): Promise<T> {
   const { 
-    method = 'GET', 
-    data, 
     queryParams = {}, 
     headers = {} 
   } = options;

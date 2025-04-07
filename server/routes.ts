@@ -444,10 +444,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // CSV upload routes
   app.post("/api/csv/upload", upload.array("files"), asyncHandler(async (req, res) => {
+    console.log("CSV Upload request received:", { 
+      files: req.files ? (Array.isArray(req.files) ? req.files.length : 'not array') : 'no files',
+      contentType: req.headers['content-type'] 
+    });
+    
     if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      console.log("No files in request");
       return res.status(400).json({ message: "No files uploaded" });
     }
     
+    console.log("Processing files:", req.files.map(f => f.originalname).join(', '));
     const uploadResults = [];
     
     for (const file of req.files as Express.Multer.File[]) {

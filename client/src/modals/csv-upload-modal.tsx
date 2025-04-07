@@ -7,6 +7,8 @@ import { validateCSVFile } from "@/lib/utils/csv-parser";
 import { CsvRecord } from "@shared/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+// Import custom fetch for debugging
+const debug = console.log;
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type SelectedFile = {
@@ -26,12 +28,22 @@ export function CsvUploadModal() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (files: File[]) => {
+      debug("Starting upload mutation with files:", files.map(f => f.name));
       const formData = new FormData();
       files.forEach(file => {
         formData.append("files", file);
+        debug("Added file to formData:", file.name);
       });
       
-      return await apiRequest("POST", "/api/csv/upload", formData);
+      debug("Sending request to /api/csv/upload");
+      try {
+        const result = await apiRequest("POST", "/api/csv/upload", formData);
+        debug("Upload success, result:", result);
+        return result;
+      } catch (error) {
+        debug("Upload error:", error);
+        throw error;
+      }
     },
     onSuccess: (data) => {
       toast({

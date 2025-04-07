@@ -21,8 +21,7 @@ export function PriceDiscrepancyList() {
   // Mutation to clear all price discrepancies
   const clearAllDiscrepanciesMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/products/discrepancies/clear-all');
-      return await response.json();
+      return await apiRequest('POST', '/api/products/discrepancies/clear-all');
     },
     onSuccess: (data: {success?: boolean, message?: string, clearedCount?: number}) => {
       toast({
@@ -46,8 +45,7 @@ export function PriceDiscrepancyList() {
   // Mutation to re-scrape a product price
   const reScrapeProductMutation = useMutation({
     mutationFn: async (productId: number) => {
-      const response = await apiRequest('POST', `/api/products/${productId}/rescrape`);
-      return await response.json();
+      return await apiRequest('POST', `/api/products/${productId}/rescrape`);
     },
     onSuccess: (data: {success?: boolean, message?: string, product?: any}) => {
       toast({
@@ -71,8 +69,7 @@ export function PriceDiscrepancyList() {
   // Mutation to clear a single price discrepancy
   const clearDiscrepancyMutation = useMutation({
     mutationFn: async (productId: number) => {
-      const response = await apiRequest('POST', `/api/products/discrepancies/${productId}/clear`);
-      return await response.json();
+      return await apiRequest('POST', `/api/products/discrepancies/${productId}/clear`);
     },
     onSuccess: (data: {message?: string, productId?: number}) => {
       toast({
@@ -108,8 +105,7 @@ export function PriceDiscrepancyList() {
   // Mutation to re-check all products with price discrepancies
   const reCheckAllMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/products/recheck-all');
-      return await response.json();
+      return await apiRequest('POST', '/api/products/recheck-all');
     },
     onSuccess: (data) => {
       toast({
@@ -145,11 +141,10 @@ export function PriceDiscrepancyList() {
       productId: number;
       newPrice: number;
     }) => {
-      const res = await apiRequest("POST", "/api/products/update-price", {
+      return await apiRequest("POST", "/api/products/update-price", {
         productId,
         newPrice
       });
-      return res.json();
     },
     onSuccess: (data, variables) => {
       toast({
