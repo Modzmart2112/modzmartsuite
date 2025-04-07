@@ -410,62 +410,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Upload not found" });
     }
     
-    // Extract domain patterns from filename to help identify suppliers
-    let domainPatterns: string[] = [];
+    console.log(`Processing deletion of CSV upload: ${uploadToDelete.filename}`);
     
-    if (uploadToDelete.filename.toLowerCase().includes('artec')) {
-      domainPatterns.push('%prospeedracing.com.au%');
-    }
+    // Get all products that have supplier info
+    const allProducts = await storage.getProducts(1000, 0);
+    const productsWithSupplierInfo = allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
     
-    if (uploadToDelete.filename.toLowerCase().includes('bilstein')) {
-      domainPatterns.push('%bilstein%');
-    }
+    // Clear supplier data for all products with URLs
+    console.log(`Clearing supplier data for ${productsWithSupplierInfo.length} products with supplier info`);
     
-    // Add more patterns for other suppliers in CSV files as needed
-    
-    // If we have domain patterns, use them to specifically target related products
-    if (domainPatterns.length > 0) {
-      console.log(`Resetting supplier data for patterns: ${domainPatterns.join(', ')}`);
-      
-      // Get all products
-      const allProducts = await storage.getProducts(1000, 0);
-      
-      // Filter products that match any of the patterns
-      for (const product of allProducts) {
-        if (product.supplierUrl) {
-          // Check if this product's URL matches any of our patterns
-          const matchesPattern = domainPatterns.some(pattern => {
-            // Convert SQL LIKE pattern (with % wildcards) to JavaScript RegExp
-            const regexPattern = pattern
-              .replace(/%/g, '.*')  // Convert % to .*
-              .replace(/_/g, '.');  // Convert _ to .
-            
-            const regex = new RegExp(regexPattern, 'i');
-            return regex.test(product.supplierUrl || '');
-          });
-          
-          if (matchesPattern) {
-            await storage.updateProduct(product.id, {
-              supplierUrl: null,
-              supplierPrice: null,
-              hasPriceDiscrepancy: false
-            });
-          }
-        }
-      }
-    } else {
-      // If we can't identify specific supplier patterns, fall back to resetting all
-      console.log(`No specific supplier pattern identified for ${uploadToDelete.filename}, resetting all supplier data`);
-      const allProducts = await storage.getProducts(1000, 0);
-      const productsWithSupplierInfo = allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
-      
-      for (const product of productsWithSupplierInfo) {
-        await storage.updateProduct(product.id, {
-          supplierUrl: null,
-          supplierPrice: null,
-          hasPriceDiscrepancy: false
-        });
-      }
+    // Process each product
+    for (const product of productsWithSupplierInfo) {
+      console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
+      await storage.updateProduct(product.id, {
+        supplierUrl: null,
+        supplierPrice: null,
+        hasPriceDiscrepancy: false
+      });
     }
     
     // Now delete the CSV upload
@@ -494,62 +455,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Upload not found" });
     }
     
-    // Extract domain patterns from filename to help identify suppliers
-    let domainPatterns: string[] = [];
+    console.log(`Processing cancellation of CSV upload: ${uploadToCancel.filename}`);
     
-    if (uploadToCancel.filename.toLowerCase().includes('artec')) {
-      domainPatterns.push('%prospeedracing.com.au%');
-    }
+    // Get all products that have supplier info
+    const allProducts = await storage.getProducts(1000, 0);
+    const productsWithSupplierInfo = allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
     
-    if (uploadToCancel.filename.toLowerCase().includes('bilstein')) {
-      domainPatterns.push('%bilstein%');
-    }
+    // Clear supplier data for all products with URLs
+    console.log(`Clearing supplier data for ${productsWithSupplierInfo.length} products with supplier info`);
     
-    // Add more patterns for other suppliers in CSV files as needed
-    
-    // If we have domain patterns, use them to specifically target related products
-    if (domainPatterns.length > 0) {
-      console.log(`Resetting supplier data for patterns: ${domainPatterns.join(', ')}`);
-      
-      // Get all products
-      const allProducts = await storage.getProducts(1000, 0);
-      
-      // Filter products that match any of the patterns
-      for (const product of allProducts) {
-        if (product.supplierUrl) {
-          // Check if this product's URL matches any of our patterns
-          const matchesPattern = domainPatterns.some(pattern => {
-            // Convert SQL LIKE pattern (with % wildcards) to JavaScript RegExp
-            const regexPattern = pattern
-              .replace(/%/g, '.*')  // Convert % to .*
-              .replace(/_/g, '.');  // Convert _ to .
-            
-            const regex = new RegExp(regexPattern, 'i');
-            return regex.test(product.supplierUrl || '');
-          });
-          
-          if (matchesPattern) {
-            await storage.updateProduct(product.id, {
-              supplierUrl: null,
-              supplierPrice: null,
-              hasPriceDiscrepancy: false
-            });
-          }
-        }
-      }
-    } else {
-      // If we can't identify specific supplier patterns, fall back to resetting all
-      console.log(`No specific supplier pattern identified for ${uploadToCancel.filename}, resetting all supplier data`);
-      const allProducts = await storage.getProducts(1000, 0);
-      const productsWithSupplierInfo = allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
-      
-      for (const product of productsWithSupplierInfo) {
-        await storage.updateProduct(product.id, {
-          supplierUrl: null,
-          supplierPrice: null,
-          hasPriceDiscrepancy: false
-        });
-      }
+    // Process each product
+    for (const product of productsWithSupplierInfo) {
+      console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
+      await storage.updateProduct(product.id, {
+        supplierUrl: null,
+        supplierPrice: null,
+        hasPriceDiscrepancy: false
+      });
     }
     
     // Now update the CSV upload status
