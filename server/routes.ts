@@ -459,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // We'll continue with the deletion even if the file can't be found or processed
       }
       
-      // Use the stored product IDs from the CSV upload record to determine which products to update
+      // Use the stored product IDs from the CSV upload record to determine which products were updated
       const productIdsToUpdate = uploadToDelete.updatedProductIds || [];
       console.log(`Found ${productIdsToUpdate.length} product IDs associated with this CSV upload`);
       
@@ -467,41 +467,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allProducts = await storage.getProducts(1000, 0);
       
       // Filter to only the products that were updated by this specific CSV
-      // We want to reset them regardless of whether they currently have supplier data
       const productsToUpdate = allProducts.filter(p => 
         productIdsToUpdate.includes(p.id));
-        
-      console.log(`Found ${productsToUpdate.length} products from this CSV that will be reset`);
       
-      console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToDelete.filename}`);
+      console.log(`Found ${productsToUpdate.length} products from this CSV`);
       
-      // Process each product
-      let successCount = 0;
-      let failCount = 0;
+      // NEW BEHAVIOR: We no longer clear supplier URLs or prices when deleting a CSV
+      // This preserves the data for products but removes their association with the CSV upload
+      console.log(`CSV deletion will preserve supplier URLs and prices for ${productsToUpdate.length} products`);
       
-      for (const product of productsToUpdate) {
-        try {
-          console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
-          
-          // Force explicit null values for all supplier fields
-          const updatedProduct = await storage.updateProduct(product.id, {
-            supplierUrl: null,
-            supplierPrice: null,
-            hasPriceDiscrepancy: false
-          });
-          
-          if (updatedProduct) {
-            console.log(`Successfully cleared data for product ${product.sku}`);
-            successCount++;
-          } else {
-            console.error(`Failed to update product ${product.sku} - no product returned`);
-            failCount++;
-          }
-        } catch (error) {
-          console.error(`Error clearing data for product ${product.sku}:`, error);
-          failCount++;
-        }
-      }
+      // Just count the affected products without modifying their supplier data
+      const successCount = productsToUpdate.length;
+      const failCount = 0;
       
       // Now delete the CSV upload
       const result = await storage.deleteCsvUpload(uploadId);
@@ -512,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({ 
         success: true, 
-        message: `Upload deleted successfully. Reset ${successCount} products, ${failCount} failures.`
+        message: `Upload deleted successfully. Preserved data for ${successCount} products.`
       });
     } catch (error) {
       console.error(`Error during CSV deletion process:`, error);
@@ -584,7 +561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToCancel.filename}`);
       
-      // Process each product
+      // Process each product - for cancellation we DO clear supplier data
       let successCount = 0;
       let failCount = 0;
       
