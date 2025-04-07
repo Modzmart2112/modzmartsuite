@@ -19,18 +19,71 @@ export class Scheduler {
     // Clear any existing job with the same name
     this.stopJob(name);
     
-    log(`Starting scheduled job: ${name} (interval: ${intervalMs}ms)`, 'scheduler');
-    
-    // Execute job immediately
-    job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
-    
-    // Schedule periodic execution
-    const timer = setInterval(() => {
-      log(`Running scheduled job: ${name}`, 'scheduler');
+    // For the price check job, we want to run at midnight AEST
+    if (name === 'daily-price-check') {
+      // Calculate time until next midnight AEST
+      const msUntilMidnightAEST = this.calculateMsUntilMidnightAEST();
+      
+      log(`Starting scheduled job: ${name} at midnight AEST (in ${Math.round(msUntilMidnightAEST/1000/60)} minutes)`, 'scheduler');
+      
+      // Don't run immediately, wait until the scheduled time
+      const timer = setTimeout(() => {
+        // Run at midnight
+        log(`Running scheduled job: ${name} (midnight AEST triggered)`, 'scheduler');
+        job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
+        
+        // Then set up the recurring daily interval
+        const dailyTimer = setInterval(() => {
+          log(`Running scheduled job: ${name} (daily midnight AEST)`, 'scheduler');
+          job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
+        }, 24 * 60 * 60 * 1000); // 24 hours in milliseconds
+        
+        this.timers.set(name, dailyTimer);
+      }, msUntilMidnightAEST);
+      
+      this.timers.set(name, timer);
+    } else {
+      // For other jobs, use the standard interval approach
+      log(`Starting scheduled job: ${name} (interval: ${intervalMs}ms)`, 'scheduler');
+      
+      // Execute job immediately
       job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
-    }, intervalMs);
+      
+      // Schedule periodic execution
+      const timer = setInterval(() => {
+        log(`Running scheduled job: ${name}`, 'scheduler');
+        job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
+      }, intervalMs);
+      
+      this.timers.set(name, timer);
+    }
+  }
+  
+  /**
+   * Calculate milliseconds until next midnight AEST (UTC+10)
+   * @returns Milliseconds until midnight AEST
+   */
+  private calculateMsUntilMidnightAEST(): number {
+    // Current time in UTC
+    const now = new Date();
     
-    this.timers.set(name, timer);
+    // AEST is UTC+10
+    const aestOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
+    
+    // Current time in AEST
+    const aestNow = new Date(now.getTime() + aestOffset);
+    
+    // Next midnight in AEST
+    const aestMidnight = new Date(aestNow);
+    aestMidnight.setHours(0, 0, 0, 0);
+    
+    // If it's already past midnight AEST, set to next day
+    if (aestNow > aestMidnight) {
+      aestMidnight.setDate(aestMidnight.getDate() + 1);
+    }
+    
+    // Calculate milliseconds until midnight AEST
+    return aestMidnight.getTime() - aestNow.getTime();
   }
   
   /**
@@ -40,7 +93,9 @@ export class Scheduler {
   stopJob(name: string) {
     const timer = this.timers.get(name);
     if (timer) {
+      // Clear both types of timers to be safe
       clearInterval(timer);
+      clearTimeout(timer);
       this.timers.delete(name);
       log(`Stopped job: ${name}`, 'scheduler');
     }
@@ -51,7 +106,9 @@ export class Scheduler {
    */
   stopAll() {
     for (const [name, timer] of this.timers.entries()) {
+      // Clear both types of timers to be safe
       clearInterval(timer);
+      clearTimeout(timer);
       log(`Stopped job: ${name}`, 'scheduler');
     }
     this.timers.clear();

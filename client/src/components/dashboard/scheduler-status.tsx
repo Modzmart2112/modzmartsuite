@@ -48,13 +48,29 @@ export function SchedulerStatus() {
     }
   };
 
-  // Calculate next run time (midnight)
+  // Calculate next run time (midnight AEST)
   const calculateNextRun = () => {
+    // Current time
     const now = new Date();
-    const tomorrow = new Date();
-    tomorrow.setDate(now.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    return tomorrow;
+    
+    // Calculate next AEST midnight (UTC+10)
+    // AEST is 10 hours ahead of UTC
+    const aestOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
+    
+    // Get current date in AEST
+    const aestNow = new Date(now.getTime() + aestOffset);
+    
+    // Set to next midnight in AEST
+    const aestMidnight = new Date(aestNow);
+    aestMidnight.setHours(0, 0, 0, 0);
+    
+    // If it's already past midnight AEST, set to next day
+    if (aestNow > aestMidnight) {
+      aestMidnight.setDate(aestMidnight.getDate() + 1);
+    }
+    
+    // Convert back to local time for display
+    return new Date(aestMidnight.getTime() - aestOffset);
   };
   
   useEffect(() => {
@@ -230,7 +246,7 @@ export function SchedulerStatus() {
                 <div>
                   <div className="font-medium">Next Price Check:</div>
                   <div className="text-sm">{formatTime(status?.nextScheduledRun || calculateNextRun().toISOString())}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Checks run daily at midnight</div>
+                  <div className="text-xs text-muted-foreground mt-1">Checks run daily at 12:00 AM AEST (UTC+10)</div>
                 </div>
               </div>
             ) : (
