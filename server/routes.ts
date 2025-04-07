@@ -917,6 +917,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Re-check all products with price discrepancies
+  app.post("/api/products/recheck-all", asyncHandler(async (req, res) => {
+    try {
+      // Get all products with price discrepancies
+      const discrepancies = await storage.getPriceDiscrepancies();
+      
+      if (discrepancies.length === 0) {
+        return res.json({ 
+          success: true, 
+          message: "No price discrepancies found to re-check", 
+          totalChecked: 0,
+          updatedCount: 0 
+        });
+      }
+      
+      console.log(`Re-checking prices for ${discrepancies.length} products with discrepancies`);
+      
+      const results = {
+        success: 0,
+        failed: 0,
+        updated: 0,
+        noChange: 0,
+        noUrl: 0
+      };
+      
+      // Process each product with a discrepancy
+      for (const discrepancy of discrepancies) {
+        try {
+          const product = await storage.getProductById(discrepancy.productId);
+          
+          if (!product) {
+            console.error(`Product not found: ${discrepancy.productId}`);
+            results.failed++;
+            continue;
+          }
+          
+          if (!product.supplierUrl) {
+            console.log(`Product ${product.sku} has no supplier URL`);
+            results.noUrl++;
+            continue;
+          }
+          
+          // Use the same scraper used on the suppliers page
+          console.log(`Re-scraping price for product ${product.sku} from ${product.supplierUrl}`);
+          const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
+          
+          if (!scrapeResult.success || !scrapeResult.price) {
+            console.error(`Failed to extract price for ${product.sku}: ${scrapeResult.message || "Unknown error"}`);
+            results.failed++;
+            continue;
+          }
+          
+          const newSupplierPrice = scrapeResult.price;
+          const oldSupplierPrice = product.supplierPrice || 0;
+          const shopifyPrice = product.shopifyPrice || 0;
+          
+          // Calculate percentage difference for reporting
+          const percentageDifference = shopifyPrice > 0 
+            ? ((newSupplierPrice - shopifyPrice) / shopifyPrice) * 100 
+            : 0;
+          
+          // Only flag as discrepancy if difference is significant (e.g., more than 1%)
+          const hasPriceDiscrepancy = Math.abs(percentageDifference) > 1;
+          
+          // Update the product with the new supplier price
+          await storage.updateProduct(product.id, {
+            supplierPrice: newSupplierPrice,
+            hasPriceDiscrepancy,
+            lastChecked: new Date()
+          });
+          
+          console.log(`Re-scraped price for product ${product.sku}: $${newSupplierPrice} (Discrepancy: ${hasPriceDiscrepancy})`);
+          
+          // Track if the price changed during this re-check
+          if (Math.abs(newSupplierPrice - oldSupplierPrice) > 0.01) {
+            results.updated++;
+          } else {
+            results.noChange++;
+          }
+          
+          results.success++;
+        } catch (error) {
+          console.error(`Error processing product ${discrepancy.productId}:`, error);
+          results.failed++;
+        }
+      }
+      
+      const totalChecked = results.success + results.failed;
+      
+      res.json({
+        success: true,
+        message: `Re-checked ${totalChecked} products with discrepancies`,
+        totalChecked,
+        updatedCount: results.updated,
+        noChangeCount: results.noChange,
+        failedCount: results.failed,
+        noUrlCount: results.noUrl
+      });
+    } catch (error: any) {
+      console.error(`Error re-checking all prices:`, error);
+      res.status(500).json({ 
+        success: false,
+        message: `Error re-checking all prices: ${error.message || 'Unknown error'}`
+      });
+    }
+  }));
+  
   // Create HTTP server
   const httpServer = createServer(app);
   

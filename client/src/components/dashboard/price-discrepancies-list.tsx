@@ -101,6 +101,36 @@ export function PriceDiscrepancyList() {
     if (reScrapeProductMutation.isPending) return;
     reScrapeProductMutation.mutate(productId);
   };
+  
+  // Mutation to re-check all products with price discrepancies
+  const reCheckAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/products/recheck-all');
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Re-check Complete",
+        description: `Re-checked all products with discrepancies. Found ${data.updatedCount || 0} updates.`,
+      });
+      // Invalidate the discrepancies query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to re-check all prices",
+        variant: "destructive",
+      });
+      console.error("Error re-checking all prices:", error);
+    }
+  });
+  
+  // Function to handle re-checking all products with proper UI state management
+  const handleReCheckAll = () => {
+    if (reCheckAllMutation.isPending) return;
+    reCheckAllMutation.mutate();
+  };
 
   // Mutation to update a product's price
   const updatePriceMutation = useMutation({
@@ -176,17 +206,30 @@ export function PriceDiscrepancyList() {
         <div className="flex justify-between items-center">
           <CardTitle className="text-xl font-semibold">Price Discrepancies</CardTitle>
           {discrepancies.length > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1 text-sm font-medium" 
-              onClick={() => clearAllDiscrepanciesMutation.mutate()}
-              disabled={clearAllDiscrepanciesMutation.isPending}
-            >
-              <Trash2 size={14} />
-              Clear All
-              {clearAllDiscrepanciesMutation.isPending && "..."}
-            </Button>
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1 text-sm font-medium" 
+                onClick={() => handleReCheckAll()}
+                disabled={reCheckAllMutation.isPending}
+              >
+                <Redo size={14} />
+                Re-check All
+                {reCheckAllMutation.isPending && "..."}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1 text-sm font-medium" 
+                onClick={() => clearAllDiscrepanciesMutation.mutate()}
+                disabled={clearAllDiscrepanciesMutation.isPending}
+              >
+                <Trash2 size={14} />
+                Clear All
+                {clearAllDiscrepanciesMutation.isPending && "..."}
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -225,16 +268,6 @@ export function PriceDiscrepancyList() {
                     </div>
                     <div className="flex flex-col space-y-2">
                       <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="gap-1"
-                          onClick={() => handleReScrapeProduct(discrepancy.productId)}
-                          disabled={reScrapeProductMutation.isPending}
-                        >
-                          <Redo size={14} />
-                          {reScrapeProductMutation.isPending ? "Checking..." : "Re-check"}
-                        </Button>
                         <Button 
                           variant="default" 
                           size="sm"
