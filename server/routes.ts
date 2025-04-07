@@ -388,7 +388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       // First, process the CSV to get the SKUs and URLs it contains
-      const csvPath = path.join(__dirname, '..', 'attached_assets', uploadToDelete.filename);
+      const csvPath = path.join(process.cwd(), 'attached_assets', uploadToDelete.filename);
       let records: CsvRecord[] = [];
       
       try {
@@ -482,7 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       // First, process the CSV to get the SKUs and URLs it contains
-      const csvPath = path.join(__dirname, '..', 'attached_assets', uploadToCancel.filename);
+      const csvPath = path.join(process.cwd(), 'attached_assets', uploadToCancel.filename);
       let records: CsvRecord[] = [];
       
       try {

@@ -61,15 +61,8 @@ export default function Suppliers() {
       if (!res.ok) throw new Error('Failed to fetch uploads');
       return res.json();
     },
-    refetchInterval: (data) => {
-      // Check if any uploads are still processing
-      if (data && data.uploads && data.uploads.some((upload: CsvUpload) => upload.status === 'processing')) {
-        // Poll every 3 seconds while processing
-        return 3000;
-      }
-      // Otherwise, don't poll
-      return false;
-    }
+    // Always poll every 3 seconds to ensure real-time updates
+    refetchInterval: 3000
   });
 
   // Upload mutation
