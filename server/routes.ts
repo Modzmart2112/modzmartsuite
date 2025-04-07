@@ -130,6 +130,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ products, total });
   }));
   
+  // Quick search endpoint for the header search functionality
+  app.get("/api/products/search", asyncHandler(async (req, res) => {
+    const query = req.query.q as string || '';
+    
+    if (!query || query.length < 2) {
+      return res.json([]);
+    }
+    
+    // Limit search results to 10 items for quick search
+    const products = await storage.searchProducts(query, 10, 0);
+    
+    // Return simplified product data for the dropdown
+    const searchResults = products.map(product => ({
+      id: product.id,
+      sku: product.sku,
+      title: product.title,
+      shopifyPrice: product.shopifyPrice,
+      supplierPrice: product.supplierPrice,
+      hasPriceDiscrepancy: product.hasPriceDiscrepancy
+    }));
+    
+    res.json(searchResults);
+  }));
+  
   app.get("/api/products/discrepancies", asyncHandler(async (req, res) => {
     console.log("Fetching price discrepancies");
     const discrepancies = await storage.getPriceDiscrepancies();
@@ -722,6 +746,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting Shopify connection status:", error);
       res.status(500).json({ message: "Failed to get connection status" });
+    }
+  }));
+  
+  // Enhanced Shopify connection status endpoint for the profile menu
+  app.get("/api/shopify/connection-status", asyncHandler(async (req, res) => {
+    try {
+      const user = await storage.getUser(1); // Simplified: using first user
+      const stats = await storage.getStats();
+      
+      // Check if Shopify is properly connected
+      const connected = !!(user?.shopifyApiKey && user?.shopifyApiSecret && user?.shopifyStoreUrl);
+      
+      // Get shop name from the store URL or use a default
+      let shopName = "Modz Mart";
+      if (user?.shopifyStoreUrl) {
+        try {
+          const url = new URL(user.shopifyStoreUrl);
+          shopName = url.hostname.split('.')[0];
+          // Convert from kebab-case to Title Case
+          shopName = shopName
+            .split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+        } catch (error) {
+          console.error("Error parsing shop URL:", error);
+        }
+      }
+      
+      res.json({
+        connected,
+        shopName,
+        lastSync: stats?.lastShopifySync ? stats.lastShopifySync.toISOString() : null
+      });
+    } catch (error) {
+      console.error("Error getting Shopify connection status:", error);
+      res.status(500).json({ 
+        connected: false, 
+        shopName: "Modz Mart", 
+        lastSync: null,
+        error: "Failed to get connection status" 
+      });
     }
   }));
   
