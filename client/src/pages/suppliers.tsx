@@ -568,50 +568,10 @@ export default function Suppliers() {
                   <span className="text-sm text-gray-500 mb-1 ml-2">of {formatNumber(totalProducts)} products</span>
                 </div>
                 
-                <div className="h-[180px] mb-4 relative flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <defs>
-                        <linearGradient id="gradientWithUrl" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#9333ea" stopOpacity={0.8}/>
-                          <stop offset="100%" stopColor="#6366f1" stopOpacity={1}/>
-                        </linearGradient>
-                        <linearGradient id="gradientWithoutUrl" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0%" stopColor="#e2e8f0" stopOpacity={0.8}/>
-                          <stop offset="100%" stopColor="#cbd5e1" stopOpacity={1}/>
-                        </linearGradient>
-                      </defs>
-                      <Pie
-                        data={[
-                          { name: 'With Supplier URL', value: withSupplierUrl },
-                          { name: 'Without Supplier URL', value: totalProducts - withSupplierUrl }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        strokeWidth={4}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        <Cell fill="url(#gradientWithUrl)" stroke="#ffffff" />
-                        <Cell fill="url(#gradientWithoutUrl)" stroke="#ffffff" />
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value: number, name: string) => [formatNumber(value), name]}
-                        contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.8)',
-                          color: '#fff',
-                          borderRadius: '4px',
-                          border: 'none',
-                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                    <div className="bg-white w-[100px] h-[100px] rounded-full shadow-md flex items-center justify-center">
-                      <Globe className="h-14 w-14 text-purple-500" />
+                <div className="h-[180px] mb-4 flex items-center justify-center">
+                  <div className="bg-purple-50 w-[180px] h-[180px] rounded-full flex items-center justify-center shadow-lg">
+                    <div className="bg-white w-[150px] h-[150px] rounded-full shadow-md flex items-center justify-center">
+                      <Globe className="h-20 w-20 text-purple-500" />
                     </div>
                   </div>
                 </div>
