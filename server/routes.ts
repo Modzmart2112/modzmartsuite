@@ -747,8 +747,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get Shopify brand distribution data
   app.get("/api/shopify/brands", asyncHandler(async (req, res) => {
     try {
-      // Get products with vendor information
-      const products = await storage.getProducts(1000, 0);
+      console.log("Fetching brand distribution data...");
+      
+      // Get total product count to know how many we need to fetch
+      const totalProducts = await storage.getProductCount();
+      console.log(`Total products in database: ${totalProducts}`);
+      
+      // We need to fetch all products to get accurate brand distribution
+      const products = await storage.getProducts(totalProducts, 0);
+      console.log(`Retrieved ${products.length} products for brand analysis`);
       
       // Count products by vendor (brand)
       const brands: Record<string, number> = {};
@@ -760,6 +767,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         brands[brand]++;
       });
+      
+      // Print out a summary of the brands found
+      console.log(`Found ${Object.keys(brands).length} unique brands`);
       
       // Convert to array format for frontend
       const brandData = Object.entries(brands).map(([name, count]) => ({
