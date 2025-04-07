@@ -35,7 +35,7 @@ export function ProductsOverview() {
               </div>
               
               <div className="text-base text-gray-500 mt-1 mb-6">
-                {isLoading ? "..." : `${stats?.newProductsCount || 0} new products arriving on Monday`}
+                {isLoading ? "..." : `Last updated: ${new Date(stats?.lastUpdated || Date.now()).toLocaleString()}`}
               </div>
               
               {/* Progress bar instead of pie chart */}
@@ -116,7 +116,7 @@ export function ProductsOverview() {
                   {isLoading ? "..." : stats?.activeProductCount || 0}
                 </div>
                 <div className="mt-1 text-xs text-purple-500">
-                  Last sync: Today
+                  Last sync: {isLoading ? "..." : stats?.lastShopifySync ? new Date(stats.lastShopifySync).toLocaleString() : "Never"}
                 </div>
               </div>
             </div>

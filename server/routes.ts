@@ -76,9 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Stats not found" });
     }
     
-    // Format stats for the frontend
-    const salesChannels = stats.salesChannels ? (stats.salesChannels as any).channels || [] : [];
-    const geoDistribution = stats.geoDistribution ? (stats.geoDistribution as any).countries || [] : [];
+    // Format stats for the frontend - ensure we're providing valid data
+    const salesChannels = stats.salesChannels || {};
+    const geoDistribution = stats.geoDistribution || {};
     
     res.json({
       totalOrders: stats.totalOrders,
@@ -98,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       productCount,
       activeProductCount,
       offMarketCount: productCount - activeProductCount,
-      newProductsCount: stats.newProductsCount || 0,
+      // Removed reference to newProductsCount as it's not needed
       withSupplierUrlCount, // Add supplier URL count
       priceDiscrepancyCount, // Add discrepancy count
       totalPriceChecks: stats.totalPriceChecks || 0, // Add price check stats
