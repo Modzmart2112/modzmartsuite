@@ -83,3 +83,23 @@ export interface UploadProgress {
   status: 'pending' | 'processing' | 'completed' | 'error';
   error?: string;
 }
+
+export interface NotificationPreferences {
+  priceIncreaseNotify: boolean;
+  priceDecreaseNotify: boolean;
+  priceThresholdPercent: number;
+  dailySummary: boolean;
+  notifyOutOfStock: boolean;
+  telegramEnabled: boolean;
+  emailEnabled: boolean;
+  emailAddress?: string;
+}
+
+export interface AccountSettings {
+  username: string;
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+  email?: string;
+  displayName?: string;
+}

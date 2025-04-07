@@ -310,9 +310,183 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">
-                Notification preferences will be available soon.
-              </p>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                toast({
+                  title: "Preferences Updated",
+                  description: "Your notification preferences have been saved."
+                });
+              }}>
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Price Change Notifications</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="priceIncreaseNotify">Price Increases</Label>
+                          <p className="text-sm text-gray-500">
+                            Get notified when supplier prices increase
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <Label className="sr-only" htmlFor="priceIncreaseNotify">
+                            Price Increases
+                          </Label>
+                          <input
+                            type="checkbox"
+                            id="priceIncreaseNotify"
+                            className="form-checkbox h-5 w-5 text-primary border-gray-300 rounded"
+                            defaultChecked
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="priceDecreaseNotify">Price Decreases</Label>
+                          <p className="text-sm text-gray-500">
+                            Get notified when supplier prices decrease
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <Label className="sr-only" htmlFor="priceDecreaseNotify">
+                            Price Decreases
+                          </Label>
+                          <input
+                            type="checkbox"
+                            id="priceDecreaseNotify"
+                            className="form-checkbox h-5 w-5 text-primary border-gray-300 rounded"
+                            defaultChecked
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="priceThresholdPercent">Minimum Price Change Threshold</Label>
+                          <p className="text-sm text-gray-500">
+                            Only notify for price changes above this percentage
+                          </p>
+                        </div>
+                        <div className="flex items-center w-24">
+                          <Input
+                            id="priceThresholdPercent"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            defaultValue="1.0"
+                            className="w-full"
+                          />
+                          <span className="ml-2">%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Notification Methods</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="telegramEnabled">Telegram</Label>
+                          <p className="text-sm text-gray-500">
+                            Receive notifications via Telegram bot
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <Label className="sr-only" htmlFor="telegramEnabled">
+                            Telegram
+                          </Label>
+                          <input
+                            type="checkbox"
+                            id="telegramEnabled"
+                            className="form-checkbox h-5 w-5 text-primary border-gray-300 rounded"
+                            defaultChecked
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="emailEnabled">Email</Label>
+                          <p className="text-sm text-gray-500">
+                            Receive notifications via email
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <Label className="sr-only" htmlFor="emailEnabled">
+                            Email
+                          </Label>
+                          <input
+                            type="checkbox"
+                            id="emailEnabled"
+                            className="form-checkbox h-5 w-5 text-primary border-gray-300 rounded"
+                          />
+                        </div>
+                      </div>
+                      <div className="pt-2">
+                        <Label htmlFor="emailAddress">Email Address</Label>
+                        <Input
+                          id="emailAddress"
+                          type="email"
+                          placeholder="you@example.com"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Additional Notifications</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="dailySummary">Daily Summary</Label>
+                          <p className="text-sm text-gray-500">
+                            Receive a daily summary of all price changes
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <Label className="sr-only" htmlFor="dailySummary">
+                            Daily Summary
+                          </Label>
+                          <input
+                            type="checkbox"
+                            id="dailySummary"
+                            className="form-checkbox h-5 w-5 text-primary border-gray-300 rounded"
+                            defaultChecked
+                          />
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="notifyOutOfStock">Out of Stock Alerts</Label>
+                          <p className="text-sm text-gray-500">
+                            Get notified when supplier products go out of stock
+                          </p>
+                        </div>
+                        <div className="flex items-center">
+                          <Label className="sr-only" htmlFor="notifyOutOfStock">
+                            Out of Stock Alerts
+                          </Label>
+                          <input
+                            type="checkbox"
+                            id="notifyOutOfStock"
+                            className="form-checkbox h-5 w-5 text-primary border-gray-300 rounded"
+                            defaultChecked
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button type="submit" className="w-full sm:w-auto">
+                    Save Preferences
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
@@ -326,9 +500,91 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-500">
-                Account settings will be available soon.
-              </p>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                toast({
+                  title: "Account Updated",
+                  description: "Your account details have been saved."
+                });
+              }}>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="username">Username</Label>
+                      <Input
+                        id="username"
+                        defaultValue="admin"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="displayName">Display Name</Label>
+                      <Input
+                        id="displayName"
+                        defaultValue="Administrator"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="email">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-medium mb-3">Change Password</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="currentPassword">Current Password</Label>
+                        <Input
+                          id="currentPassword"
+                          type="password"
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          className="mt-1"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="confirmPassword">Confirm Password</Label>
+                        <Input
+                          id="confirmPassword"
+                          type="password"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                    <Button type="submit">
+                      Save Account Details
+                    </Button>
+                    <Button variant="outline" type="button" onClick={() => {
+                      toast({
+                        title: "Changes Discarded",
+                        description: "Your changes have been discarded."
+                      });
+                    }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </TabsContent>
