@@ -5,6 +5,7 @@ import { ProductsOverview } from "@/components/dashboard/products-overview";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { SalesChannels } from "@/components/dashboard/sales-channels";
 import { GeoDistribution } from "@/components/dashboard/geo-distribution";
+import { SchedulerStatus } from "@/components/dashboard/scheduler-status";
 
 export default function Dashboard() {
   return (
@@ -52,9 +53,10 @@ export default function Dashboard() {
       </div>
       
       {/* Bottom Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <GeoDistribution />
         <SalesChannels />
+        <SchedulerStatus />
       </div>
     </div>
   );

@@ -23,6 +23,7 @@ export const products = pgTable("products", {
   supplierUrl: text("supplier_url"),
   supplierPrice: real("supplier_price"),
   lastScraped: timestamp("last_scraped"),
+  lastChecked: timestamp("last_checked"),
   hasPriceDiscrepancy: boolean("has_price_discrepancy").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -72,6 +73,10 @@ export const stats = pgTable("stats", {
   newCustomers: integer("new_customers").default(0),
   salesChannels: jsonb("sales_channels").default({}),
   geoDistribution: jsonb("geo_distribution").default({}),
+  // Price check metrics
+  lastPriceCheck: timestamp("last_price_check"),
+  totalPriceChecks: integer("total_price_checks").default(0),
+  totalDiscrepanciesFound: integer("total_discrepancies_found").default(0),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 

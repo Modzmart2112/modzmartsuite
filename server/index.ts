@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { scheduler, checkAllPrices } from "./scheduler";
 
 const app = express();
 app.use(express.json());
@@ -66,5 +67,9 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Start the price check scheduler - run once every 24 hours (86400000 ms)
+    scheduler.startJob('daily-price-check', 86400000, checkAllPrices);
+    log('Price check scheduler initialized', 'scheduler');
   });
 })();

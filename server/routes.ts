@@ -13,6 +13,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { processCsvFile } from "./csv-handler";
+import { scheduler, checkAllPrices } from "./scheduler";
 
 
 // Helper function to handle controller errors
@@ -705,6 +706,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Telegram connection error:", error);
       res.status(500).json({ message: "Failed to connect to Telegram" });
     }
+  }));
+  
+  // Scheduler routes
+  app.get("/api/scheduler/status", asyncHandler(async (req, res) => {
+    const activeJobs = Array.from(scheduler["timers"].keys());
+    const stats = await storage.getStats();
+    
+    res.json({
+      activeJobs,
+      lastPriceCheck: stats?.lastPriceCheck || null,
+      totalPriceChecks: stats?.totalPriceChecks || 0,
+      totalDiscrepanciesFound: stats?.totalDiscrepanciesFound || 0
+    });
+  }));
+  
+  app.post("/api/scheduler/price-check/start", asyncHandler(async (req, res) => {
+    const { interval } = req.body;
+    // Default to 24 hours if interval not specified
+    const intervalMs = interval ? parseInt(interval) : 86400000;
+    
+    // Start the price check job
+    scheduler.startJob('daily-price-check', intervalMs, checkAllPrices);
+    
+    res.json({
+      success: true,
+      message: `Price check scheduler started with interval ${intervalMs}ms`,
+      jobName: 'daily-price-check'
+    });
+  }));
+  
+  app.post("/api/scheduler/price-check/stop", asyncHandler(async (req, res) => {
+    // Stop the price check job
+    scheduler.stopJob('daily-price-check');
+    
+    res.json({
+      success: true,
+      message: "Price check scheduler stopped",
+      jobName: 'daily-price-check'
+    });
+  }));
+  
+  app.post("/api/scheduler/price-check/run-now", asyncHandler(async (req, res) => {
+    // Run the price check job immediately
+    res.json({
+      success: true,
+      message: "Price check started",
+      jobName: 'daily-price-check'
+    });
+    
+    // Execute after sending response (to avoid timeout)
+    checkAllPrices().catch(error => {
+      console.error("Error running price check:", error);
+    });
   }));
   
   // Create HTTP server

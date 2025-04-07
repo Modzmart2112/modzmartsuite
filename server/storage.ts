@@ -24,6 +24,7 @@ export interface IStorage {
   getProductsBySku(skus: string[]): Promise<Product[]>;
   getProductById(id: number): Promise<Product | undefined>;
   getProductBySku(sku: string): Promise<Product | undefined>;
+  getProductsWithSupplierUrls(): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<Product>): Promise<Product | undefined>;
   searchProducts(query: string, limit: number, offset: number): Promise<Product[]>;
@@ -176,6 +177,11 @@ export class MemStorage implements IStorage {
     return Array.from(this.products.values()).find(
       (product) => product.sku === sku
     );
+  }
+  
+  async getProductsWithSupplierUrls(): Promise<Product[]> {
+    return Array.from(this.products.values())
+      .filter(product => product.supplierUrl !== null && product.supplierUrl !== '');
   }
 
   async createProduct(productData: InsertProduct): Promise<Product> {
@@ -467,6 +473,18 @@ export class DatabaseStorage implements IStorage {
     }
     
     return result[0];
+  }
+  
+  async getProductsWithSupplierUrls(): Promise<Product[]> {
+    return await db.select()
+      .from(products)
+      .where(
+        and(
+          isNotNull(products.supplierUrl),
+          sql`${products.supplierUrl} != ''`
+        )
+      )
+      .orderBy(asc(products.id));
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
