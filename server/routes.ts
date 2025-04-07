@@ -61,6 +61,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const productCount = await storage.getProductCount();
     const activeProductCount = await storage.getActiveProductCount();
     
+    // Get additional stats needed for the dashboard
+    const productsWithSupplierUrls = await storage.getProductsWithSupplierUrls();
+    const withSupplierUrlCount = productsWithSupplierUrls.length;
+    
+    // Get price discrepancies count
+    const discrepancies = await storage.getPriceDiscrepancies();
+    const priceDiscrepancyCount = discrepancies.length;
+    
     if (!stats) {
       return res.status(404).json({ message: "Stats not found" });
     }
@@ -88,6 +96,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       activeProductCount,
       offMarketCount: productCount - activeProductCount,
       newProductsCount: 400, // Example value
+      withSupplierUrlCount, // Add supplier URL count
+      priceDiscrepancyCount, // Add discrepancy count
+      totalPriceChecks: stats.totalPriceChecks || 0, // Add price check stats
+      totalDiscrepanciesFound: stats.totalDiscrepanciesFound || 0,
+      lastPriceCheck: stats.lastPriceCheck ? stats.lastPriceCheck.toISOString() : null,
       lastUpdated: stats.lastUpdated ? stats.lastUpdated.toISOString() : new Date().toISOString()
     });
   }));
