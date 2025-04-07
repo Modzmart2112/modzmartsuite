@@ -13,8 +13,8 @@ export function ProductsOverview() {
     : "0.00";
 
   return (
-    <div className="flex justify-center w-full">
-      <Card className="shadow-md border border-gray-100 w-full max-w-4xl">
+    <div className="w-full">
+      <Card className="shadow-md border border-gray-100 w-full">
         <CardHeader className="pb-0">
           <CardTitle className="text-xl font-semibold text-gray-800">Products Overview</CardTitle>
           <CardDescription>Summary of product listings and status</CardDescription>

@@ -42,9 +42,6 @@ export default function Dashboard() {
         <ProductsOverview />
       </div>
 
-      {/* Stats Row */}
-      <StatsRow />
-
       {/* Price Discrepancy Chart - Full Width */}
       <div className="mb-6">
         <PriceDiscrepancyChart />
