@@ -150,7 +150,6 @@ export function ShopifyBrandDistribution() {
   if (!isConnected) {
     return (
       <Card className="shadow-md overflow-hidden border-0">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
         <CardHeader>
           <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
           <CardDescription>Connect to Shopify to view your brand distribution</CardDescription>
@@ -176,8 +175,7 @@ export function ShopifyBrandDistribution() {
   
   return (
     <Card className="shadow-md overflow-hidden border-0">
-      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-      <CardHeader className="pb-0 pt-6">
+      <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
