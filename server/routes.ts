@@ -132,12 +132,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Create a new price history record that sets supplierPrice = shopifyPrice
-    // This will effectively remove the discrepancy without changing the actual Shopify price
     await storage.createPriceHistory({
       productId,
       shopifyPrice: product.shopifyPrice,
       supplierPrice: product.shopifyPrice, // Match supplier price to shopify price to clear discrepancy
     });
+    
+    // Update the product to clear the discrepancy flag
+    await storage.updateProduct(productId, {
+      hasPriceDiscrepancy: false,
+      supplierPrice: null,
+      supplierUrl: null
+    });
+    
+    console.log(`Cleared price discrepancy for product ID ${productId}`);
     
     res.json({ 
       success: true, 
