@@ -37,13 +37,17 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Products Overview at the top */}
+      <div className="mb-6">
+        <ProductsOverview />
+      </div>
+
       {/* Stats Row */}
       <StatsRow />
 
-      {/* Price Discrepancy Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {/* Price Discrepancy Chart - Full Width */}
+      <div className="mb-6">
         <PriceDiscrepancyChart />
-        <ProductsOverview />
       </div>
       
       {/* Price Discrepancy List */}
