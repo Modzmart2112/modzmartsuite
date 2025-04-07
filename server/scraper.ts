@@ -825,68 +825,33 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
       // ProSpeedRacing sometimes has HTML like: <meta property="og:image:height" content="2544"><meta property="og:price:amount" content="1,579.95">
       // We need a more robust extraction that prioritizes the OpenGraph price meta tag
       
-      // First, let's extract the HTML tag containing the og:price:amount property
-      const extractPriceMetaContent = (htmlContent: string): string | null => {
-        // Get a section of HTML that might contain our price tag
-        const ogTagSection = htmlContent.match(/<meta[^>]*og:price:amount[^>]*>/i);
-        if (!ogTagSection || !ogTagSection[0]) return null;
-        
-        // Extract the content attribute from this tag
-        const contentMatch = ogTagSection[0].match(/content="([^"]+)"/i);
-        if (!contentMatch || !contentMatch[1]) return null;
-        
-        return contentMatch[1].trim();
-      };
+      // Extract the OpenGraph price meta tag directly - this is the most reliable source
+      const ogPriceTagMatch = html.match(/<meta\s+property=["']og:price:amount["']\s+content=["']([^"']+)["']/i);
       
-      // Attempt to get the price from OpenGraph meta tag using a more reliable extraction method
-      const ogPriceContent = extractPriceMetaContent(html);
-      
-      if (ogPriceContent) {
-        console.log(`Found potential price from OpenGraph: "${ogPriceContent}"`);
+      if (ogPriceTagMatch && ogPriceTagMatch[1]) {
+        const rawPriceStr = ogPriceTagMatch[1].trim();
+        console.log(`Found price from OpenGraph meta tag: "${rawPriceStr}"`);
         
-        // Remove any commas from the price (e.g., "1,579.95" -> "1579.95")
-        const cleanPriceStr = ogPriceContent.replace(/,/g, '');
+        // Remove any commas from the price (e.g., "4,579.95" -> "4579.95")
+        const cleanPriceStr = rawPriceStr.replace(/,/g, '');
         const price = parseFloat(cleanPriceStr);
         
         if (!isNaN(price) && price > 0) {
-          potentialPrices.push({
-            value: price,
-            source: 'OpenGraph meta tag',
-            confidence: 99  // Highest confidence for OpenGraph tags
-          });
-          console.log(`Added price ${price} from OpenGraph meta tag with highest confidence (original: ${ogPriceContent})`);
+          console.log(`Successfully parsed price: ${price} from OpenGraph meta tag (original: ${rawPriceStr})`);
+          
+          // Return the result immediately since this is the authoritative source
+          return {
+            sku,
+            url,
+            price,
+            htmlSample: `<meta property="og:price:amount" content="${rawPriceStr}">`,
+            note: "Price extracted from OpenGraph meta tag"
+          };
         } else {
-          console.log(`Failed to parse price from OpenGraph: "${ogPriceContent}" -> "${cleanPriceStr}" -> ${price}`);
+          console.log(`Failed to parse price from OpenGraph: "${rawPriceStr}" -> "${cleanPriceStr}" -> ${price}`);
         }
       } else {
-        // Fallback to the original regex method if our improved method fails
-        const ogPriceRegexes = [
-          /<meta[^>]*property="og:price:amount"[^>]*content="([^"]+)"/i,  // Standard format
-          /<meta[^>]*property="og:price:amount"[^>]*content="([^"]+)/i,   // Handle unclosed quotes
-          /property="og:price:amount"[^>]*content="([^"]+)"/i,            // Handle unconventional tag order
-          /content="([0-9,.]+)"[^>]*property="og:price:amount"/i          // Handle reversed attribute order
-        ];
-        
-        for (const regex of ogPriceRegexes) {
-          const match = html.match(regex);
-          if (match && match[1]) {
-            let priceStr = match[1].trim();
-            console.log(`Found potential price from OpenGraph regex: "${priceStr}"`);
-            
-            // Remove any commas from the price
-            priceStr = priceStr.replace(/,/g, '');
-            const price = parseFloat(priceStr);
-            
-            if (!isNaN(price) && price > 0) {
-              potentialPrices.push({
-                value: price,
-                source: 'OpenGraph meta tag',
-                confidence: 90  // High confidence for OpenGraph tags via regex
-              });
-              console.log(`Added price ${price} from OpenGraph meta tag with high confidence`);
-            }
-          }
-        }
+        console.log(`No OpenGraph price meta tag found in HTML`);
       }
       
       // APPROACH 2: Look for hardcoded product price in page markup
