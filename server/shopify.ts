@@ -53,6 +53,7 @@ class ShopifyClient {
               description: product.body_html || "",
               sku: variant.sku || "",
               price: parseFloat(variant.price) || 0,
+              cost: parseFloat(variant.cost) || 0, // Add cost price from Shopify
               images: product.images?.map((img: any) => img.src) || [],
               vendor: product.vendor || "",
               productType: product.product_type || ""
@@ -106,6 +107,7 @@ class ShopifyClient {
               description: product.body_html || "",
               sku: variant.sku,
               price: parseFloat(variant.price) || 0,
+              cost: parseFloat(variant.cost) || 0, // Add cost price from Shopify
               images: product.images?.map((img: any) => img.src) || [],
               vendor: product.vendor || "",
               productType: product.product_type || ""

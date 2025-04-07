@@ -27,6 +27,10 @@ export interface IStorage {
   getProductById(id: number): Promise<Product | undefined>;
   getProductBySku(sku: string): Promise<Product | undefined>;
   getProductsWithSupplierUrls(): Promise<Product[]>;
+  getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]>;
+  getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]>;
+  getVendors(): Promise<string[]>;
+  getProductTypes(): Promise<string[]>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<Product>): Promise<Product | undefined>;
   searchProducts(query: string, limit: number, offset: number): Promise<Product[]>;
@@ -212,6 +216,48 @@ export class MemStorage implements IStorage {
   async getProductsWithSupplierUrls(): Promise<Product[]> {
     return Array.from(this.products.values())
       .filter(product => product.supplierUrl !== null && product.supplierUrl !== '');
+  }
+  
+  async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {
+    const filteredProducts = Array.from(this.products.values())
+      .filter(product => product.vendor === vendor)
+      .sort((a, b) => a.title.localeCompare(b.title));
+    
+    if (limit !== undefined && offset !== undefined) {
+      return filteredProducts.slice(offset, offset + limit);
+    }
+    return filteredProducts;
+  }
+  
+  async getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]> {
+    const filteredProducts = Array.from(this.products.values())
+      .filter(product => product.productType === productType)
+      .sort((a, b) => a.title.localeCompare(b.title));
+    
+    if (limit !== undefined && offset !== undefined) {
+      return filteredProducts.slice(offset, offset + limit);
+    }
+    return filteredProducts;
+  }
+  
+  async getVendors(): Promise<string[]> {
+    const vendors = new Set<string>();
+    for (const product of this.products.values()) {
+      if (product.vendor) {
+        vendors.add(product.vendor);
+      }
+    }
+    return Array.from(vendors).sort();
+  }
+  
+  async getProductTypes(): Promise<string[]> {
+    const productTypes = new Set<string>();
+    for (const product of this.products.values()) {
+      if (product.productType) {
+        productTypes.add(product.productType);
+      }
+    }
+    return Array.from(productTypes).sort();
   }
 
   async createProduct(productData: InsertProduct): Promise<Product> {
@@ -731,6 +777,54 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(products.id));
+  }
+  
+  async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {
+    let query = db
+      .select()
+      .from(products)
+      .where(eq(products.vendor, vendor))
+      .orderBy(asc(products.title));
+    
+    if (limit !== undefined && offset !== undefined) {
+      query = query.limit(limit).offset(offset);
+    }
+    
+    return await query;
+  }
+  
+  async getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]> {
+    let query = db
+      .select()
+      .from(products)
+      .where(eq(products.productType, productType))
+      .orderBy(asc(products.title));
+    
+    if (limit !== undefined && offset !== undefined) {
+      query = query.limit(limit).offset(offset);
+    }
+    
+    return await query;
+  }
+  
+  async getVendors(): Promise<string[]> {
+    const vendorsQuery = await db
+      .selectDistinct({ vendor: products.vendor })
+      .from(products)
+      .where(isNotNull(products.vendor))
+      .orderBy(asc(products.vendor));
+    
+    return vendorsQuery.map(v => v.vendor).filter(Boolean) as string[];
+  }
+  
+  async getProductTypes(): Promise<string[]> {
+    const typesQuery = await db
+      .selectDistinct({ productType: products.productType })
+      .from(products)
+      .where(isNotNull(products.productType))
+      .orderBy(asc(products.productType));
+    
+    return typesQuery.map(t => t.productType).filter(Boolean) as string[];
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {

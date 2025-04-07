@@ -187,6 +187,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Get all vendors
+  app.get("/api/products/vendors", asyncHandler(async (req, res) => {
+    console.log("Fetching all vendors");
+    const vendors = await storage.getVendors();
+    console.log(`Found ${vendors.length} vendors`);
+    res.json(vendors);
+  }));
+  
+  // Get all product types
+  app.get("/api/products/product-types", asyncHandler(async (req, res) => {
+    console.log("Fetching all product types");
+    const productTypes = await storage.getProductTypes();
+    console.log(`Found ${productTypes.length} product types`);
+    res.json(productTypes);
+  }));
+  
+  // Get products by vendor
+  app.get("/api/products/by-vendor/:vendor", asyncHandler(async (req, res) => {
+    const vendor = req.params.vendor;
+    const limit = parseInt(req.query.limit as string || "50");
+    const offset = parseInt(req.query.offset as string || "0");
+    console.log(`Fetching products for vendor: ${vendor}, limit: ${limit}, offset: ${offset}`);
+    const products = await storage.getProductsByVendor(vendor, limit, offset);
+    console.log(`Found ${products.length} products for vendor: ${vendor}`);
+    res.json(products);
+  }));
+  
+  // Get products by product type
+  app.get("/api/products/by-product-type/:productType", asyncHandler(async (req, res) => {
+    const productType = req.params.productType;
+    const limit = parseInt(req.query.limit as string || "50");
+    const offset = parseInt(req.query.offset as string || "0");
+    console.log(`Fetching products for product type: ${productType}, limit: ${limit}, offset: ${offset}`);
+    const products = await storage.getProductsByProductType(productType, limit, offset);
+    console.log(`Found ${products.length} products for product type: ${productType}`);
+    res.json(products);
+  }));
+  
   // Price history routes
   app.get("/api/products/price-histories", asyncHandler(async (req, res) => {
     // Get the 100 most recent price history entries
@@ -1886,6 +1924,7 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             title: shopifyProduct.title,
             description: shopifyProduct.description,
             shopifyPrice: shopifyProduct.price,
+            costPrice: shopifyProduct.cost || null, // Add cost price from Shopify
             images: shopifyProduct.images,
             status: "active",
             vendor: shopifyProduct.vendor,
@@ -1899,6 +1938,7 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             description: shopifyProduct.description,
             shopifyId: shopifyProduct.id,
             shopifyPrice: shopifyProduct.price,
+            costPrice: shopifyProduct.cost || null, // Add cost price from Shopify
             images: shopifyProduct.images,
             status: "active",
             vendor: shopifyProduct.vendor,

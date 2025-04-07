@@ -20,6 +20,7 @@ export const products = pgTable("products", {
   description: text("description"),
   shopifyId: text("shopify_id").notNull(),
   shopifyPrice: real("shopify_price").notNull(),
+  costPrice: real("cost_price"), // Cost price from Shopify
   supplierUrl: text("supplier_url"),
   supplierPrice: real("supplier_price"),
   lastScraped: timestamp("last_scraped"),
