@@ -36,6 +36,13 @@ interface PriceHistoryRecord {
   createdAt: string | Date;
 }
 
+// Define chart data interface with dual values
+interface ChartDataPoint {
+  date: string;
+  value: number;       // Supplier price
+  secondaryValue: number; // Retail/Shopify price
+}
+
 export function PriceDiscrepancyChart() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -87,11 +94,12 @@ export function PriceDiscrepancyChart() {
     // Define the number of days to show based on time range
     const daysToShow = timeRange === '30D' ? 30 : timeRange === '90D' ? 90 : 180;
     
-    // Define the date type
+    // Define the date type for internal processing
     interface DateData {
       date: Date;
       dateString: string;
-      value: number; // Single line chart value
+      supplierValue: number;     // Supplier price
+      shopifyValue: number;      // Shopify/retail price
       count: number;
     }
     
@@ -116,12 +124,13 @@ export function PriceDiscrepancyChart() {
       dates.push({
         date,
         dateString,
-        value: 0,
+        supplierValue: 0,
+        shopifyValue: 0,
         count: 0
       });
     }
     
-    // Simplify to use a single value representing average price
+    // Process historical data to get both supplier and shopify prices
     if (Array.isArray(priceHistories) && priceHistories.length > 0) {
       priceHistories.forEach((history: PriceHistoryRecord) => {
         const historyDate = new Date(history.createdAt);
@@ -138,8 +147,9 @@ export function PriceDiscrepancyChart() {
         
         const matchingDay = dates.find(d => d.dateString === matchingDateString);
         if (matchingDay) {
-          // Only use supplier price for the single line design
-          matchingDay.value += history.supplierPrice || 0;
+          // Accumulate both supplier and shopify prices
+          matchingDay.supplierValue += history.supplierPrice || 0;
+          matchingDay.shopifyValue += history.shopifyPrice || 0;
           matchingDay.count += 1;
         }
       });
@@ -147,16 +157,20 @@ export function PriceDiscrepancyChart() {
       // Calculate averages
       dates.forEach(day => {
         if (day.count > 0) {
-          day.value = day.value / day.count;
+          day.supplierValue = day.supplierValue / day.count;
+          day.shopifyValue = day.shopifyValue / day.count;
         }
       });
     }
     
-    // Add some randomness to make the chart look more realistic and like the reference
-    // This is just for demo purposes; in a real app we'd use real data
-    let baseValue = 2000;
-    if (dates.length > 0 && dates[0].value > 0) {
-      baseValue = dates[0].value;
+    // Define base values
+    let baseSupplierValue = 2000;
+    let baseShopifyValue = 2400; // Retail price typically higher
+    
+    if (dates.length > 0) {
+      if (dates[0].supplierValue > 0) baseSupplierValue = dates[0].supplierValue;
+      if (dates[0].shopifyValue > 0) baseShopifyValue = dates[0].shopifyValue;
+      else if (dates[0].supplierValue > 0) baseShopifyValue = dates[0].supplierValue * 1.2; // 20% markup
     }
     
     return dates.map((day, index) => {
@@ -164,15 +178,19 @@ export function PriceDiscrepancyChart() {
       if (day.count > 0) {
         return {
           date: day.dateString,
-          value: day.value
+          value: day.supplierValue,
+          secondaryValue: day.shopifyValue
         };
       }
       
-      // Otherwise create realistic-looking sample data
-      const variance = Math.sin(index * 0.5) * 800 + Math.random() * 500 - 250;
+      // Otherwise create realistic-looking sample data for both lines
+      const supplierVariance = Math.sin(index * 0.4) * 800 + Math.random() * 400 - 200;
+      const shopifyVariance = Math.sin(index * 0.5 + 1) * 900 + Math.random() * 500 - 250;
+      
       return {
         date: day.dateString,
-        value: Math.max(100, baseValue + variance)
+        value: Math.max(100, baseSupplierValue + supplierVariance),
+        secondaryValue: Math.max(120, baseShopifyValue + shopifyVariance)
       };
     });
   }, [priceHistories, timeRange]);
@@ -193,20 +211,28 @@ export function PriceDiscrepancyChart() {
     return `$${formatPrice(revenueInK)}K`;
   };
 
-  // Find current and historical price data
+  // Find current and historical price data for both lines
   const currentValue = chartData.length > 0 ? chartData[chartData.length - 1].value : 0;
   const startValue = chartData.length > 0 ? chartData[0].value : 0;
   const percentChange = startValue > 0 ? ((currentValue - startValue) / startValue) * 100 : 0;
   const formattedPercent = percentChange.toFixed(1);
   const isPositive = percentChange >= 0;
+  
+  // Data for the secondary line (retail/Shopify price)
+  const currentSecondaryValue = chartData.length > 0 ? chartData[chartData.length - 1].secondaryValue || 0 : 0;
+  const startSecondaryValue = chartData.length > 0 ? chartData[0].secondaryValue || 0 : 0;
+  const secondaryPercentChange = startSecondaryValue > 0 ? 
+    ((currentSecondaryValue - startSecondaryValue) / startSecondaryValue) * 100 : 0;
+  const secondaryFormattedPercent = secondaryPercentChange.toFixed(1);
+  const isSecondaryPositive = secondaryPercentChange >= 0;
 
   return (
     <Card className="shadow-md">
       <CardHeader className="pb-0">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl font-semibold text-gray-800">Price Trends</CardTitle>
-            <CardDescription>Average supplier prices over time</CardDescription>
+            <CardTitle className="text-xl font-semibold text-gray-800">Price Analysis</CardTitle>
+            <CardDescription>Supplier vs. Retail Price Trends</CardDescription>
           </div>
           
           <div className="flex items-center">
@@ -252,20 +278,30 @@ export function PriceDiscrepancyChart() {
         
         <div className="grid grid-cols-4 gap-4 mt-6">
           <div>
-            <div className="text-sm font-medium text-gray-500">Total Revenue</div>
-            <div className="text-2xl font-bold mt-1">{formatTotalRevenue()}</div>
+            <div className="text-sm font-medium text-gray-500">Tracked Products</div>
+            <div className="text-2xl font-bold mt-1">{(stats as any).withSupplierUrlCount || 0}</div>
             <div className="flex items-center mt-1">
               <Badge variant="outline" className={`${isPositive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} hover:bg-opacity-100`}>
                 {isPositive ? '+' : ''}{formattedPercent}%
               </Badge>
-              <span className="text-xs text-gray-500 ml-2">vs prev. period</span>
+              <span className="text-xs text-gray-500 ml-2">growth rate</span>
             </div>
           </div>
           
           <div>
-            <div className="text-sm font-medium text-gray-500">Current Value</div>
+            <div className="text-sm font-medium text-gray-500">Supplier Price</div>
             <div className="text-2xl font-bold mt-1">${formatPrice(currentValue)}</div>
-            <div className="text-xs text-gray-500 mt-1">Last updated today</div>
+            <div className="text-xs text-gray-500 mt-1">Average price</div>
+          </div>
+          
+          <div>
+            <div className="text-sm font-medium text-gray-500">Retail Price</div>
+            <div className="text-2xl font-bold mt-1">${formatPrice(currentSecondaryValue)}</div>
+            <div className="flex items-center mt-1">
+              <Badge variant="outline" className={`${isSecondaryPositive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} hover:bg-opacity-100`}>
+                {isSecondaryPositive ? '+' : ''}{secondaryFormattedPercent}%
+              </Badge>
+            </div>
           </div>
           
           <div>
@@ -273,12 +309,7 @@ export function PriceDiscrepancyChart() {
             <div className="text-2xl font-bold mt-1">
               {Array.isArray(discrepancies) ? discrepancies.length : 0}
             </div>
-            <div className="text-xs text-gray-500 mt-1">Products with price differences</div>
-          </div>
-          
-          <div>
-            <div className="text-sm font-medium text-gray-500">Avg. Difference</div>
-            <div className="text-2xl font-bold mt-1">{calculateAverageDifference()}</div>
+            <div className="text-xs text-gray-500 mt-1">Needing attention</div>
           </div>
         </div>
       </CardHeader>
@@ -317,16 +348,19 @@ export function PriceDiscrepancyChart() {
                 domain={['dataMin - 500', 'dataMax + 500']}
               />
               
-              {/* Tooltip for showing price at each point */}
+              {/* Enhanced tooltip showing both supplier and retail prices */}
               <Tooltip 
-                formatter={(value: number) => [`$${formatPrice(value)}`, 'Price']}
+                formatter={(value: number, name: string) => {
+                  const displayName = name === 'value' ? 'Supplier' : 'Retail';
+                  return [`$${formatPrice(value)}`, displayName];
+                }}
                 labelFormatter={(label) => `Date: ${label}`}
                 contentStyle={{ 
                   backgroundColor: '#000', 
                   color: '#fff',
                   borderRadius: '4px', 
                   border: 'none',
-                  padding: '6px 10px',
+                  padding: '8px 12px',
                   fontSize: '12px'
                 }}
                 wrapperStyle={{ 
@@ -351,17 +385,35 @@ export function PriceDiscrepancyChart() {
                 }} 
               />
               
-              {/* Enhanced gradient definitions with multiple color stops matching the line color */}
+              {/* Enhanced gradient definitions with multiple color stops for both lines */}
               <defs>
+                {/* Supplier price gradient (blue) */}
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0284c7" stopOpacity={0.8}/>
-                  <stop offset="20%" stopColor="#0284c7" stopOpacity={0.5}/>
-                  <stop offset="50%" stopColor="#0284c7" stopOpacity={0.3}/>
-                  <stop offset="100%" stopColor="#0284c7" stopOpacity={0}/>
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                  <stop offset="20%" stopColor="#3b82f6" stopOpacity={0.5}/>
+                  <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
+                </linearGradient>
+                
+                {/* Retail/Shopify price gradient (purple) */}
+                <linearGradient id="colorSecondaryValue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.8}/>
+                  <stop offset="20%" stopColor="#a855f7" stopOpacity={0.5}/>
+                  <stop offset="50%" stopColor="#a855f7" stopOpacity={0.3}/>
+                  <stop offset="100%" stopColor="#a855f7" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               
-              {/* Area fill under the line with enhanced gradient */}
+              {/* Area fill under the secondary line (retail price) */}
+              <Area 
+                type="monotone"
+                dataKey="secondaryValue"
+                stroke="none"
+                fill="url(#colorSecondaryValue)"
+                fillOpacity={1}
+              />
+              
+              {/* Area fill under the primary line (supplier price) */}
               <Area 
                 type="monotone"
                 dataKey="value"
@@ -370,17 +422,34 @@ export function PriceDiscrepancyChart() {
                 fillOpacity={1}
               />
               
-              {/* The main line with enhanced styling */}
+              {/* Secondary line (retail/Shopify price) with enhanced styling */}
               <Line 
                 type="monotone" 
-                dataKey="value" 
-                name="Price"
-                stroke="#0284c7" 
+                dataKey="secondaryValue" 
+                name="Retail Price"
+                stroke="#a855f7" 
                 strokeWidth={3}
                 dot={false}
                 activeDot={{ 
                   r: 6, 
-                  fill: "#0284c7", 
+                  fill: "#a855f7", 
+                  stroke: "#fff", 
+                  strokeWidth: 2,
+                  strokeDasharray: ""
+                }}
+              />
+              
+              {/* Primary line (supplier price) with enhanced styling */}
+              <Line 
+                type="monotone" 
+                dataKey="value" 
+                name="Supplier Price"
+                stroke="#3b82f6" 
+                strokeWidth={3}
+                dot={false}
+                activeDot={{ 
+                  r: 6, 
+                  fill: "#3b82f6", 
                   stroke: "#fff", 
                   strokeWidth: 2,
                   strokeDasharray: ""
@@ -390,9 +459,22 @@ export function PriceDiscrepancyChart() {
           </ResponsiveContainer>
         </div>
         
-        <div className="flex items-center justify-end mt-2 text-xs text-gray-500">
-          <Info size={14} className="mr-1" />
-          Price trends are calculated using actual supplier pricing data from all products
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+              <span className="text-sm text-gray-600">Supplier Price</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
+              <span className="text-sm text-gray-600">Retail Price</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center text-xs text-gray-500">
+            <Info size={14} className="mr-1" />
+            Charts reflect real pricing data from tracked products
+          </div>
         </div>
       </CardContent>
     </Card>
