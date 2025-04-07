@@ -386,31 +386,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     console.log(`Processing deletion of CSV upload: ${uploadToDelete.filename}`);
     
-    // Get all products that have supplier info
-    const allProducts = await storage.getProducts(1000, 0);
-    const productsWithSupplierInfo = allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
-    
-    // Clear supplier data for all products with URLs
-    console.log(`Clearing supplier data for ${productsWithSupplierInfo.length} products with supplier info`);
-    
-    // Process each product
-    for (const product of productsWithSupplierInfo) {
-      console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
-      await storage.updateProduct(product.id, {
-        supplierUrl: null,
-        supplierPrice: null,
-        hasPriceDiscrepancy: false
+    try {
+      // First, process the CSV to get the SKUs and URLs it contains
+      const csvPath = path.join(__dirname, '..', 'attached_assets', uploadToDelete.filename);
+      let records: CsvRecord[] = [];
+      
+      try {
+        // Try to extract records from the CSV to know which products to clear
+        records = await processCsvFile(csvPath);
+        console.log(`Found ${records.length} records in CSV file ${uploadToDelete.filename}`);
+      } catch (error) {
+        console.error(`Error processing CSV file ${uploadToDelete.filename}:`, error);
+        // Fall back to clearing all supplier info if we can't process the CSV
+        console.warn(`Falling back to clearing all supplier info since CSV parsing failed`);
+      }
+      
+      // Extract the SKUs from the CSV records
+      const csvSkus = records.map(r => r.sku).filter(Boolean);
+      console.log(`Extracted ${csvSkus.length} SKUs from CSV file ${uploadToDelete.filename}`);
+      
+      // Get all products that match the SKUs in the CSV
+      const allProducts = await storage.getProducts(1000, 0);
+      
+      // Products that need supplier info cleared are either:
+      // 1. Products with SKUs found in the CSV, or
+      // 2. All products with supplier info if we couldn't extract SKUs from the CSV
+      const productsToUpdate = csvSkus.length > 0
+        ? allProducts.filter(p => csvSkus.includes(p.sku) && (p.supplierUrl !== null || p.supplierPrice !== null))
+        : allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
+      
+      console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToDelete.filename}`);
+      
+      // Process each product
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const product of productsToUpdate) {
+        try {
+          console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
+          
+          // Force explicit null values for all supplier fields
+          const updatedProduct = await storage.updateProduct(product.id, {
+            supplierUrl: null,
+            supplierPrice: null,
+            hasPriceDiscrepancy: false
+          });
+          
+          if (updatedProduct) {
+            console.log(`Successfully cleared data for product ${product.sku}`);
+            successCount++;
+          } else {
+            console.error(`Failed to update product ${product.sku} - no product returned`);
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Error clearing data for product ${product.sku}:`, error);
+          failCount++;
+        }
+      }
+      
+      // Now delete the CSV upload
+      const result = await storage.deleteCsvUpload(uploadId);
+      
+      if (!result) {
+        return res.status(404).json({ message: "CSV upload deletion failed" });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Upload deleted successfully. Reset ${successCount} products, ${failCount} failures.`
       });
+    } catch (error) {
+      console.error(`Error during CSV deletion process:`, error);
+      res.status(500).json({ message: "An error occurred during CSV deletion" });
     }
-    
-    // Now delete the CSV upload
-    const result = await storage.deleteCsvUpload(uploadId);
-    
-    if (!result) {
-      return res.status(404).json({ message: "CSV upload deletion failed" });
-    }
-    
-    res.json({ success: true, message: "Upload deleted successfully and supplier prices reset" });
   }));
   
   // Cancel processing a CSV upload
@@ -431,34 +480,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     console.log(`Processing cancellation of CSV upload: ${uploadToCancel.filename}`);
     
-    // Get all products that have supplier info
-    const allProducts = await storage.getProducts(1000, 0);
-    const productsWithSupplierInfo = allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
-    
-    // Clear supplier data for all products with URLs
-    console.log(`Clearing supplier data for ${productsWithSupplierInfo.length} products with supplier info`);
-    
-    // Process each product
-    for (const product of productsWithSupplierInfo) {
-      console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
-      await storage.updateProduct(product.id, {
-        supplierUrl: null,
-        supplierPrice: null,
-        hasPriceDiscrepancy: false
+    try {
+      // First, process the CSV to get the SKUs and URLs it contains
+      const csvPath = path.join(__dirname, '..', 'attached_assets', uploadToCancel.filename);
+      let records: CsvRecord[] = [];
+      
+      try {
+        // Try to extract records from the CSV to know which products to clear
+        records = await processCsvFile(csvPath);
+        console.log(`Found ${records.length} records in CSV file ${uploadToCancel.filename}`);
+      } catch (error) {
+        console.error(`Error processing CSV file ${uploadToCancel.filename}:`, error);
+        // Fall back to clearing all supplier info if we can't process the CSV
+        console.warn(`Falling back to clearing all supplier info since CSV parsing failed`);
+      }
+      
+      // Extract the SKUs from the CSV records
+      const csvSkus = records.map(r => r.sku).filter(Boolean);
+      console.log(`Extracted ${csvSkus.length} SKUs from CSV file ${uploadToCancel.filename}`);
+      
+      // Get all products that match the SKUs in the CSV
+      const allProducts = await storage.getProducts(1000, 0);
+      
+      // Products that need supplier info cleared are either:
+      // 1. Products with SKUs found in the CSV, or
+      // 2. All products with supplier info if we couldn't extract SKUs from the CSV
+      const productsToUpdate = csvSkus.length > 0
+        ? allProducts.filter(p => csvSkus.includes(p.sku) && (p.supplierUrl !== null || p.supplierPrice !== null))
+        : allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
+      
+      console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToCancel.filename}`);
+      
+      // Process each product
+      let successCount = 0;
+      let failCount = 0;
+      
+      for (const product of productsToUpdate) {
+        try {
+          console.log(`Clearing supplier data for product ${product.id} (${product.sku})`);
+          
+          // Force explicit null values for all supplier fields
+          const updatedProduct = await storage.updateProduct(product.id, {
+            supplierUrl: null,
+            supplierPrice: null,
+            hasPriceDiscrepancy: false
+          });
+          
+          if (updatedProduct) {
+            console.log(`Successfully cleared data for product ${product.sku}`);
+            successCount++;
+          } else {
+            console.error(`Failed to update product ${product.sku} - no product returned`);
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Error clearing data for product ${product.sku}:`, error);
+          failCount++;
+        }
+      }
+      
+      // Now update the CSV upload status
+      const upload = await storage.updateCsvUpload(uploadId, { 
+        status: 'cancelled',
+        processedCount: 0
       });
+      
+      if (!upload) {
+        return res.status(404).json({ message: "Failed to update upload status" });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Processing cancelled. Reset ${successCount} products, ${failCount} failures.` 
+      });
+    } catch (error) {
+      console.error(`Error during CSV cancellation process:`, error);
+      res.status(500).json({ message: "An error occurred during CSV cancellation" });
     }
-    
-    // Now update the CSV upload status
-    const upload = await storage.updateCsvUpload(uploadId, { 
-      status: 'cancelled',
-      processedCount: 0
-    });
-    
-    if (!upload) {
-      return res.status(404).json({ message: "Failed to update upload status" });
-    }
-    
-    res.json({ success: true, message: "Processing cancelled successfully and supplier prices reset" });
   }));
   
   app.get("/api/csv/status/:id", asyncHandler(async (req, res) => {
@@ -788,10 +886,22 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
     
     // Update final status with detailed logs
     console.log(`CSV Upload ${uploadId} processing complete. Total records: ${records.length}, Processed: ${processedCount}, Updated: ${updatedProductCount}, New: ${newProductCount}`);
-    await storage.updateCsvUpload(uploadId, {
-      processedCount,
-      status: "completed"
-    });
+    
+    // Ensure we update the status with the final count and completed status
+    try {
+      const updatedUpload = await storage.updateCsvUpload(uploadId, {
+        processedCount,
+        status: "completed"
+      });
+      
+      if (!updatedUpload) {
+        console.error(`Failed to update CSV upload ${uploadId} status to completed`);
+      } else {
+        console.log(`Successfully updated CSV upload ${uploadId} status to completed`);
+      }
+    } catch (error) {
+      console.error(`Error updating CSV upload ${uploadId} status:`, error);
+    }
   } catch (error) {
     console.error(`Error processing CSV upload ${uploadId}:`, error);
     

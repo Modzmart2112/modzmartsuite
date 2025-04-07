@@ -54,12 +54,21 @@ export default function Suppliers() {
   const [uploadToCancel, setUploadToCancel] = useState<number | null>(null);
   
   // Query recent CSV uploads
-  const { data: recentUploads, isLoading } = useQuery({
+  const { data: recentUploads, isLoading, refetch } = useQuery<{uploads: CsvUpload[]}>({
     queryKey: ['/api/csv/uploads'],
     queryFn: async () => {
       const res = await fetch('/api/csv/uploads');
       if (!res.ok) throw new Error('Failed to fetch uploads');
       return res.json();
+    },
+    refetchInterval: (data) => {
+      // Check if any uploads are still processing
+      if (data && data.uploads && data.uploads.some((upload: CsvUpload) => upload.status === 'processing')) {
+        // Poll every 3 seconds while processing
+        return 3000;
+      }
+      // Otherwise, don't poll
+      return false;
     }
   });
 
@@ -314,7 +323,7 @@ export default function Suppliers() {
                         <div className="text-center">
                           <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
                           <div className="text-2xl font-bold">
-                            {recentUploads.uploads.filter((u: CsvUpload) => u.status === 'completed').length}
+                            {recentUploads.uploads.filter((u) => u.status === 'completed').length}
                           </div>
                           <p className="text-sm text-gray-500">Completed Uploads</p>
                         </div>
