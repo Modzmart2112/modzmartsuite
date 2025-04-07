@@ -134,12 +134,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/search", asyncHandler(async (req, res) => {
     const query = req.query.q as string || '';
     
+    console.log(`Searching for products with query: "${query}"`);
+    
     if (!query || query.length < 2) {
+      console.log('Query too short, returning empty array');
       return res.json([]);
     }
     
     // Limit search results to 10 items for quick search
     const products = await storage.searchProducts(query, 10, 0);
+    console.log(`Found ${products.length} products matching "${query}"`);
+    
+    if (products.length > 0) {
+      console.log('Sample product:', products[0].title);
+    }
     
     // Return simplified product data for the dropdown
     const searchResults = products.map(product => ({

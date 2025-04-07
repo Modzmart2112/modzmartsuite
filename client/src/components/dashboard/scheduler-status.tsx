@@ -28,9 +28,13 @@ export function SchedulerStatus() {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchStatus = async () => {
-    try {
+  const fetchStatus = async (showLoading = false) => {
+    // Only show loading state on initial load or manual refresh
+    if (showLoading) {
       setLoading(true);
+    }
+    
+    try {
       const response = await fetch("/api/scheduler/status", {
         method: "GET"
       });
@@ -38,11 +42,14 @@ export function SchedulerStatus() {
       setStatus(json);
     } catch (error) {
       console.error("Failed to fetch scheduler status:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch scheduler status",
-        variant: "destructive",
-      });
+      // Only show toast on manual refresh to avoid repeated error messages
+      if (showLoading) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch scheduler status",
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -74,9 +81,11 @@ export function SchedulerStatus() {
   };
   
   useEffect(() => {
-    fetchStatus();
-    // Refresh status every 30 seconds
-    const interval = setInterval(fetchStatus, 30000);
+    // Only show loading state on the initial fetch
+    fetchStatus(true);
+    // Refresh status only every 5 minutes (reduced from 30 seconds)
+    // Don't show loading indicator for automatic refreshes to prevent UI flicker
+    const interval = setInterval(() => fetchStatus(false), 300000);
     return () => clearInterval(interval);
   }, []);
 
@@ -99,7 +108,7 @@ export function SchedulerStatus() {
         title: "Scheduler Started",
         description: "Price check scheduler has been started successfully",
       });
-      fetchStatus();
+      fetchStatus(true);
     } catch (error) {
       console.error("Failed to start scheduler:", error);
       toast({
@@ -130,7 +139,7 @@ export function SchedulerStatus() {
         title: "Scheduler Stopped",
         description: "Price check scheduler has been stopped",
       });
-      fetchStatus();
+      fetchStatus(true);
     } catch (error) {
       console.error("Failed to stop scheduler:", error);
       toast({
@@ -161,6 +170,8 @@ export function SchedulerStatus() {
         title: "Price Check Started",
         description: "Price check has been initiated",
       });
+      // Fetch updated status after initiating the price check
+      fetchStatus(true);
     } catch (error) {
       console.error("Failed to run price check:", error);
       toast({
@@ -192,7 +203,7 @@ export function SchedulerStatus() {
         title: "Stats Reset",
         description: "Price check statistics have been reset",
       });
-      fetchStatus();
+      fetchStatus(true);
     } catch (error) {
       console.error("Failed to reset stats:", error);
       toast({
