@@ -900,6 +900,126 @@ async function seleniumProSpeedRacingScraper(url: string): Promise<ScrapedPriceR
   }
 }
 
+/**
+ * Special handling for ProSpeedRacing sites using curl command directly
+ * This bypasses any browser/JavaScript issues and gets the raw HTML directly
+ */
+async function curlProSpeedRacingPrice(url: string): Promise<ScrapedPriceResult> {
+  console.log(`Running curl-based price extraction for ProSpeedRacing: ${url}`);
+  
+  // Extract SKU from URL
+  let sku = url.split('/').pop() || '';
+  if (sku && sku.includes('?')) {
+    sku = sku.split('?')[0];
+  }
+  
+  try {
+    // Use dynamic import to avoid issues on environments where child_process might not be available
+    const { exec } = await import('child_process');
+    
+    // First, let's try to get the OpenGraph price tag directly - most reliable for this site
+    const ogPriceCommand = `curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" "${url}" | grep -o '<meta property="og:price:amount" content="[^"]*"' | head -1`;
+    
+    return new Promise((resolve) => {
+      exec(ogPriceCommand, (error, stdout, stderr) => {
+        if (error || !stdout.trim()) {
+          console.log(`Direct OpenGraph meta tag extraction failed, trying alternative curl approach`);
+          
+          // If OpenGraph tag fails, try to fetch and scan the full HTML for price patterns
+          const fullCommand = `curl -s -L -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" "${url}" | grep -o '\\$[0-9,]*\\.[0-9][0-9]' | sort | uniq`;
+          
+          exec(fullCommand, (err2, stdout2, stderr2) => {
+            if (err2 || !stdout2.trim()) {
+              console.log(`All curl-based extraction methods failed for ${url}`);
+              return resolve({
+                sku,
+                url,
+                price: null,
+                error: "Failed to extract price using curl commands",
+              });
+            }
+            
+            // We might get multiple price matches, so find the highest one (usually the regular price)
+            const priceMatches = stdout2.trim().split('\n');
+            console.log(`Found ${priceMatches.length} price matches with curl:`, priceMatches);
+            
+            if (priceMatches.length > 0) {
+              // Process each price string
+              const prices: number[] = [];
+              
+              for (const priceStr of priceMatches) {
+                // Clean and parse the price
+                const cleanPrice = priceStr.replace('$', '').replace(/,/g, '').trim();
+                const price = parseFloat(cleanPrice);
+                
+                if (!isNaN(price) && price > 0) {
+                  prices.push(price);
+                }
+              }
+              
+              // Sort prices from highest to lowest
+              prices.sort((a, b) => b - a);
+              
+              if (prices.length > 0) {
+                console.log(`Using highest price from curl results: $${prices[0]}`);
+                return resolve({
+                  sku,
+                  url,
+                  price: prices[0],
+                  note: "Price extracted using curl command (direct HTML extraction)"
+                });
+              }
+            }
+            
+            return resolve({
+              sku,
+              url,
+              price: null,
+              error: "No valid prices found in curl extraction results",
+            });
+          });
+          
+          return;
+        }
+        
+        // We found an OpenGraph meta tag, now extract the price from it
+        const priceTagMatch = stdout.match(/content="([^"]+)"/);
+        if (priceTagMatch && priceTagMatch[1]) {
+          const rawPrice = priceTagMatch[1];
+          console.log(`Found OpenGraph price with curl: ${rawPrice}`);
+          
+          // Parse the price
+          const price = parseFloat(rawPrice.replace(/,/g, ''));
+          if (!isNaN(price) && price > 0) {
+            console.log(`Successfully extracted price: $${price} with direct curl on OpenGraph meta`);
+            return resolve({
+              sku,
+              url,
+              price,
+              note: "Price extracted using curl command (OpenGraph meta)"
+            });
+          }
+        }
+        
+        return resolve({
+          sku,
+          url,
+          price: null,
+          error: "Failed to parse price from OpenGraph meta tag",
+        });
+      });
+    });
+  } catch (error) {
+    console.error(`Error in curl-based extraction:`, error);
+    return {
+      sku,
+      url,
+      price: null,
+      error: (error as Error).message,
+    };
+  }
+}
+
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
   // Note: We've enhanced our scraper to handle JavaScript-rendered prices
   // which often differ from the server-side HTML prices
@@ -912,7 +1032,30 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
   console.log(`Scraping price from URL: ${url}`);
   console.log(`Environment checks: Puppeteer=${canUsePuppeteer}, Selenium=${canUseSelenium}, Replit=${isReplit}`);
   
-  // First try the enhanced fetcher method for all URLs - most reliable and efficient
+  // Special case for ProSpeedRacing - we've found that direct curl works best for them
+  if (url.includes('prospeedracing.com.au')) {
+    console.log(`ProSpeedRacing URL detected: ${url} - trying curl-based extraction first`);
+    try {
+      const curlResult = await curlProSpeedRacingPrice(url);
+      if (curlResult.price !== null) {
+        console.log(`Successfully extracted price with curl: $${curlResult.price}`);
+        
+        // Apply any site-specific price adjustments
+        const adjustedPrice = adjustPrice(curlResult.price, url);
+        if (adjustedPrice !== curlResult.price) {
+          console.log(`Applied price adjustment: ${curlResult.price} -> ${adjustedPrice}`);
+          curlResult.price = adjustedPrice;
+        }
+        
+        return curlResult;
+      }
+      console.log(`Curl extraction failed, falling back to other methods`);
+    } catch (curlError) {
+      console.error(`Error during curl extraction: ${(curlError as Error).message}`);
+    }
+  }
+  
+  // Try the enhanced fetcher method for all URLs - most reliable and efficient
   try {
     console.log(`Attempting enhanced fetcher method for URL: ${url}`);
     const fetcherResult = await enhancedFetcher(url);
@@ -939,7 +1082,7 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     console.error(`Error during enhanced fetcher: ${(fetcherError as Error).message}`);
   }
   
-  // Special handling for ProSpeedRacing URLs if enhanced fetcher failed
+  // Additional handling for ProSpeedRacing URLs if both curl and enhanced fetcher failed
   if (url.includes('prospeedracing.com.au')) {
     console.log(`ProSpeedRacing URL detected: ${url} - using specialized extraction logic`);
     
