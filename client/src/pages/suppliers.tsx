@@ -25,7 +25,8 @@ import {
   Calendar,
   RefreshCw,
   Link2,
-  Percent
+  Percent,
+  Globe
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -560,7 +561,7 @@ export default function Suppliers() {
                   <span className="text-sm text-gray-500 mb-1 ml-2">of {formatNumber(totalProducts)} products</span>
                 </div>
                 
-                <div className="h-[180px] mb-4">
+                <div className="h-[180px] mb-4 relative flex items-center justify-center">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <defs>
@@ -601,6 +602,11 @@ export default function Suppliers() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-white w-[100px] h-[100px] rounded-full shadow-md flex items-center justify-center">
+                      <Globe className="h-14 w-14 text-purple-500" />
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="space-y-3.5 mt-2">
