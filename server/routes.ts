@@ -9,10 +9,10 @@ import { scrapePriceFromUrl } from "./scraper";
 import { sendTelegramNotification } from "./telegram";
 import { ZodError } from "zod";
 import multer from "multer";
-import csvParser from "csv-parser";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { processCsvFile } from "./csv-handler";
 
 
 // Helper function to handle controller errors
@@ -324,36 +324,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     for (const file of req.files as Express.Multer.File[]) {
       const records: CsvRecord[] = [];
       
-      // Process the CSV file
+      // Process the CSV file using our dedicated handler
       try {
-        const parsePromise = new Promise<CsvRecord[]>((resolve, reject) => {
-          fs.createReadStream(file.path)
-            .pipe(csvParser())
-            .on("data", (data: any) => {
-              // Map CSV columns to our expected format
-              const record: CsvRecord = {
-                sku: data.SKU || data.sku || "",
-                originUrl: data["Origin URL"] || data["origin_url"] || data.originUrl || "",
-                title: data.Title || data.title || "",
-                cost: data["Cost per item"] || data.cost || "",
-                price: data.Price || data.price || "",
-                description: data.Description || data.description || ""
-              };
-              
-              // Only add records with SKU and Origin URL
-              if (record.sku && record.originUrl) {
-                records.push(record);
-              }
-            })
-            .on("end", () => {
-              resolve(records);
-            })
-            .on("error", (error) => {
-              reject(error);
-            });
-        });
-        
-        await parsePromise;
+        const csvRecords = await processCsvFile(file.path);
+        records.push(...csvRecords);
         
         // Create CSV upload record
         const csvUpload = await storage.createCsvUpload({
