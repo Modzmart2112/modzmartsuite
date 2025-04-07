@@ -115,7 +115,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
   
   app.get("/api/products/discrepancies", asyncHandler(async (req, res) => {
+    console.log("Fetching price discrepancies");
     const discrepancies = await storage.getPriceDiscrepancies();
+    console.log(`Found ${discrepancies.length} price discrepancies`);
     res.json(discrepancies);
   }));
   
