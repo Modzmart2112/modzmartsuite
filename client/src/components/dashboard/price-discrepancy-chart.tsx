@@ -345,7 +345,7 @@ export function PriceDiscrepancyChart() {
                 tick={{ fontSize: 12 }} 
                 width={40}
                 tickFormatter={(value) => `$${Math.round(value / 1000)}k`}
-                domain={['dataMin - 500', 'dataMax + 500']}
+                domain={['dataMin - 700', 'dataMax + 700']}
               />
               
               {/* Enhanced tooltip showing both supplier and retail prices */}
@@ -387,59 +387,37 @@ export function PriceDiscrepancyChart() {
               
               {/* Enhanced gradient definitions with multiple color stops for both lines */}
               <defs>
-                {/* Supplier price gradient (blue) */}
+                {/* Supplier price gradient (blue) - enhanced colorization */}
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                  <stop offset="20%" stopColor="#3b82f6" stopOpacity={0.5}/>
-                  <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.9}/>
+                  <stop offset="20%" stopColor="#3b82f6" stopOpacity={0.7}/>
+                  <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
                   <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
                 
-                {/* Retail/Shopify price gradient (purple) */}
+                {/* Retail/Shopify price gradient (purple) - enhanced colorization */}
                 <linearGradient id="colorSecondaryValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.8}/>
-                  <stop offset="20%" stopColor="#a855f7" stopOpacity={0.5}/>
-                  <stop offset="50%" stopColor="#a855f7" stopOpacity={0.3}/>
+                  <stop offset="0%" stopColor="#a855f7" stopOpacity={0.9}/>
+                  <stop offset="20%" stopColor="#a855f7" stopOpacity={0.7}/>
+                  <stop offset="50%" stopColor="#a855f7" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#a855f7" stopOpacity={0.05}/>
                   <stop offset="100%" stopColor="#a855f7" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               
-              {/* Area fill under the secondary line (retail price) */}
-              <Area 
-                type="monotone"
-                dataKey="secondaryValue"
-                stroke="none"
-                fill="url(#colorSecondaryValue)"
-                fillOpacity={1}
-              />
-              
-              {/* Area fill under the primary line (supplier price) */}
+              {/* Primary area and line - Supplier Price (blue) */}
               <Area 
                 type="monotone"
                 dataKey="value"
                 stroke="none"
+                strokeWidth={0}
                 fill="url(#colorValue)"
-                fillOpacity={1}
+                fillOpacity={0.8}
+                isAnimationActive={false}
+                stackId="1"
               />
               
-              {/* Secondary line (retail/Shopify price) with enhanced styling */}
-              <Line 
-                type="monotone" 
-                dataKey="secondaryValue" 
-                name="Retail Price"
-                stroke="#a855f7" 
-                strokeWidth={3}
-                dot={false}
-                activeDot={{ 
-                  r: 6, 
-                  fill: "#a855f7", 
-                  stroke: "#fff", 
-                  strokeWidth: 2,
-                  strokeDasharray: ""
-                }}
-              />
-              
-              {/* Primary line (supplier price) with enhanced styling */}
               <Line 
                 type="monotone" 
                 dataKey="value" 
@@ -447,12 +425,40 @@ export function PriceDiscrepancyChart() {
                 stroke="#3b82f6" 
                 strokeWidth={3}
                 dot={false}
+                isAnimationActive={false}
                 activeDot={{ 
                   r: 6, 
                   fill: "#3b82f6", 
                   stroke: "#fff", 
-                  strokeWidth: 2,
-                  strokeDasharray: ""
+                  strokeWidth: 2
+                }}
+              />
+
+              {/* Secondary area and line - Retail Price (purple) */}
+              <Area 
+                type="monotone"
+                dataKey="secondaryValue"
+                stroke="none"
+                strokeWidth={0}
+                fill="url(#colorSecondaryValue)"
+                fillOpacity={0.8}
+                isAnimationActive={false}
+                stackId="2"
+              />
+              
+              <Line 
+                type="monotone" 
+                dataKey="secondaryValue" 
+                name="Retail Price"
+                stroke="#a855f7" 
+                strokeWidth={3}
+                dot={false}
+                isAnimationActive={false}
+                activeDot={{ 
+                  r: 6, 
+                  fill: "#a855f7", 
+                  stroke: "#fff", 
+                  strokeWidth: 2
                 }}
               />
             </LineChart>
