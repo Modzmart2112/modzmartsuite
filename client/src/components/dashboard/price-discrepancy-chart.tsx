@@ -201,33 +201,33 @@ export function PriceDiscrepancyChart() {
   const isPositive = percentChange >= 0;
 
   return (
-    <Card className="shadow-md">
-      <CardHeader className="pb-0">
+    <Card className="shadow-md" style={{ backgroundColor: '#111827', border: '1px solid #1f2937' }}>
+      <CardHeader className="pb-0" style={{ backgroundColor: '#111827' }}>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl font-semibold text-gray-800">Price Trends</CardTitle>
-            <CardDescription>Average supplier prices over time</CardDescription>
+            <CardTitle className="text-xl font-semibold text-white">Price Trends</CardTitle>
+            <CardDescription className="text-gray-400">Average supplier prices over time</CardDescription>
           </div>
           
           <div className="flex items-center">
-            <div className="flex border rounded-md overflow-hidden">
+            <div className="flex border border-gray-700 rounded-md overflow-hidden bg-gray-900">
               <Button 
                 variant={timeRange === '30D' ? 'default' : 'ghost'}
-                className="h-8 px-3 rounded-none" 
+                className={`h-8 px-3 rounded-none ${timeRange !== '30D' ? 'text-gray-400 hover:text-white' : ''}`}
                 onClick={() => setTimeRange('30D')}
               >
                 30D
               </Button>
               <Button 
                 variant={timeRange === '90D' ? 'default' : 'ghost'}
-                className="h-8 px-3 rounded-none" 
+                className={`h-8 px-3 rounded-none ${timeRange !== '90D' ? 'text-gray-400 hover:text-white' : ''}`}
                 onClick={() => setTimeRange('90D')}
               >
                 90D
               </Button>
               <Button 
                 variant={timeRange === '6M' ? 'default' : 'ghost'}
-                className="h-8 px-3 rounded-none" 
+                className={`h-8 px-3 rounded-none ${timeRange !== '6M' ? 'text-gray-400 hover:text-white' : ''}`}
                 onClick={() => setTimeRange('6M')}
               >
                 6M
@@ -238,7 +238,7 @@ export function PriceDiscrepancyChart() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="ml-4 gap-1 text-sm font-medium" 
+                className="ml-4 gap-1 text-sm font-medium text-gray-300 border-gray-700 hover:bg-gray-800 hover:text-white" 
                 onClick={() => clearDiscrepanciesMutation.mutate()}
                 disabled={clearDiscrepanciesMutation.isPending}
               >
@@ -252,39 +252,39 @@ export function PriceDiscrepancyChart() {
         
         <div className="grid grid-cols-4 gap-4 mt-6">
           <div>
-            <div className="text-sm font-medium text-gray-500">Total Revenue</div>
-            <div className="text-2xl font-bold mt-1">{formatTotalRevenue()}</div>
+            <div className="text-sm font-medium text-gray-400">Total Revenue</div>
+            <div className="text-2xl font-bold mt-1 text-white">{formatTotalRevenue()}</div>
             <div className="flex items-center mt-1">
-              <Badge variant="outline" className={`${isPositive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'} hover:bg-opacity-100`}>
+              <Badge variant="outline" className={`${isPositive ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'} hover:bg-opacity-100`}>
                 {isPositive ? '+' : ''}{formattedPercent}%
               </Badge>
-              <span className="text-xs text-gray-500 ml-2">vs prev. period</span>
+              <span className="text-xs text-gray-400 ml-2">vs prev. period</span>
             </div>
           </div>
           
           <div>
-            <div className="text-sm font-medium text-gray-500">Current Value</div>
-            <div className="text-2xl font-bold mt-1">${formatPrice(currentValue)}</div>
-            <div className="text-xs text-gray-500 mt-1">Last updated today</div>
+            <div className="text-sm font-medium text-gray-400">Current Value</div>
+            <div className="text-2xl font-bold mt-1 text-white">${formatPrice(currentValue)}</div>
+            <div className="text-xs text-gray-400 mt-1">Last updated today</div>
           </div>
           
           <div>
-            <div className="text-sm font-medium text-gray-500">Price Discrepancies</div>
-            <div className="text-2xl font-bold mt-1">
+            <div className="text-sm font-medium text-gray-400">Price Discrepancies</div>
+            <div className="text-2xl font-bold mt-1 text-white">
               {Array.isArray(discrepancies) ? discrepancies.length : 0}
             </div>
-            <div className="text-xs text-gray-500 mt-1">Products with price differences</div>
+            <div className="text-xs text-gray-400 mt-1">Products with price differences</div>
           </div>
           
           <div>
-            <div className="text-sm font-medium text-gray-500">Avg. Difference</div>
-            <div className="text-2xl font-bold mt-1">{calculateAverageDifference()}</div>
+            <div className="text-sm font-medium text-gray-400">Avg. Difference</div>
+            <div className="text-2xl font-bold mt-1 text-white">{calculateAverageDifference()}</div>
           </div>
         </div>
       </CardHeader>
       
-      <CardContent className="pt-0">
-        <div className="h-[350px] mt-8">
+      <CardContent className="pt-0" style={{ backgroundColor: '#111827' }}>
+        <div className="h-[350px] mt-8" style={{ backgroundColor: '#111827' }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}
@@ -299,11 +299,11 @@ export function PriceDiscrepancyChart() {
                 vertical={false} 
                 horizontal={true}
                 strokeDasharray="3 3" 
-                stroke="#f0f0f0" 
+                stroke="#2d3748" 
               />
               <XAxis 
                 dataKey="date" 
-                tick={{ fontSize: 12 }} 
+                tick={{ fontSize: 12, fill: "#9ca3af" }} 
                 axisLine={false} 
                 tickLine={false}
                 padding={{ left: 0, right: 0 }}
@@ -311,7 +311,7 @@ export function PriceDiscrepancyChart() {
               <YAxis 
                 axisLine={false} 
                 tickLine={false} 
-                tick={{ fontSize: 12 }} 
+                tick={{ fontSize: 12, fill: "#9ca3af" }} 
                 width={40}
                 tickFormatter={(value) => `$${Math.round(value / 1000)}k`}
                 domain={['dataMin - 500', 'dataMax + 500']}
@@ -351,13 +351,12 @@ export function PriceDiscrepancyChart() {
                 }} 
               />
               
-              {/* Enhanced gradient definitions with multiple color stops matching the line color */}
+              {/* Gradient definitions matching the reference dark theme */}
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0284c7" stopOpacity={0.8}/>
-                  <stop offset="20%" stopColor="#0284c7" stopOpacity={0.5}/>
-                  <stop offset="50%" stopColor="#0284c7" stopOpacity={0.3}/>
-                  <stop offset="100%" stopColor="#0284c7" stopOpacity={0}/>
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.5}/>
+                  <stop offset="40%" stopColor="#0284c7" stopOpacity={0.3}/>
+                  <stop offset="100%" stopColor="#0c4a6e" stopOpacity={0.05}/>
                 </linearGradient>
               </defs>
               
@@ -370,17 +369,22 @@ export function PriceDiscrepancyChart() {
                 fillOpacity={1}
               />
               
-              {/* The main line with enhanced styling */}
+              {/* The main line with enhanced styling - bright blue line */}
               <Line 
                 type="monotone" 
                 dataKey="value" 
                 name="Price"
-                stroke="#0284c7" 
+                stroke="#38bdf8" 
                 strokeWidth={3}
-                dot={false}
+                dot={{ 
+                  r: 4, 
+                  fill: "#38bdf8", 
+                  stroke: "#fff",
+                  strokeWidth: 2
+                }}
                 activeDot={{ 
                   r: 6, 
-                  fill: "#0284c7", 
+                  fill: "#38bdf8", 
                   stroke: "#fff", 
                   strokeWidth: 2,
                   strokeDasharray: ""
@@ -390,8 +394,8 @@ export function PriceDiscrepancyChart() {
           </ResponsiveContainer>
         </div>
         
-        <div className="flex items-center justify-end mt-2 text-xs text-gray-500">
-          <Info size={14} className="mr-1" />
+        <div className="flex items-center justify-end mt-2 text-xs text-gray-400">
+          <Info size={14} className="mr-1 text-gray-400" />
           Price trends are calculated using actual supplier pricing data from all products
         </div>
       </CardContent>
