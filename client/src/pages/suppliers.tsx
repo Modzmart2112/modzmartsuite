@@ -316,95 +316,133 @@ export default function Suppliers() {
       </div>
       
       {/* Overview statistics section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <Card className="shadow-sm border border-gray-100 overflow-hidden">
+          <CardHeader className="pb-2 pt-6 px-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Total Products</p>
-                <div className="flex items-end">
-                  <h3 className="text-2xl font-bold">{formatNumber(totalProducts)}</h3>
-                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
-                </div>
-              </div>
-              <div className="p-3 bg-blue-50 rounded-md">
-                <Boxes className="h-6 w-6 text-blue-500" />
+              <CardTitle className="text-sm font-medium text-gray-600">Total Products</CardTitle>
+              <div className="p-2 bg-blue-50 rounded-full">
+                <Boxes className="h-4 w-4 text-blue-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              All products in your inventory
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-end">
+              <h3 className="text-3xl font-bold text-gray-900">{formatNumber(totalProducts)}</h3>
+              <span className="text-sm text-gray-500 mb-1 ml-2">items</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1.5">
+              Total products in your inventory
             </p>
-          </CardContent>
-        </Card>
-        
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">With Supplier URLs</p>
-                <div className="flex items-end">
-                  <h3 className="text-2xl font-bold">{formatNumber(withSupplierUrl)}</h3>
-                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
-                </div>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-md">
-                <LinkIcon className="h-6 w-6 text-purple-500" />
-              </div>
-            </div>
-            <div className="mt-2">
-              <Progress value={calculatePercentage(withSupplierUrl, totalProducts)} className="h-1" />
-              <p className="text-xs text-gray-500 mt-1">
-                {calculatePercentage(withSupplierUrl, totalProducts)}% of products have supplier URLs
-              </p>
+            
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
+              <span className="text-gray-500">Synced with Shopify</span>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
+        <Card className="shadow-sm border border-gray-100 overflow-hidden">
+          <CardHeader className="pb-2 pt-6 px-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">With Supplier Prices</p>
-                <div className="flex items-end">
-                  <h3 className="text-2xl font-bold">{formatNumber(withSupplierPrice)}</h3>
-                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
-                </div>
-              </div>
-              <div className="p-3 bg-green-50 rounded-md">
-                <DollarSign className="h-6 w-6 text-green-500" />
+              <CardTitle className="text-sm font-medium text-gray-600">Supplier URLs</CardTitle>
+              <div className="p-2 bg-purple-50 rounded-full">
+                <LinkIcon className="h-4 w-4 text-purple-600" />
               </div>
             </div>
-            <div className="mt-2">
-              <Progress value={calculatePercentage(withSupplierPrice, totalProducts)} className="h-1" />
-              <p className="text-xs text-gray-500 mt-1">
-                {calculatePercentage(withSupplierPrice, totalProducts)}% of products have supplier prices
-              </p>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-end">
+              <h3 className="text-3xl font-bold text-gray-900">{formatNumber(withSupplierUrl)}</h3>
+              <span className="text-sm text-gray-500 mb-1 ml-2">items</span>
+            </div>
+            
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                <span>Coverage</span>
+                <span className="font-medium">{calculatePercentage(withSupplierUrl, totalProducts)}%</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full" 
+                  style={{ width: `${calculatePercentage(withSupplierUrl, totalProducts)}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <div className="h-1.5 w-1.5 rounded-full bg-purple-500"></div>
+              <span className="text-gray-500">Products with supplier URLs</span>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm">
-          <CardContent className="pt-6">
+        <Card className="shadow-sm border border-gray-100 overflow-hidden">
+          <CardHeader className="pb-2 pt-6 px-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Price Discrepancies</p>
-                <div className="flex items-end">
-                  <h3 className="text-2xl font-bold">{formatNumber(withDiscrepancies)}</h3>
-                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
-                </div>
-              </div>
-              <div className="p-3 bg-orange-50 rounded-md">
-                <Percent className="h-6 w-6 text-orange-500" />
+              <CardTitle className="text-sm font-medium text-gray-600">Supplier Prices</CardTitle>
+              <div className="p-2 bg-green-50 rounded-full">
+                <DollarSign className="h-4 w-4 text-green-600" />
               </div>
             </div>
-            <div className="mt-2">
-              <Progress 
-                value={calculatePercentage(withDiscrepancies, withSupplierPrice)} 
-                className={`h-1 ${withDiscrepancies > 0 ? '[&>div]:bg-orange-500' : ''}`} 
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {calculatePercentage(withDiscrepancies, withSupplierPrice)}% of products with supplier prices
-              </p>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-end">
+              <h3 className="text-3xl font-bold text-gray-900">{formatNumber(withSupplierPrice)}</h3>
+              <span className="text-sm text-gray-500 mb-1 ml-2">items</span>
+            </div>
+            
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                <span>Coverage</span>
+                <span className="font-medium">{calculatePercentage(withSupplierPrice, totalProducts)}%</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full" 
+                  style={{ width: `${calculatePercentage(withSupplierPrice, totalProducts)}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+              <span className="text-gray-500">Products with scraped prices</span>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm border border-gray-100 overflow-hidden">
+          <CardHeader className="pb-2 pt-6 px-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-gray-600">Price Discrepancies</CardTitle>
+              <div className="p-2 bg-orange-50 rounded-full">
+                <Percent className="h-4 w-4 text-orange-600" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex items-end">
+              <h3 className="text-3xl font-bold text-gray-900">{formatNumber(withDiscrepancies)}</h3>
+              <span className="text-sm text-gray-500 mb-1 ml-2">items</span>
+            </div>
+            
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                <span>% of priced products</span>
+                <span className="font-medium">{calculatePercentage(withDiscrepancies, withSupplierPrice)}%</span>
+              </div>
+              <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full" 
+                  style={{ width: `${calculatePercentage(withDiscrepancies, withSupplierPrice)}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="mt-3 flex items-center gap-2 text-xs">
+              <div className="h-1.5 w-1.5 rounded-full bg-orange-500"></div>
+              <span className="text-gray-500">Products with different prices</span>
             </div>
           </CardContent>
         </Card>
