@@ -2,9 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useQuery } from "@tanstack/react-query";
 
 export function ProductsOverview() {
-  // Fetch dashboard stats from API
+  // Fetch dashboard stats from API with refetch interval
   const { data: stats, isLoading } = useQuery({
     queryKey: ['/api/dashboard/stats'],
+    // Refetch every 10 seconds to keep data updated, especially after operations
+    refetchInterval: 10000,
   });
 
   // Calculate percentage of active products

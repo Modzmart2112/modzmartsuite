@@ -29,8 +29,9 @@ export function PriceDiscrepancyList() {
         title: "Success",
         description: data.message || `Cleared ${data.clearedCount || 0} price discrepancies`,
       });
-      // Invalidate the discrepancies query to refresh the data
+      // Invalidate the discrepancies query and dashboard stats to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
     },
     onError: (error) => {
       toast({
@@ -53,8 +54,9 @@ export function PriceDiscrepancyList() {
         title: "Success",
         description: `Successfully re-checked product price`,
       });
-      // Invalidate the discrepancies query to refresh the data
+      // Invalidate the discrepancies query and dashboard stats to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
     },
     onError: (error: any) => {
       toast({
@@ -77,8 +79,9 @@ export function PriceDiscrepancyList() {
         title: "Success",
         description: data.message || "Price discrepancy cleared",
       });
-      // Invalidate the discrepancies query to refresh the data
+      // Invalidate the discrepancies query and dashboard stats to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
     },
     onError: (error) => {
       toast({
@@ -113,8 +116,9 @@ export function PriceDiscrepancyList() {
         title: "Re-check Complete",
         description: `Re-checked all products with discrepancies. Found ${data.updatedCount || 0} updates.`,
       });
-      // Invalidate the discrepancies query to refresh the data
+      // Invalidate the discrepancies query and dashboard stats to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
     },
     onError: (error) => {
       toast({
