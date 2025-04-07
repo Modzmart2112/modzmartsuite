@@ -351,15 +351,17 @@ export function PriceDiscrepancyChart() {
                 }} 
               />
               
-              {/* Gradient definitions */}
+              {/* Enhanced gradient definitions with multiple color stops matching the line color */}
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#38BDF8" stopOpacity={0}/>
+                  <stop offset="0%" stopColor="#0284c7" stopOpacity={0.8}/>
+                  <stop offset="20%" stopColor="#0284c7" stopOpacity={0.5}/>
+                  <stop offset="50%" stopColor="#0284c7" stopOpacity={0.3}/>
+                  <stop offset="100%" stopColor="#0284c7" stopOpacity={0}/>
                 </linearGradient>
               </defs>
               
-              {/* Area fill under the line */}
+              {/* Area fill under the line with enhanced gradient */}
               <Area 
                 type="monotone"
                 dataKey="value"
@@ -368,19 +370,20 @@ export function PriceDiscrepancyChart() {
                 fillOpacity={1}
               />
               
-              {/* The main line */}
+              {/* The main line with enhanced styling */}
               <Line 
                 type="monotone" 
                 dataKey="value" 
                 name="Price"
-                stroke="#38BDF8" 
-                strokeWidth={2}
+                stroke="#0284c7" 
+                strokeWidth={3}
                 dot={false}
                 activeDot={{ 
                   r: 6, 
-                  fill: "#38BDF8", 
+                  fill: "#0284c7", 
                   stroke: "#fff", 
-                  strokeWidth: 2 
+                  strokeWidth: 2,
+                  strokeDasharray: ""
                 }}
               />
             </LineChart>
