@@ -124,7 +124,14 @@ export class MemStorage implements IStorage {
 
   async createUser(userData: InsertUser): Promise<User> {
     const id = this.userIdCounter++;
-    const user: User = { ...userData, id };
+    const user: User = {
+      ...userData,
+      id,
+      telegramChatId: userData.telegramChatId || null,
+      shopifyApiKey: userData.shopifyApiKey || null,
+      shopifyApiSecret: userData.shopifyApiSecret || null,
+      shopifyStoreUrl: userData.shopifyStoreUrl || null,
+    };
     this.users.set(id, user);
     return user;
   }
@@ -175,6 +182,14 @@ export class MemStorage implements IStorage {
     const product: Product = { 
       ...productData, 
       id,
+      status: productData.status || null,
+      description: productData.description || null,
+      supplierUrl: productData.supplierUrl || null,
+      supplierPrice: productData.supplierPrice || null,
+      lastScraped: productData.lastScraped || null,
+      images: productData.images || null,
+      vendor: productData.vendor || null,
+      productType: productData.productType || null,
       createdAt: now,
       updatedAt: now
     };
@@ -201,6 +216,7 @@ export class MemStorage implements IStorage {
     const history: PriceHistory = { 
       ...historyData, 
       id,
+      supplierPrice: historyData.supplierPrice || null,
       createdAt: new Date()
     };
     this.priceHistories.set(id, history);
@@ -210,7 +226,11 @@ export class MemStorage implements IStorage {
   async getPriceHistoryByProductId(productId: number, limit: number): Promise<PriceHistory[]> {
     return Array.from(this.priceHistories.values())
       .filter(history => history.productId === productId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeB - timeA;
+      })
       .slice(0, limit);
   }
 
@@ -237,7 +257,11 @@ export class MemStorage implements IStorage {
 
   async getRecentCsvUploads(limit: number): Promise<CsvUpload[]> {
     return Array.from(this.csvUploads.values())
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeB - timeA;
+      })
       .slice(0, limit);
   }
   
@@ -251,7 +275,9 @@ export class MemStorage implements IStorage {
     const notification: Notification = { 
       ...notificationData, 
       id,
-      createdAt: new Date()
+      status: notificationData.status || null,
+      createdAt: new Date(),
+      sentAt: null
     };
     this.notifications.set(id, notification);
     return notification;
@@ -269,7 +295,11 @@ export class MemStorage implements IStorage {
   async getPendingNotifications(): Promise<Notification[]> {
     return Array.from(this.notifications.values())
       .filter(notification => notification.status === 'pending')
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeA - timeB;
+      });
   }
 
   // Stats operations
