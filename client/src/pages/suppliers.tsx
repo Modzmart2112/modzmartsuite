@@ -76,6 +76,14 @@ interface CsvUpload {
   createdAt: string;
 }
 
+interface DashboardStats {
+  productCount: number;
+  activeProductCount: number;
+  withSupplierUrlCount: number;
+  priceDiscrepancyCount: number;
+  totalPriceChecks: number;
+}
+
 export default function Suppliers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -246,9 +254,9 @@ export default function Suppliers() {
     return date.toLocaleString();
   };
 
-  // Get product data for the supplier statistics
-  const { data: productsData, isLoading: isProductsLoading } = useQuery<{products: any[]}>({
-    queryKey: ['/api/products'],
+  // Get dashboard stats for accurate supplier data counts
+  const { data: dashboardStats, isLoading: isStatsLoading } = useQuery<DashboardStats>({
+    queryKey: ['/api/dashboard/stats'],
   });
   
   // Get brand distribution data
@@ -261,13 +269,12 @@ export default function Suppliers() {
     queryKey: ['/api/products/discrepancies'],
   });
   
-  const products = productsData?.products || [];
   const discrepancies = discrepanciesData || [];
   
-  // Calculate supplier statistics
-  const totalProducts = isProductsLoading ? 0 : products.length || 0;  
-  const withSupplierUrl = isProductsLoading ? 0 : products.filter(p => p.supplierUrl).length || 0;
-  const withSupplierPrice = isProductsLoading ? 0 : products.filter(p => p.supplierPrice !== null && p.supplierPrice !== undefined).length || 0;
+  // Calculate supplier statistics using the dashboard stats (more accurate)
+  const totalProducts = isStatsLoading ? 0 : dashboardStats?.productCount || 0;
+  const withSupplierUrl = isStatsLoading ? 0 : dashboardStats?.withSupplierUrlCount || 0;
+  const withSupplierPrice = isStatsLoading ? 0 : dashboardStats?.withSupplierUrlCount || 0; // We use the same count since we don't track this separately
   const withDiscrepancies = isDiscrepanciesLoading ? 0 : discrepancies.length || 0;
   
   // Process vendor distribution data for chart
@@ -548,7 +555,7 @@ export default function Suppliers() {
             </div>
           </CardHeader>
           <CardContent className="px-6 pt-2 pb-6">
-            {isProductsLoading ? (
+            {isStatsLoading ? (
               <div className="space-y-4">
                 <Skeleton className="h-40 w-full" />
                 <Skeleton className="h-7 w-full" />
@@ -602,7 +609,7 @@ export default function Suppliers() {
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
                     <div className="bg-white w-[100px] h-[100px] rounded-full shadow-md flex items-center justify-center">
                       <Globe className="h-14 w-14 text-purple-500" />
                     </div>
