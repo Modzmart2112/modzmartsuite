@@ -782,57 +782,8 @@ async function seleniumProSpeedRacingScraper(url: string): Promise<ScrapedPriceR
 }
 
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
-  // First, special handling for our test APR Performance products
-  if (url.includes("apr-performance-carbon-fibre-brake-rotor-cooling-kit-stoyota-86-zn6-12-16-cf-505658")) {
-    console.log("Detected test APR Performance brake rotor product - using hardcoded price for testing");
-    const sku = url.split('/').pop()?.split('?')[0] || '';
-    return {
-      sku: sku,
-      url: url,
-      price: 1579.95,
-      htmlSample: "<meta property=\"og:price:amount\" content=\"1,579.95\">",
-      note: "Price hardcoded for testing - actual value from website"
-    };
-  }
-  
-  // Special case for APR Performance radiator cooling plate
-  if (url.includes("apr-performance-carbon-fibre-radiator-cooling-plate-mitsubishi-evo-7-9-ct9a-cf-483031")) {
-    console.log("Detected APR Performance radiator cooling plate - using hardcoded price for testing");
-    const sku = url.split('/').pop()?.split('?')[0] || '';
-    return {
-      sku: sku,
-      url: url,
-      price: 399.95,
-      htmlSample: "<meta property=\"og:price:amount\" content=\"399.95\">",
-      note: "Price hardcoded for testing - actual value from website"
-    };
-  }
-  
-  // Special case for APR Performance air dam lip for Honda Civic Type R
-  if (url.includes("apr-performance-carbon-fibre-front-air-dam-lip-honda-civic-type-r-fl5-22-fa-923005")) {
-    console.log("Detected APR Performance air dam lip for Honda Civic Type R - using hardcoded price for testing");
-    const sku = url.split('/').pop()?.split('?')[0] || '';
-    return {
-      sku: sku,
-      url: url,
-      price: 2179.95,
-      htmlSample: "<meta property=\"og:price:amount\" content=\"2,179.95\">",
-      note: "Price hardcoded for testing - actual value from website"
-    };
-  }
-  
-  // Special case for APR Performance GTC-300 adjustable wing for Subaru STI
-  if (url.includes("apr-performance-carbon-fibre-gtc-300-adjustable-wing-subaru-sti-va-15-21")) {
-    console.log("Detected APR Performance GTC-300 adjustable wing for Subaru STI - using hardcoded price for testing");
-    const sku = url.split('/').pop()?.split('?')[0] || '';
-    return {
-      sku: sku,
-      url: url,
-      price: 4579.95,
-      htmlSample: "<meta property=\"og:price:amount\" content=\"4,579.95\">",
-      note: "Price hardcoded for testing - actual value from website"
-    };
-  }
+  // Note: We've removed all special case handlers in favor of a more robust general approach
+  // that can extract prices correctly from all ProSpeedRacing URLs, handling comma formatting properly
   
   // Check if our scraping tools are available in this environment
   const canUsePuppeteer = isPuppeteerAvailable();
@@ -872,31 +823,68 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
       
       // APPROACH 1: Look for OpenGraph price meta tag (og:price:amount)
       // ProSpeedRacing sometimes has HTML like: <meta property="og:image:height" content="2544"><meta property="og:price:amount" content="1,579.95">
-      // We need a more flexible regex that can handle this specific structure
-      const ogPriceRegexes = [
-        /<meta[^>]*property="og:price:amount"[^>]*content="([^"]+)"/i,  // Standard format
-        /<meta[^>]*property="og:price:amount"[^>]*content="([^"]+)/i,   // Handle unclosed quotes
-        /property="og:price:amount"[^>]*content="([^"]+)"/i,            // Handle unconventional tag order
-        /content="([0-9,.]+)"[^>]*property="og:price:amount"/i          // Handle reversed attribute order
-      ];
+      // We need a more robust extraction that prioritizes the OpenGraph price meta tag
       
-      for (const regex of ogPriceRegexes) {
-        const match = html.match(regex);
-        if (match && match[1]) {
-          let priceStr = match[1].trim();
-          console.log(`Found potential price from OpenGraph: "${priceStr}"`);
-          
-          // Remove any commas from the price (e.g., "1,579.95" -> "1579.95")
-          priceStr = priceStr.replace(/,/g, '');
-          const price = parseFloat(priceStr);
-          
-          if (!isNaN(price) && price > 0) {
-            potentialPrices.push({
-              value: price,
-              source: 'OpenGraph meta tag',
-              confidence: 90  // High confidence for OpenGraph tags
-            });
-            console.log(`Added price ${price} from OpenGraph meta tag with high confidence`);
+      // First, let's extract the HTML tag containing the og:price:amount property
+      const extractPriceMetaContent = (htmlContent: string): string | null => {
+        // Get a section of HTML that might contain our price tag
+        const ogTagSection = htmlContent.match(/<meta[^>]*og:price:amount[^>]*>/i);
+        if (!ogTagSection || !ogTagSection[0]) return null;
+        
+        // Extract the content attribute from this tag
+        const contentMatch = ogTagSection[0].match(/content="([^"]+)"/i);
+        if (!contentMatch || !contentMatch[1]) return null;
+        
+        return contentMatch[1].trim();
+      };
+      
+      // Attempt to get the price from OpenGraph meta tag using a more reliable extraction method
+      const ogPriceContent = extractPriceMetaContent(html);
+      
+      if (ogPriceContent) {
+        console.log(`Found potential price from OpenGraph: "${ogPriceContent}"`);
+        
+        // Remove any commas from the price (e.g., "1,579.95" -> "1579.95")
+        const cleanPriceStr = ogPriceContent.replace(/,/g, '');
+        const price = parseFloat(cleanPriceStr);
+        
+        if (!isNaN(price) && price > 0) {
+          potentialPrices.push({
+            value: price,
+            source: 'OpenGraph meta tag',
+            confidence: 99  // Highest confidence for OpenGraph tags
+          });
+          console.log(`Added price ${price} from OpenGraph meta tag with highest confidence (original: ${ogPriceContent})`);
+        } else {
+          console.log(`Failed to parse price from OpenGraph: "${ogPriceContent}" -> "${cleanPriceStr}" -> ${price}`);
+        }
+      } else {
+        // Fallback to the original regex method if our improved method fails
+        const ogPriceRegexes = [
+          /<meta[^>]*property="og:price:amount"[^>]*content="([^"]+)"/i,  // Standard format
+          /<meta[^>]*property="og:price:amount"[^>]*content="([^"]+)/i,   // Handle unclosed quotes
+          /property="og:price:amount"[^>]*content="([^"]+)"/i,            // Handle unconventional tag order
+          /content="([0-9,.]+)"[^>]*property="og:price:amount"/i          // Handle reversed attribute order
+        ];
+        
+        for (const regex of ogPriceRegexes) {
+          const match = html.match(regex);
+          if (match && match[1]) {
+            let priceStr = match[1].trim();
+            console.log(`Found potential price from OpenGraph regex: "${priceStr}"`);
+            
+            // Remove any commas from the price
+            priceStr = priceStr.replace(/,/g, '');
+            const price = parseFloat(priceStr);
+            
+            if (!isNaN(price) && price > 0) {
+              potentialPrices.push({
+                value: price,
+                source: 'OpenGraph meta tag',
+                confidence: 90  // High confidence for OpenGraph tags via regex
+              });
+              console.log(`Added price ${price} from OpenGraph meta tag with high confidence`);
+            }
           }
         }
       }

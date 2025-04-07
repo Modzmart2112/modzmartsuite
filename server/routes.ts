@@ -165,21 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`Testing scrape for URL: ${url}`);
       
-      // Special case for the problematic URL with comma in price
-      if (url.includes("apr-performance-carbon-fibre-brake-rotor-cooling-kit-stoyota-86-zn6-12-16-cf-505658")) {
-        console.log("Detected test APR Performance product - using hardcoded price for testing");
-        const sku = url.split('/').pop()?.split('?')[0] || '';
-        res.json({
-          sku: sku,
-          url: url,
-          price: 1579.95,
-          htmlSample: "<meta property=\"og:price:amount\" content=\"1,579.95\">",
-          note: "Price hardcoded for testing - actual value from website"
-        });
-        return;
-      }
-      
-      // For all other URLs, use the real scraper
+      // Use our upgraded scraper with improved price extraction for all URLs
       const result = await scrapePriceFromUrl(url);
       
       // Log the raw HTML content if needed for debugging
@@ -193,11 +179,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error) {
           console.error(`Failed to fetch HTML content: ${error}`);
         }
-      }
-      
-      // Add note about OpenGraph extraction for ProSpeedRacing URLs
-      if (url.includes("prospeedracing.com.au") && !result.note) {
-        result.note = "Price extracted from ProSpeedRacing website using OpenGraph meta tags";
       }
       
       res.json(result);
@@ -218,27 +199,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "URL is required" });
     }
     
-    // Special case for the problematic URL with comma in price
-    if (url.includes("apr-performance-carbon-fibre-brake-rotor-cooling-kit-stoyota-86-zn6-12-16-cf-505658")) {
-      console.log("Detected test APR Performance product - using hardcoded price for testing");
-      const sku = url.split('/').pop()?.split('?')[0] || '';
-      res.json({
-        sku: sku,
-        url: url,
-        price: 1579.95,
-        htmlSample: "<meta property=\"og:price:amount\" content=\"1,579.95\">",
-        note: "Price hardcoded for testing - actual value from website"
-      });
-      return;
-    }
-    
     try {
+      // Use our improved price extraction for all URLs
       const result = await scrapePriceFromUrl(url);
-      
-      // Add note about OpenGraph extraction for ProSpeedRacing URLs
-      if (url.includes("prospeedracing.com.au") && !result.note) {
-        result.note = "Price extracted from ProSpeedRacing website using OpenGraph meta tags";
-      }
       
       res.json(result);
     } catch (error) {
@@ -270,29 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      // Special case for the APR Performance product (test case)
-      if (product.supplierUrl?.includes("apr-performance-carbon-fibre-brake-rotor-cooling-kit-stoyota-86-zn6-12-16-cf-505658")) {
-        console.log("Detected test APR Performance product - using hardcoded price for testing");
-        const scrapeResult = {
-          sku: product.sku,
-          url: product.supplierUrl,
-          price: 1579.95,
-          note: "Price hardcoded for testing - actual value from website"
-        };
-        return res.json({
-          success: true,
-          product: await storage.updateProduct(product.id, {
-            supplierPrice: scrapeResult.price,
-            lastScraped: new Date(),
-            hasPriceDiscrepancy: Math.abs(scrapeResult.price - product.shopifyPrice) > 0.01
-          }),
-          originalPrice: product.supplierPrice,
-          newPrice: scrapeResult.price,
-          hasPriceDiscrepancy: Math.abs(scrapeResult.price - product.shopifyPrice) > 0.01
-        });
-      }
-      
-      // For all other products, use the normal price scraper
+      // Use our improved price extraction for all products
       const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
       
       if (scrapeResult.price === null) {

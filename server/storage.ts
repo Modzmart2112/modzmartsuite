@@ -187,7 +187,7 @@ export class MemStorage implements IStorage {
       supplierUrl: productData.supplierUrl || null,
       supplierPrice: productData.supplierPrice || null,
       lastScraped: productData.lastScraped || null,
-      images: productData.images || null,
+      images: productData.images || [],
       vendor: productData.vendor || null,
       productType: productData.productType || null,
       createdAt: now,
