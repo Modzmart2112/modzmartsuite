@@ -538,18 +538,15 @@ export default function Suppliers() {
         </Card>
         
         <Card className="shadow-sm border border-gray-100 overflow-hidden">
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2 pt-6 px-6">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Supplier URLs Status</CardTitle>
-                <CardDescription>Overview of product link status</CardDescription>
-              </div>
-              <div className="p-2 bg-blue-50 rounded-full">
-                <LinkIcon className="h-4 w-4 text-blue-600" />
+              <CardTitle className="text-sm font-medium text-gray-600">Supplier URLs Status</CardTitle>
+              <div className="p-2 bg-purple-50 rounded-full">
+                <LinkIcon className="h-4 w-4 text-purple-600" />
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pb-2">
+          <CardContent className="px-6 pt-2 pb-6">
             {isProductsLoading ? (
               <div className="space-y-4">
                 <Skeleton className="h-40 w-full" />
@@ -558,17 +555,22 @@ export default function Suppliers() {
               </div>
             ) : (
               <>
-                <div className="h-[200px]">
+                <div className="flex items-end mb-4">
+                  <h3 className="text-3xl font-bold text-gray-900">{formatNumber(withSupplierUrl)}</h3>
+                  <span className="text-sm text-gray-500 mb-1 ml-2">of {formatNumber(totalProducts)} products</span>
+                </div>
+                
+                <div className="h-[180px] mb-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <defs>
-                        <linearGradient id="gradientWithUrl" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                          <stop offset="100%" stopColor="#3b82f6" stopOpacity={1}/>
+                        <linearGradient id="gradientWithUrl" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#9333ea" stopOpacity={0.8}/>
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity={1}/>
                         </linearGradient>
-                        <linearGradient id="gradientWithoutUrl" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.8}/>
-                          <stop offset="100%" stopColor="#94a3b8" stopOpacity={1}/>
+                        <linearGradient id="gradientWithoutUrl" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#e2e8f0" stopOpacity={0.8}/>
+                          <stop offset="100%" stopColor="#cbd5e1" stopOpacity={1}/>
                         </linearGradient>
                       </defs>
                       <Pie
@@ -580,11 +582,12 @@ export default function Suppliers() {
                         cy="50%"
                         innerRadius={60}
                         outerRadius={80}
+                        strokeWidth={4}
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        <Cell fill="url(#gradientWithUrl)" stroke="#fff" />
-                        <Cell fill="url(#gradientWithoutUrl)" stroke="#fff" />
+                        <Cell fill="url(#gradientWithUrl)" stroke="#ffffff" />
+                        <Cell fill="url(#gradientWithoutUrl)" stroke="#ffffff" />
                       </Pie>
                       <Tooltip 
                         formatter={(value: number, name: string) => [formatNumber(value), name]}
@@ -600,11 +603,11 @@ export default function Suppliers() {
                   </ResponsiveContainer>
                 </div>
                 
-                <div className="space-y-4 mt-4">
+                <div className="space-y-3.5 mt-2">
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center">
-                        <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-purple-500 mr-2"></span>
                         <span className="text-sm font-medium">With Supplier URL</span>
                       </div>
                       <div className="flex items-center">
@@ -616,7 +619,7 @@ export default function Suppliers() {
                     </div>
                     <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full" 
+                        className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full" 
                         style={{ width: `${calculatePercentage(withSupplierUrl, totalProducts)}%` }}
                       ></div>
                     </div>
@@ -625,7 +628,7 @@ export default function Suppliers() {
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center">
-                        <span className="w-3 h-3 rounded-full bg-gray-400 mr-2"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-gray-400 mr-2"></span>
                         <span className="text-sm font-medium">Without Supplier URL</span>
                       </div>
                       <div className="flex items-center">
@@ -643,20 +646,22 @@ export default function Suppliers() {
                     </div>
                   </div>
                 </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-medium">
+                        {calculatePercentage(withSupplierUrl, totalProducts)}% Coverage
+                      </Badge>
+                    </div>
+                    <Button variant="outline" size="sm" asChild className="text-xs h-8">
+                      <a href="/products">View All Products</a>
+                    </Button>
+                  </div>
+                </div>
               </>
             )}
           </CardContent>
-          <CardFooter className="border-t bg-gray-50 py-3">
-            <div className="flex items-center justify-between w-full">
-              <span className="text-sm text-gray-500 flex items-center">
-                <Link2 className="h-4 w-4 mr-1.5" />
-                <span>{calculatePercentage(withSupplierUrl, totalProducts)}% Coverage</span>
-              </span>
-              <Button variant="outline" size="sm" asChild>
-                <a href="/products">View All Products</a>
-              </Button>
-            </div>
-          </CardFooter>
         </Card>
       </div>
       
