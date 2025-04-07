@@ -407,19 +407,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // We'll continue with the deletion even if the file can't be found or processed
       }
       
-      // Extract the SKUs from the CSV records
-      const csvSkus = records.map(r => r.sku).filter(Boolean);
-      console.log(`Extracted ${csvSkus.length} SKUs from CSV file ${uploadToDelete.filename}`);
+      // Use the stored product IDs from the CSV upload record to determine which products to update
+      const productIdsToUpdate = uploadToDelete.updatedProductIds || [];
+      console.log(`Found ${productIdsToUpdate.length} product IDs associated with this CSV upload`);
       
-      // Get all products that match the SKUs in the CSV
+      // Get all products
       const allProducts = await storage.getProducts(1000, 0);
       
-      // Products that need supplier info cleared are either:
-      // 1. Products with SKUs found in the CSV, or
-      // 2. All products with supplier info if we couldn't extract SKUs from the CSV
-      const productsToUpdate = csvSkus.length > 0
-        ? allProducts.filter(p => csvSkus.includes(p.sku) && (p.supplierUrl !== null || p.supplierPrice !== null))
-        : allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
+      // Filter to only the products that were updated by this specific CSV
+      const productsToUpdate = allProducts.filter(p => 
+        productIdsToUpdate.includes(p.id) && (p.supplierUrl !== null || p.supplierPrice !== null));
+        
+      console.log(`Found ${productsToUpdate.length} products with supplier data that will be reset`);
       
       console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToDelete.filename}`);
       
@@ -507,19 +506,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // We'll continue with the cancellation even if the file can't be found or processed
       }
       
-      // Extract the SKUs from the CSV records
-      const csvSkus = records.map(r => r.sku).filter(Boolean);
-      console.log(`Extracted ${csvSkus.length} SKUs from CSV file ${uploadToCancel.filename}`);
+      // Use the stored product IDs from the CSV upload record to determine which products to update
+      const productIdsToUpdate = uploadToCancel.updatedProductIds || [];
+      console.log(`Found ${productIdsToUpdate.length} product IDs associated with this CSV upload`);
       
-      // Get all products that match the SKUs in the CSV
-      const allProducts = await storage.getProducts(1000, 0);
+      // We'll only update products if we've already started processing and captured some product IDs
+      // If we haven't started processing yet (productIdsToUpdate is empty), we won't touch any products
       
-      // Products that need supplier info cleared are either:
-      // 1. Products with SKUs found in the CSV, or
-      // 2. All products with supplier info if we couldn't extract SKUs from the CSV
-      const productsToUpdate = csvSkus.length > 0
-        ? allProducts.filter(p => csvSkus.includes(p.sku) && (p.supplierUrl !== null || p.supplierPrice !== null))
-        : allProducts.filter(p => p.supplierUrl !== null || p.supplierPrice !== null);
+      let productsToUpdate: Product[] = [];
+      
+      if (productIdsToUpdate.length > 0) {
+          // Get all products
+          const allProducts = await storage.getProducts(1000, 0);
+          
+          // Filter to only the products that were updated by this specific CSV
+          productsToUpdate = allProducts.filter(p => 
+            productIdsToUpdate.includes(p.id) && (p.supplierUrl !== null || p.supplierPrice !== null));
+            
+          console.log(`Found ${productsToUpdate.length} products with supplier data that will be reset`);
+      } else {
+          console.log('No products have been processed yet, so no products need to be updated');
+      }
       
       console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToCancel.filename}`);
       
@@ -706,6 +713,9 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
     let updatedProductCount = 0;
     let newProductCount = 0;
     
+    // Keep track of which products were updated by this CSV
+    const updatedProductIds: number[] = [];
+    
     for (const record of records) {
       try {
         // Ensure we have both SKU and Origin URL - these are required
@@ -719,12 +729,17 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
         
         if (product) {
           // Update supplier URL if provided
-          if (record.originUrl && record.originUrl !== product.supplierUrl) {
+          if (product && record.originUrl && record.originUrl !== product.supplierUrl) {
             product = await storage.updateProduct(product.id, {
               supplierUrl: record.originUrl
             });
             console.log(`Updated existing product SKU ${record.sku} with Origin URL: ${record.originUrl}`);
             updatedProductCount++;
+            
+            // Add to tracking
+            if (product && product.id && !updatedProductIds.includes(product.id)) {
+              updatedProductIds.push(product.id);
+            }
           }
         } else {
           // If product doesn't exist, first try Shopify, then create a new one regardless
@@ -758,6 +773,11 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
               });
               console.log(`Created new product from Shopify: SKU ${record.sku} with Origin URL: ${record.originUrl}`);
               newProductCount++;
+              
+              // Add to tracking (only if product exists and has an ID)
+              if (product && product.id && !updatedProductIds.includes(product.id)) {
+                updatedProductIds.push(product.id);
+              }
             } else {
               // If not found in Shopify or no Shopify credentials, create a basic product
               // Use the price from the CSV if available, otherwise default to 0
@@ -832,6 +852,11 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
                 hasPriceDiscrepancy
               });
               
+              // Add this product ID to our tracking list
+              if (product.id && !updatedProductIds.includes(product.id)) {
+                updatedProductIds.push(product.id);
+              }
+              
               // Record the price history
               await storage.createPriceHistory({
                 productId: product.id,
@@ -898,12 +923,14 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
     
     // Update final status with detailed logs
     console.log(`CSV Upload ${uploadId} processing complete. Total records: ${records.length}, Processed: ${processedCount}, Updated: ${updatedProductCount}, New: ${newProductCount}`);
+    console.log(`Tracked ${updatedProductIds.length} products affected by this CSV upload`);
     
     // Ensure we update the status with the final count and completed status
     try {
       const updatedUpload = await storage.updateCsvUpload(uploadId, {
         processedCount,
-        status: "completed"
+        status: "completed",
+        updatedProductIds // Store the list of product IDs that were updated by this CSV
       });
       
       if (!updatedUpload) {

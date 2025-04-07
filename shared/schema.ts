@@ -46,6 +46,7 @@ export const csvUploads = pgTable("csv_uploads", {
   recordsCount: integer("records_count").notNull(),
   processedCount: integer("processed_count").notNull(),
   status: text("status").notNull(),
+  updatedProductIds: jsonb("updated_product_ids").$type<number[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
