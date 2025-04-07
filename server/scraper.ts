@@ -131,11 +131,14 @@ function isPuppeteerAvailable(): boolean {
 // Helper to check if Selenium is available in this environment
 function isSeleniumAvailable(): boolean {
   try {
-    // Disable Selenium in Cloud Run and Replit environments
-    if (process.env.REPL_ID || process.env.NODE_ENV === 'production') {
-      console.log('Running in Cloud Run/Replit environment - Selenium disabled');
-      return false;
+    // In Replit environment, Selenium is often problematic
+    if (process.env.REPL_ID) {
+      console.log('Running in Replit environment - Selenium may be unreliable, preferring direct fetch');
+      return false; // Prefer direct fetch in Replit
     }
+    
+    // For other environments, assume it's not available by default
+    // We're primarily using Puppeteer or direct fetch methods
     return false;
   } catch (error) {
     console.warn('Error checking Selenium availability:', error);
