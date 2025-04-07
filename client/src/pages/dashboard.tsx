@@ -1,5 +1,6 @@
 import { CsvUpload } from "@/components/dashboard/csv-upload";
 import { PriceDiscrepancyChart } from "@/components/dashboard/price-discrepancy-chart";
+import { PriceDiscrepancyList } from "@/components/dashboard/price-discrepancies-list";
 import { ProductsOverview } from "@/components/dashboard/products-overview";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { SalesChannels } from "@/components/dashboard/sales-channels";
@@ -44,6 +45,11 @@ export default function Dashboard() {
 
       {/* Stats Row */}
       <StatsRow />
+      
+      {/* Price Discrepancy List */}
+      <div className="mb-6">
+        <PriceDiscrepancyList />
+      </div>
       
       {/* Bottom Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

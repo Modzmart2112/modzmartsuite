@@ -117,6 +117,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Endpoint to clear a single price discrepancy by product ID
+  app.post("/api/products/discrepancies/:productId/clear", asyncHandler(async (req, res) => {
+    const productId = parseInt(req.params.productId);
+    
+    if (isNaN(productId)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+    
+    const product = await storage.getProductById(productId);
+    
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    
+    // Create a new price history record that sets supplierPrice = shopifyPrice
+    // This will effectively remove the discrepancy without changing the actual Shopify price
+    await storage.createPriceHistory({
+      productId,
+      shopifyPrice: product.shopifyPrice,
+      supplierPrice: product.shopifyPrice, // Match supplier price to shopify price to clear discrepancy
+    });
+    
+    res.json({ 
+      success: true, 
+      message: `Successfully cleared price discrepancy for ${product.title}`, 
+      productId
+    });
+  }));
+  
   // Debug route to test price scraping
   app.get("/api/scrape-test", asyncHandler(async (req, res) => {
     const url = req.query.url as string;

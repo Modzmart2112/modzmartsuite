@@ -14,7 +14,7 @@ export function PriceDiscrepancyNotification() {
   const [dismissing, setDismissing] = useState(false);
 
   // Fetch price discrepancies
-  const { data: discrepancies, isLoading, error } = useQuery({
+  const { data: discrepancies = [], isLoading, error } = useQuery<PriceDiscrepancy[]>({
     queryKey: ['/api/products/discrepancies'],
     // Only check for discrepancies every minute to avoid excessive API calls
     refetchInterval: 60000,
@@ -57,6 +57,33 @@ export function PriceDiscrepancyNotification() {
       });
     },
   });
+  
+  // Dismiss discrepancy mutation
+  const dismissDiscrepancyMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const res = await apiRequest("POST", `/api/products/discrepancies/${productId}/clear`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Discrepancy dismissed",
+        description: data.message || "The price discrepancy has been dismissed."
+      });
+      
+      // Close notification
+      handleDismiss();
+      
+      // Invalidate discrepancies query
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error dismissing discrepancy",
+        description: error.message || "There was an error dismissing the price discrepancy.",
+        variant: "destructive",
+      });
+    }
+  });
 
   // Show notification when discrepancies are found
   useEffect(() => {
@@ -66,7 +93,25 @@ export function PriceDiscrepancyNotification() {
     }
   }, [discrepancies, visible, dismissing]);
 
+  const handleVisualDismiss = () => {
+    // This just visually dismisses the notification without affecting the database
+    setDismissing(true);
+    setVisible(false);
+    
+    // Reset after animation completes
+    setTimeout(() => {
+      setCurrentDiscrepancy(null);
+      setDismissing(false);
+    }, 500);
+  };
+  
   const handleDismiss = () => {
+    if (!currentDiscrepancy) return;
+    
+    // Dismiss the discrepancy in the database
+    dismissDiscrepancyMutation.mutate(currentDiscrepancy.productId);
+    
+    // Also do the visual dismissal
     setDismissing(true);
     setVisible(false);
     
