@@ -377,8 +377,7 @@ export class MemStorage implements IStorage {
     for (const product of this.products.values()) {
       if (product.hasPriceDiscrepancy) {
         product.hasPriceDiscrepancy = false;
-        product.supplierUrl = null;
-        product.supplierPrice = null;
+        // Keep supplierUrl and supplierPrice so the scheduler can still check these URLs
         product.updatedAt = new Date();
         clearedCount++;
       }
@@ -697,13 +696,12 @@ export class DatabaseStorage implements IStorage {
         return 0; // No discrepancies to clear
       }
       
-      // Update all products with price discrepancies in a single query
+      // Only reset the hasPriceDiscrepancy flag without clearing supplier data
+      // This way, the scheduler can still check these URLs in the future
       const now = new Date();
       const result = await db.update(products)
         .set({
           hasPriceDiscrepancy: false,
-          supplierUrl: null,
-          supplierPrice: null,
           updatedAt: now
         })
         .where(

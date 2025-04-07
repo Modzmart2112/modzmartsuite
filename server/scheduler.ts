@@ -78,8 +78,10 @@ export async function checkAllPrices(): Promise<void> {
       try {
         if (!product.supplierUrl) continue;
         
-        // Scrape the current price
+        // Scrape the current price using the same method as CSV processing
         log(`Checking price for ${product.sku} (${product.title})`, 'price-checker');
+        
+        // Use the same scraper that CSV processing uses to ensure consistency
         const result = await scrapePriceFromUrl(product.supplierUrl);
         
         if (result.price) {

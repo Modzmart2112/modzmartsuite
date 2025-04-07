@@ -68,8 +68,26 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
     
-    // Start the price check scheduler - run once every 24 hours (86400000 ms)
-    scheduler.startJob('daily-price-check', 86400000, checkAllPrices);
-    log('Price check scheduler initialized', 'scheduler');
+    // Start the price check scheduler - run once daily at midnight
+    const now = new Date();
+    const tonight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + 1, // tomorrow
+      0, 0, 0 // at midnight (00:00:00)
+    );
+    const msUntilMidnight = tonight.getTime() - now.getTime();
+    
+    // First run: schedule for next midnight
+    setTimeout(() => {
+      // Execute job
+      checkAllPrices().catch(err => console.error('Error in initial price check:', err));
+      
+      // Then schedule to run every 24 hours
+      scheduler.startJob('daily-price-check', 86400000, checkAllPrices);
+      log('Price check scheduler set to run daily at midnight', 'scheduler');
+    }, msUntilMidnight);
+    
+    log(`Price check scheduler initialized - first run in ${Math.round(msUntilMidnight/3600000)} hours at midnight`, 'scheduler');
   });
 })();
