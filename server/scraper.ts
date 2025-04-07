@@ -5,6 +5,7 @@ import { URL } from 'url';
 import { Builder, By, until, WebDriver } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome';
 import fs from 'fs';
+import { enhancedFetcher } from './enhanced-fetcher';
 
 // Set a longer timeout for puppeteer operations
 const PUPPETEER_TIMEOUT = 30000;
@@ -186,7 +187,7 @@ function adjustPrice(price: number, url: string): number {
 }
 
 // Enhanced puppeteer-based scraper specifically for ProSpeedRacing
-async function enhancedPuppeteerScraper(url: string): Promise<ScrapedPriceResult> {
+export async function enhancedPuppeteerScraper(url: string): Promise<ScrapedPriceResult> {
   let browser: Browser | null = null;
   
   try {
@@ -911,67 +912,121 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
   console.log(`Scraping price from URL: ${url}`);
   console.log(`Environment checks: Puppeteer=${canUsePuppeteer}, Selenium=${canUseSelenium}, Replit=${isReplit}`);
   
-  // Special handling for ProSpeedRacing URLs
-  if (url.includes('prospeedracing.com.au')) {
-    console.log(`ProSpeedRacing URL detected: ${url} - using improved extraction logic`);
+  // First try the enhanced fetcher method for all URLs - most reliable and efficient
+  try {
+    console.log(`Attempting enhanced fetcher method for URL: ${url}`);
+    const fetcherResult = await enhancedFetcher(url);
     
-    // For Replit environment, prioritize direct fetch which is faster and more reliable
-    if (isReplit) {
-      try {
-        // Use the specialized ProSpeedRacing direct fetch method
-        return await directFetchProSpeedRacing(url);
-      } catch (directFetchError) {
-        console.error(`Error during direct fetch for ProSpeedRacing: ${(directFetchError as Error).message}`);
-        // Continue to fallback methods
+    // If we successfully extracted a price, return that result
+    if (fetcherResult.price !== null && !isNaN(fetcherResult.price)) {
+      console.log(`Successfully extracted price ${fetcherResult.price} using enhanced fetcher from ${url}`);
+      
+      // Apply any site-specific price adjustments
+      const adjustedPrice = adjustPrice(fetcherResult.price, url);
+      if (adjustedPrice !== fetcherResult.price) {
+        console.log(`Applied price adjustment: ${fetcherResult.price} -> ${adjustedPrice}`);
+        fetcherResult.price = adjustedPrice;
       }
+      
+      return {
+        ...fetcherResult,
+        note: fetcherResult.note || "Price extracted with enhanced fetcher"
+      };
     } else {
-      // For non-Replit environments, try Puppeteer first
-      if (canUsePuppeteer) {
-        try {
-          console.log(`Attempting Puppeteer-based scraping for URL: ${url}`);
-          const puppeteerResult = await enhancedPuppeteerScraper(url);
-          
-          // If we successfully extracted a price with Puppeteer, return that result
-          if (puppeteerResult.price !== null && !isNaN(puppeteerResult.price)) {
-            console.log(`Successfully extracted price ${puppeteerResult.price} using Puppeteer from ${url}`);
-            
-            // Apply any site-specific price adjustments
-            const adjustedPrice = adjustPrice(puppeteerResult.price, url);
-            if (adjustedPrice !== puppeteerResult.price) {
-              console.log(`Applied price adjustment: ${puppeteerResult.price} -> ${adjustedPrice}`);
-              puppeteerResult.price = adjustedPrice;
-            }
-            
-            return puppeteerResult;
-          } else {
-            console.log(`Puppeteer scraper failed to extract price from ${url}: ${puppeteerResult.error || 'No price found'}`);
-          }
-        } catch (puppeteerError) {
-          console.error(`Error during Puppeteer scraping: ${(puppeteerError as Error).message}`);
-        }
-      }
-      
-      // Then try Selenium scraper for non-Replit environments
-      if (canUseSelenium) {
-        try {
-          console.log(`Attempting Selenium-based scraping for ProSpeedRacing URL: ${url}`);
-          const seleniumResult = await seleniumProSpeedRacingScraper(url);
-          
-          if (seleniumResult.price !== null && !isNaN(seleniumResult.price)) {
-            console.log(`Successfully extracted price ${seleniumResult.price} using Selenium from ${url}`);
-            return seleniumResult;
-          }
-        } catch (seleniumError) {
-          console.error(`Error during Selenium scraping: ${(seleniumError as Error).message}`);
-        }
-      }
-      
-      // Try direct fetch as fallback for non-Replit environments
+      console.log(`Enhanced fetcher could not extract price from ${url}: ${fetcherResult.error || 'No price found'}`);
+    }
+  } catch (fetcherError) {
+    console.error(`Error during enhanced fetcher: ${(fetcherError as Error).message}`);
+  }
+  
+  // Special handling for ProSpeedRacing URLs if enhanced fetcher failed
+  if (url.includes('prospeedracing.com.au')) {
+    console.log(`ProSpeedRacing URL detected: ${url} - using specialized extraction logic`);
+    
+    // Try Puppeteer-based rendering if available
+    if (canUsePuppeteer) {
       try {
-        return await directFetchProSpeedRacing(url);
-      } catch (directFetchError) {
-        console.error(`Error during direct fetch for ProSpeedRacing: ${(directFetchError as Error).message}`);
+        console.log(`Attempting Puppeteer-based rendering for URL: ${url}`);
+        const puppeteerResult = await enhancedPuppeteerScraper(url);
+        
+        // If we successfully extracted a price with Puppeteer, return that result
+        if (puppeteerResult.price !== null && !isNaN(puppeteerResult.price)) {
+          console.log(`Successfully extracted JS-rendered price ${puppeteerResult.price} using Puppeteer from ${url}`);
+          
+          // Apply any site-specific price adjustments
+          const adjustedPrice = adjustPrice(puppeteerResult.price, url);
+          if (adjustedPrice !== puppeteerResult.price) {
+            console.log(`Applied price adjustment: ${puppeteerResult.price} -> ${adjustedPrice}`);
+            puppeteerResult.price = adjustedPrice;
+          }
+          
+          return {
+            ...puppeteerResult,
+            note: "Price extracted after JavaScript execution with Puppeteer (actual displayed price)"
+          };
+        } else {
+          console.log(`Puppeteer scraper failed to extract price from ${url}: ${puppeteerResult.error || 'No price found'}`);
+        }
+      } catch (puppeteerError) {
+        console.error(`Error during Puppeteer scraping: ${(puppeteerError as Error).message}`);
       }
+    }
+    
+    // Fallback to direct fetch for faster processing or if Puppeteer failed
+    try {
+      // Use the specialized ProSpeedRacing direct fetch method
+      return await directFetchProSpeedRacing(url);
+    } catch (directFetchError) {
+      console.error(`Error during direct fetch for ProSpeedRacing: ${(directFetchError as Error).message}`);
+      // Continue to fallback methods
+    }
+    
+    // Additional fallbacks if all else fails
+    if (canUsePuppeteer) {
+      try {
+        console.log(`Attempting Puppeteer-based scraping for URL: ${url}`);
+        const puppeteerResult = await enhancedPuppeteerScraper(url);
+        
+        // If we successfully extracted a price with Puppeteer, return that result
+        if (puppeteerResult.price !== null && !isNaN(puppeteerResult.price)) {
+          console.log(`Successfully extracted price ${puppeteerResult.price} using Puppeteer from ${url}`);
+          
+          // Apply any site-specific price adjustments
+          const adjustedPrice = adjustPrice(puppeteerResult.price, url);
+          if (adjustedPrice !== puppeteerResult.price) {
+            console.log(`Applied price adjustment: ${puppeteerResult.price} -> ${adjustedPrice}`);
+            puppeteerResult.price = adjustedPrice;
+          }
+          
+          return puppeteerResult;
+        } else {
+          console.log(`Puppeteer scraper failed to extract price from ${url}: ${puppeteerResult.error || 'No price found'}`);
+        }
+      } catch (puppeteerError) {
+        console.error(`Error during Puppeteer scraping: ${(puppeteerError as Error).message}`);
+      }
+    }
+    
+    // Then try Selenium scraper for non-Replit environments
+    if (canUseSelenium) {
+      try {
+        console.log(`Attempting Selenium-based scraping for ProSpeedRacing URL: ${url}`);
+        const seleniumResult = await seleniumProSpeedRacingScraper(url);
+        
+        if (seleniumResult.price !== null && !isNaN(seleniumResult.price)) {
+          console.log(`Successfully extracted price ${seleniumResult.price} using Selenium from ${url}`);
+          return seleniumResult;
+        }
+      } catch (seleniumError) {
+        console.error(`Error during Selenium scraping: ${(seleniumError as Error).message}`);
+      }
+    }
+    
+    // Try direct fetch as fallback for non-Replit environments
+    try {
+      return await directFetchProSpeedRacing(url);
+    } catch (directFetchError) {
+      console.error(`Error during direct fetch for ProSpeedRacing: ${(directFetchError as Error).message}`);
     }
     
     // Extract SKU from URL
@@ -1284,43 +1339,70 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
     }
   }
   
-  // For non-ProSpeedRacing URLs, try general scrapers
-  if (canUsePuppeteer) {
-    try {
-      console.log(`Using generic Puppeteer scraper for URL: ${url}`);
-      const result = await puppeteerScraper(url);
-      
-      // If we got a price, apply any needed adjustments based on the site
-      if (result.price !== null) {
-        const originalPrice = result.price;
-        result.price = adjustPrice(result.price, url);
-        console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
-      }
-      
-      return result;
-    } catch (puppeteerError) {
-      console.error(`Generic Puppeteer scraping failed for ${url}:`, puppeteerError);
-    }
-  }
-  
-  // Fall back to fetch-based approach as last resort (always available)
+  // For non-ProSpeedRacing URLs, continue with the generic scraping methods
+  return await genericScraper(url);
+}
+
+// Generic scraper function for non-specialized sites
+async function genericScraper(urlToScrape: string): Promise<ScrapedPriceResult> {
+  // Use the new enhanced fetcher as primary method
   try {
-    console.log(`Using fetch-based scraper for URL: ${url}`);
-    const result = await fetchBasedScraper(url);
+    console.log(`Using enhanced fetcher for URL: ${urlToScrape}`);
+    const result = await enhancedFetcher(urlToScrape);
     
     // If we got a price, apply any needed adjustments based on the site
     if (result.price !== null) {
       const originalPrice = result.price;
-      result.price = adjustPrice(result.price, url);
-      console.log(`Adjusted price for ${url}: $${originalPrice} -> $${result.price}`);
+      result.price = adjustPrice(result.price, urlToScrape);
+      
+      if (originalPrice !== result.price) {
+        console.log(`Adjusted price for ${urlToScrape}: $${originalPrice} -> $${result.price}`);
+      }
+    }
+    
+    return result;
+  } catch (enhancedFetcherError) {
+    console.error(`Enhanced fetcher failed for ${urlToScrape}:`, enhancedFetcherError);
+  }
+  
+  // Fall back to puppeteer-based scraping if enhanced fetcher fails
+  const canUsePuppeteer = isPuppeteerAvailable();
+  if (canUsePuppeteer) {
+    try {
+      console.log(`Falling back to Puppeteer scraper for URL: ${urlToScrape}`);
+      const result = await puppeteerScraper(urlToScrape);
+      
+      // Apply price adjustments if needed
+      if (result.price !== null) {
+        const originalPrice = result.price;
+        result.price = adjustPrice(result.price, urlToScrape);
+        console.log(`Adjusted price for ${urlToScrape}: $${originalPrice} -> $${result.price}`);
+      }
+      
+      return result;
+    } catch (puppeteerError) {
+      console.error(`Puppeteer scraping fallback failed for ${urlToScrape}:`, puppeteerError);
+    }
+  }
+  
+  // Fall back to basic fetch-based approach as last resort (always available)
+  try {
+    console.log(`Using fetch-based scraper for URL: ${urlToScrape}`);
+    const result = await fetchBasedScraper(urlToScrape);
+    
+    // If we got a price, apply any needed adjustments based on the site
+    if (result.price !== null) {
+      const originalPrice = result.price;
+      result.price = adjustPrice(result.price, urlToScrape);
+      console.log(`Adjusted price for ${urlToScrape}: $${originalPrice} -> $${result.price}`);
     }
     
     return result;
   } catch (fetchError) {
-    console.error(`All scraping methods failed for ${url}`, fetchError);
+    console.error(`All scraping methods failed for ${urlToScrape}`, fetchError);
     return {
-      sku: url.split('/').pop() || url,
-      url,
+      sku: urlToScrape.split('/').pop() || urlToScrape,
+      url: urlToScrape,
       price: null,
       error: "All scraping methods failed to extract price"
     };
