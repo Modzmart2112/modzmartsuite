@@ -64,6 +64,15 @@ const getColor = (index: number): string => {
 export function ShopifyBrandDistribution() {
   const [chartType, setChartType] = useState<'pie' | 'bar'>('bar');
   
+  // Get shopify connection status
+  const { data: connectionInfo, isLoading: isConnectionLoading } = useQuery<any>({
+    queryKey: ['/api/shopify/connection-info'],
+  });
+  
+  const isConnected = connectionInfo?.shopifyApiKey && 
+                       connectionInfo?.shopifyApiSecret && 
+                       connectionInfo?.shopifyStoreUrl;
+  
   // Get all products from API
   const { data, isLoading, refetch } = useQuery<{products: Product[]}>({
     queryKey: ['/api/products'],
@@ -99,7 +108,7 @@ export function ShopifyBrandDistribution() {
     .sort((a, b) => b.count - a.count) // Sort by count in descending order
     .slice(0, 12); // Only show top 12 brands
   
-  if (isLoading) {
+  if (isLoading || isConnectionLoading) {
     return (
       <Card className="shadow-md">
         <CardHeader className="pb-0">
@@ -140,6 +149,33 @@ export function ShopifyBrandDistribution() {
     );
   }
   
+  if (!isConnected) {
+    return (
+      <Card className="shadow-md overflow-hidden border-0">
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
+          <CardDescription>Connect to Shopify to view your brand distribution</CardDescription>
+        </CardHeader>
+        
+        <CardContent className="flex flex-col items-center justify-center h-[400px]">
+          <div className="text-center">
+            <div className="bg-blue-50 rounded-full p-6 inline-block">
+              <BarChart3 size={48} className="text-blue-500" />
+            </div>
+            <h3 className="mt-6 text-lg font-medium">Shopify Connection Required</h3>
+            <p className="mt-2 text-gray-500 max-w-md">
+              Connect your Shopify store to visualize product distribution by brand and access powerful analytics
+            </p>
+            <Button className="mt-6" variant="default" asChild>
+              <a href="/settings">Configure Shopify Connection</a>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
   return (
     <Card className="shadow-md overflow-hidden border-0">
       <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
@@ -147,7 +183,7 @@ export function ShopifyBrandDistribution() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
-            <CardDescription>Distribution of products across manufacturers in your product catalog</CardDescription>
+            <CardDescription>Distribution of products across manufacturers in your Shopify store</CardDescription>
           </div>
           
           <div className="flex items-center gap-2">
@@ -186,7 +222,7 @@ export function ShopifyBrandDistribution() {
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-sm font-medium text-gray-500">Total Brands</div>
             <div className="text-2xl font-bold mt-1">{Object.keys(brandStats).length}</div>
-            <div className="text-xs text-gray-500 mt-1">From product catalog</div>
+            <div className="text-xs text-gray-500 mt-1">From Shopify catalog</div>
           </div>
           
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -363,7 +399,7 @@ export function ShopifyBrandDistribution() {
           
           <div className="flex items-center text-xs text-gray-500">
             <Info size={14} className="mr-1" />
-            Data from product catalog
+            Data from connected Shopify store
           </div>
         </div>
       </CardContent>
