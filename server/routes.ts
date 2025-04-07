@@ -387,18 +387,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`Processing deletion of CSV upload: ${uploadToDelete.filename}`);
     
     try {
-      // First, process the CSV to get the SKUs and URLs it contains
+      // First, check if the CSV file exists (it might have been deleted already)
       const csvPath = path.join(process.cwd(), 'attached_assets', uploadToDelete.filename);
       let records: CsvRecord[] = [];
+      let fileExists = false;
       
       try {
+        // Check if file exists before trying to read it
+        await fs.promises.access(csvPath, fs.constants.F_OK);
+        fileExists = true;
+        console.log(`Found CSV file at path: ${csvPath}`);
+        
         // Try to extract records from the CSV to know which products to clear
         records = await processCsvFile(csvPath);
         console.log(`Found ${records.length} records in CSV file ${uploadToDelete.filename}`);
       } catch (error) {
-        console.error(`Error processing CSV file ${uploadToDelete.filename}:`, error);
-        // Fall back to clearing all supplier info if we can't process the CSV
-        console.warn(`Falling back to clearing all supplier info since CSV parsing failed`);
+        console.error(`File access or processing error for ${uploadToDelete.filename}:`, error);
+        console.warn(`File may be missing or invalid - proceeding with deletion anyway`);
+        // We'll continue with the deletion even if the file can't be found or processed
       }
       
       // Extract the SKUs from the CSV records
@@ -481,18 +487,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log(`Processing cancellation of CSV upload: ${uploadToCancel.filename}`);
     
     try {
-      // First, process the CSV to get the SKUs and URLs it contains
+      // First, check if the CSV file exists (it might have been deleted already)
       const csvPath = path.join(process.cwd(), 'attached_assets', uploadToCancel.filename);
       let records: CsvRecord[] = [];
+      let fileExists = false;
       
       try {
+        // Check if file exists before trying to read it
+        await fs.promises.access(csvPath, fs.constants.F_OK);
+        fileExists = true;
+        console.log(`Found CSV file at path: ${csvPath}`);
+        
         // Try to extract records from the CSV to know which products to clear
         records = await processCsvFile(csvPath);
         console.log(`Found ${records.length} records in CSV file ${uploadToCancel.filename}`);
       } catch (error) {
-        console.error(`Error processing CSV file ${uploadToCancel.filename}:`, error);
-        // Fall back to clearing all supplier info if we can't process the CSV
-        console.warn(`Falling back to clearing all supplier info since CSV parsing failed`);
+        console.error(`File access or processing error for ${uploadToCancel.filename}:`, error);
+        console.warn(`File may be missing or invalid - proceeding with cancellation anyway`);
+        // We'll continue with the cancellation even if the file can't be found or processed
       }
       
       // Extract the SKUs from the CSV records
