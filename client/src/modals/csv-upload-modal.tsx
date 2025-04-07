@@ -31,8 +31,10 @@ export function CsvUploadModal() {
         formData.append("files", file);
       });
       
-      const res = await apiRequest("POST", "/api/csv/upload", formData);
-      return res.json();
+      return apiRequest("/api/csv/upload", {
+        method: "POST",
+        data: formData
+      });
     },
     onSuccess: (data) => {
       toast({

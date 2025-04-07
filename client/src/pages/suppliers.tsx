@@ -111,8 +111,10 @@ export default function Suppliers() {
         formData.append("files", file);
       });
       
-      const res = await apiRequest("POST", "/api/csv/upload", formData);
-      return res.json();
+      return apiRequest("/api/csv/upload", {
+        method: "POST",
+        data: formData
+      });
     },
     onSuccess: () => {
       // Show success toast
@@ -138,8 +140,9 @@ export default function Suppliers() {
   // Delete CSV upload mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/csv/uploads/${id}`);
-      return res.json();
+      return apiRequest(`/api/csv/uploads/${id}`, {
+        method: "DELETE"
+      });
     },
     onSuccess: () => {
       toast({
@@ -168,8 +171,9 @@ export default function Suppliers() {
   // Cancel CSV processing mutation
   const cancelMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/csv/uploads/${id}/cancel`);
-      return res.json();
+      return apiRequest(`/api/csv/uploads/${id}/cancel`, {
+        method: "POST"
+      });
     },
     onSuccess: () => {
       toast({
