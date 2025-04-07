@@ -114,13 +114,14 @@ export default function Navbar() {
       }
       
       try {
-        const results = await apiRequest('/api/products/search', { 
+        const results = await apiRequest<SearchResult[]>('/api/products/search', { 
           method: 'GET', 
           queryParams: { q: searchQuery } 
         });
-        setSearchResults(results);
+        setSearchResults(results || []);
       } catch (error) {
         console.error("Error searching products:", error);
+        setSearchResults([]);
       }
     };
     
