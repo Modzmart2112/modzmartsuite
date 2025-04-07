@@ -1,6 +1,6 @@
-import { BrandDistributionChart } from './brand-distribution-chart';
+import { ShopifyBrandDistribution } from './shopify-brand-distribution';
 
 export function PriceDiscrepancyChart() {
-  // This component now just wraps the BrandDistributionChart
-  return <BrandDistributionChart />;
+  // This component now uses the new enhanced Shopify brand distribution chart
+  return <ShopifyBrandDistribution />;
 }
