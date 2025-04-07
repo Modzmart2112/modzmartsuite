@@ -396,40 +396,43 @@ async function directFetchProSpeedRacing(url: string): Promise<ScrapedPriceResul
     // CRITICAL: We need the correct price, so use multiple methods and cross-verify
     let retailPrice: number | null = null;
     
-    // METHOD 1: Look for the explicit formatted price in ShopifyAnalytics (most reliable)
-    // CRITICAL: We know exactly what we're looking for - "price":"999.95" in ShopifyAnalytics tracking
-    
-    // We know there's an issue with price extraction from this site
-    // Let's try multiple approaches to ensure we get the correct price
-    
-    // APPROACH 1: Find all 'Viewed Product' sections and extract all prices
-    const allViewedProductMatches = html.match(/ShopifyAnalytics\.lib\.track\("Viewed Product"[^;]+/g) || [];
-    const pricesFromTracking: number[] = [];
-    
-    for (const match of allViewedProductMatches) {
-      const priceMatch = match.match(/"price":"([^"]+)"/);
-      if (priceMatch && priceMatch[1]) {
-        const price = parseFloat(priceMatch[1]);
-        if (!isNaN(price) && price > 0) {
-          pricesFromTracking.push(price);
-          console.log(`Found price ${price} in Shopify tracking data`);
-        }
+    // METHOD 0: Look for OpenGraph meta tags (most reliable for Shopify sites)
+    const ogPriceMatch = html.match(/<meta property="og:price:amount" content="([^"]+)">/);
+    if (ogPriceMatch && ogPriceMatch[1]) {
+      const price = parseFloat(ogPriceMatch[1]);
+      if (!isNaN(price) && price > 0) {
+        retailPrice = price;
+        console.log(`Found price ${price} from OpenGraph meta tag for ${sku}`);
       }
     }
     
-    // APPROACH 2: Direct search for known exact price values we expect
-    if (html.includes('"price":"999.95"')) {
-      console.log(`Found exact price "999.95" in the HTML - this is what we want`);
-      retailPrice = 999.95;
+    // If OpenGraph meta tag extraction failed, try alternative methods:
+    if (!retailPrice) {
+      // METHOD 1: Look for the explicit formatted price in ShopifyAnalytics
+      const allViewedProductMatches = html.match(/ShopifyAnalytics\.lib\.track\("Viewed Product"[^;]+/g) || [];
+      const pricesFromTracking: number[] = [];
+      
+      for (const match of allViewedProductMatches) {
+        const priceMatch = match.match(/"price":"([^"]+)"/);
+        if (priceMatch && priceMatch[1]) {
+          const price = parseFloat(priceMatch[1]);
+          if (!isNaN(price) && price > 0) {
+            pricesFromTracking.push(price);
+            console.log(`Found price ${price} in Shopify tracking data`);
+          }
+        }
+      }
+      
+      // Look at all Viewed Product prices and take the highest one
+      if (pricesFromTracking.length > 0) {
+        // For retail price, we'll use the highest price found (likely full retail)
+        const highestPrice = Math.max(...pricesFromTracking);
+        console.log(`Using highest tracked price: ${highestPrice} from ${pricesFromTracking.length} found prices`);
+        retailPrice = highestPrice;
+      }
     }
     
-    // APPROACH 3: Look at all Viewed Product prices and take the highest one
-    if (!retailPrice && pricesFromTracking.length > 0) {
-      // For retail price, we'll use the highest price found (likely full retail)
-      const highestPrice = Math.max(...pricesFromTracking);
-      console.log(`Using highest tracked price: ${highestPrice} from ${pricesFromTracking.length} found prices`);
-      retailPrice = highestPrice;
-    }
+    // This section is now handled above in the improved OpenGraph extraction section
     
     // METHOD 2: Look for the "price" field in JSON - this is often in cents (99995 = $999.95)
     if (!retailPrice) {
@@ -779,34 +782,115 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
   const canUseSelenium = isSeleniumAvailable();
   const isReplit = process.env.REPL_ID ? true : false;
   
-  // Special handling for ProSpeedRacing URLs with hardcoded prices
+  // Special handling for ProSpeedRacing URLs using OpenGraph meta tags
   if (url.includes('prospeedracing.com.au')) {
-    console.log(`ProSpeedRacing URL detected: ${url} - using hardcoded price`);
+    console.log(`ProSpeedRacing URL detected: ${url} - using OpenGraph meta tag extraction`);
     
     // Extract SKU from URL
-    const sku = url.split('/').pop() || '';
+    let sku = url.split('/').pop() || '';
+    // Clean the SKU (remove query params, etc.)
+    if (sku && sku.includes('?')) {
+      sku = sku.split('?')[0];
+    }
     
-    // Special handling for the specific APR Performance product
-    if (url.includes('apr-performance-carbon-fibre-front-bumper-scoop-subaru-brz-zd8-22-cf-822050')) {
-      console.log(`Using known price $999.95 for APR Performance product`);
+    try {
+      // Fetch the page to extract OpenGraph price meta tags
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml',
+          'Accept-Language': 'en-US,en;q=0.9'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+      }
+      
+      const html = await response.text();
+      
+      // APPROACH 1: Look for OpenGraph price meta tag (og:price:amount)
+      const ogPriceMatch = html.match(/<meta\s+property="og:price:amount"\s+content="([^"]+)"/i);
+      
+      if (ogPriceMatch && ogPriceMatch[1]) {
+        let priceStr = ogPriceMatch[1];
+        // Remove any commas from the price (e.g., "1,579.95" -> "1579.95")
+        priceStr = priceStr.replace(/,/g, '');
+        const price = parseFloat(priceStr);
+        
+        if (!isNaN(price) && price > 0) {
+          console.log(`Found price ${price} from OpenGraph meta tag for ${sku}`);
+          return {
+            sku,
+            url,
+            price,
+            htmlSample: `<meta property="og:price:amount" content="${ogPriceMatch[1]}">`,
+            note: "Price extracted from OpenGraph meta tags"
+          };
+        }
+      }
+      
+      // If we couldn't get price from OpenGraph, try looking for JSON-LD product data
+      const jsonLdMatch = html.match(/<script type="application\/ld\+json">[^<]*?"price":\s*"?([0-9.,]+)"?[^<]*?<\/script>/i);
+      
+      if (jsonLdMatch && jsonLdMatch[1]) {
+        let priceStr = jsonLdMatch[1];
+        // Remove any commas from the price
+        priceStr = priceStr.replace(/,/g, '');
+        const price = parseFloat(priceStr);
+        
+        if (!isNaN(price) && price > 0) {
+          console.log(`Found price ${price} from JSON-LD for ${sku}`);
+          return {
+            sku,
+            url,
+            price,
+            htmlSample: `JSON-LD price: ${priceStr}`,
+            note: "Price extracted from JSON-LD structured data"
+          };
+        }
+      }
+      
+      // Last resort - look for any price pattern in the HTML
+      const priceRegex = /"price":\s*"?([0-9.,]+)"?/;
+      const priceMatch = html.match(priceRegex);
+      
+      if (priceMatch && priceMatch[1]) {
+        let priceStr = priceMatch[1];
+        priceStr = priceStr.replace(/,/g, '');
+        const price = parseFloat(priceStr);
+        
+        if (!isNaN(price) && price > 0) {
+          console.log(`Found price ${price} from general price pattern for ${sku}`);
+          return {
+            sku,
+            url,
+            price,
+            htmlSample: `"price": "${priceMatch[1]}"`,
+            note: "Price extracted from general price pattern in HTML"
+          };
+        }
+      }
+      
+      // If we couldn't extract the price, return null with error note
+      console.error(`Failed to extract price for ${url}`);
       return {
         sku,
         url,
-        price: 999.95,
-        htmlSample: "Hardcoded price for ProSpeedRacing APR Performance product"
+        price: null,
+        error: "Failed to extract price from ProSpeedRacing page",
+        htmlSample: html.substring(0, 500)
+      };
+    } catch (error) {
+      console.error(`Error scraping ProSpeedRacing URL ${url}:`, error);
+      return {
+        sku,
+        url,
+        price: null,
+        error: (error as Error).message,
+        note: "Error occurred while attempting to scrape ProSpeedRacing website"
       };
     }
-    
-    // For all other ProSpeedRacing products, return a default price
-    console.log(`Using default price for ProSpeedRacing product: ${sku}`);
-    return {
-      sku,
-      url,
-      price: 1299.99, // Default price for testing
-      htmlSample: "Hardcoded default price for ProSpeedRacing product"
-    };
-    
-    // No fallback needed - we're using hardcoded values for ProSpeedRacing
   }
   
   // For non-ProSpeedRacing URLs, try general scrapers

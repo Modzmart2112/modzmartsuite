@@ -165,16 +165,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`Testing scrape for URL: ${url}`);
       
-      // Special handling for our test product that we know has a price of 999.95
-      if (url.includes("apr-performance-carbon-fibre-front-bumper-scoop-subaru-brz-zd8-22-cf-822050")) {
-        console.log("Using hardcoded price for test product - actual price from manual verification is $999.95");
-        return res.json({
-          sku: url.split('/').pop() || '',
-          url,
-          price: 999.95,
-          note: "Price is hardcoded for this test product based on manual verification"
-        });
-      }
+      // No special handling for test products anymore - use the real scraper
+      // Let the scraper extract the price from OpenGraph meta tags or other sources
       
       // Get the price from our scraper
       const result = await scrapePriceFromUrl(url);
@@ -192,9 +184,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Add note about hardcoded prices for all ProSpeedRacing URLs
-      if (url.includes('prospeedracing.com.au')) {
-        result.note = "Using hardcoded price for ProSpeedRacing product due to scraping challenges";
+      // Add note about OpenGraph extraction for ProSpeedRacing URLs
+      if (url.includes("prospeedracing.com.au") && !result.note) {
+        result.note = "Price extracted from ProSpeedRacing website using OpenGraph meta tags";
       }
       
       res.json(result);
@@ -218,9 +210,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await scrapePriceFromUrl(url);
       
-      // Add note about hardcoded prices for all ProSpeedRacing URLs
-      if (url.includes('prospeedracing.com.au')) {
-        result.note = "Using hardcoded price for ProSpeedRacing product due to scraping challenges";
+      // Add note about OpenGraph extraction for ProSpeedRacing URLs
+      if (url.includes("prospeedracing.com.au") && !result.note) {
+        result.note = "Price extracted from ProSpeedRacing website using OpenGraph meta tags";
       }
       
       res.json(result);
