@@ -831,14 +831,35 @@ export class DatabaseStorage implements IStorage {
     console.log(`Creating product ${product.sku} with cost price: ${product.costPrice} (${typeof product.costPrice})`);
     
     // Special handling for costPrice
-    const productData = { ...product };
-    if (productData.costPrice !== undefined) {
+    const productData: Record<string, any> = {
+      sku: product.sku,
+      title: product.title,
+      description: product.description,
+      shopifyId: product.shopifyId,
+      shopifyPrice: product.shopifyPrice,
+      images: product.images,
+      status: product.status || 'active',
+      vendor: product.vendor,
+      productType: product.productType,
+      supplierUrl: product.supplierUrl,
+      supplierPrice: product.supplierPrice,
+      onSale: product.onSale,
+      originalPrice: product.originalPrice,
+      saleEndDate: product.saleEndDate,
+      saleId: product.saleId,
+      // other fields
+    };
+    
+    // Special handling for costPrice - use the snake_case for the DB column
+    if (product.costPrice !== undefined && product.costPrice !== null) {
       // Make sure it's a number
-      if (typeof productData.costPrice === 'string') {
-        productData.costPrice = parseFloat(productData.costPrice);
+      if (typeof product.costPrice === 'string') {
+        productData.cost_price = parseFloat(product.costPrice);
+      } else {
+        productData.cost_price = product.costPrice;
       }
       
-      console.log(`Final costPrice value for new product: ${productData.costPrice}`);
+      console.log(`Final costPrice value for new product: ${productData.cost_price} (${typeof productData.cost_price})`);
     }
     
     const [createdProduct] = await db.insert(products).values(productData).returning();
@@ -868,19 +889,24 @@ export class DatabaseStorage implements IStorage {
       if (productData.images !== undefined) updateData.images = productData.images;
       if (productData.vendor !== undefined) updateData.vendor = productData.vendor;
       if (productData.productType !== undefined) updateData.productType = productData.productType;
+      if (productData.onSale !== undefined) updateData.onSale = productData.onSale;
+      if (productData.originalPrice !== undefined) updateData.originalPrice = productData.originalPrice;
+      if (productData.saleEndDate !== undefined) updateData.saleEndDate = productData.saleEndDate;
+      if (productData.saleId !== undefined) updateData.saleId = productData.saleId;
       
-      // Special handling for costPrice
-      if (productData.costPrice !== undefined) {
+      // Special handling for costPrice - key issue fixed here
+      if (productData.costPrice !== undefined && productData.costPrice !== null) {
         console.log(`Processing costPrice in updateProduct: ${productData.costPrice} (${typeof productData.costPrice})`);
+        
         // Make sure it's a number
         if (typeof productData.costPrice === 'string') {
-          updateData.costPrice = parseFloat(productData.costPrice);
+          updateData.cost_price = parseFloat(productData.costPrice);
         } else {
-          updateData.costPrice = productData.costPrice;
+          updateData.cost_price = productData.costPrice;
         }
         
         // Debug the final value
-        console.log(`Final costPrice value being set: ${updateData.costPrice} (${typeof updateData.costPrice})`);
+        console.log(`Final costPrice value being set: ${updateData.cost_price} (${typeof updateData.cost_price})`);
       }
       
       // Use Drizzle ORM for the update

@@ -2000,17 +2000,29 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
           
           console.log(`After update, product ${shopifyProduct.sku} cost price: ${result?.costPrice}`);
           
-          // Verify update with direct SQL query
-          const checkResults = await db.select({ costPrice: products.costPrice })
-            .from(products)
-            .where(eq(products.id, existingProduct.id));
+          // If there's a costPrice, update it directly with SQL as a backup method 
+          if (costPrice !== null) {
+            try {
+              await db.execute(
+                sql`UPDATE products SET cost_price = ${costPrice} WHERE id = ${existingProduct.id}`
+              );
+              console.log(`Direct SQL update for ${shopifyProduct.sku} cost_price = ${costPrice}`);
+            } catch (sqlError) {
+              console.error(`Error updating cost_price with direct SQL:`, sqlError);
+            }
+          }
           
-          const checkResult = checkResults.length > 0 ? checkResults[0] : null;
-          console.log(`SQL verification for ${shopifyProduct.sku}: cost_price = ${checkResult?.costPrice}`);
+          // Verify update with direct SQL query using raw SQL for verification
+          const checkResults = await db.execute(
+            sql`SELECT cost_price FROM products WHERE id = ${existingProduct.id}`
+          );
+          
+          const checkResult = checkResults.rows && checkResults.rows.length > 0 ? checkResults.rows[0] : null;
+          console.log(`SQL verification for ${shopifyProduct.sku}: cost_price = ${checkResult?.cost_price}`);
           
         } else {
           // Create new product
-          await storage.createProduct({
+          const newProduct = await storage.createProduct({
             sku: shopifyProduct.sku,
             title: shopifyProduct.title,
             description: shopifyProduct.description,
@@ -2022,6 +2034,37 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             vendor: shopifyProduct.vendor,
             productType: shopifyProduct.productType
           });
+          
+          // Verify that new product was created with cost price
+          if (newProduct && newProduct.id && costPrice !== null) {
+            // First check the cost price
+            const checkResults = await db.execute(
+              sql`SELECT cost_price FROM products WHERE id = ${newProduct.id}`
+            );
+            
+            const checkResult = checkResults.rows && checkResults.rows.length > 0 ? checkResults.rows[0] : null;
+            console.log(`SQL verification for new product ${shopifyProduct.sku}: cost_price = ${checkResult?.cost_price}`);
+            
+            // If cost price is not set, set it directly with SQL
+            if (!checkResult?.cost_price) {
+              try {
+                await db.execute(
+                  sql`UPDATE products SET cost_price = ${costPrice} WHERE id = ${newProduct.id}`
+                );
+                console.log(`Direct SQL update for new product ${shopifyProduct.sku} cost_price = ${costPrice}`);
+                
+                // Verify the update
+                const verifyResults = await db.execute(
+                  sql`SELECT cost_price FROM products WHERE id = ${newProduct.id}`
+                );
+                
+                const verifyResult = verifyResults.rows && verifyResults.rows.length > 0 ? verifyResults.rows[0] : null;
+                console.log(`Final verification for new product ${shopifyProduct.sku}: cost_price = ${verifyResult?.cost_price}`);
+              } catch (sqlError) {
+                console.error(`Error updating cost_price for new product with direct SQL:`, sqlError);
+              }
+            }
+          }
         }
       } catch (error) {
         console.error(`Error processing Shopify product ${shopifyProduct.sku}:`, error);
