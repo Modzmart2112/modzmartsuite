@@ -415,10 +415,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allProducts = await storage.getProducts(1000, 0);
       
       // Filter to only the products that were updated by this specific CSV
+      // We want to reset them regardless of whether they currently have supplier data
       const productsToUpdate = allProducts.filter(p => 
-        productIdsToUpdate.includes(p.id) && (p.supplierUrl !== null || p.supplierPrice !== null));
+        productIdsToUpdate.includes(p.id));
         
-      console.log(`Found ${productsToUpdate.length} products with supplier data that will be reset`);
+      console.log(`Found ${productsToUpdate.length} products from this CSV that will be reset`);
       
       console.log(`Found ${productsToUpdate.length} products to update from CSV ${uploadToDelete.filename}`);
       
@@ -520,10 +521,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const allProducts = await storage.getProducts(1000, 0);
           
           // Filter to only the products that were updated by this specific CSV
+          // We want to reset them regardless of whether they currently have supplier data
           productsToUpdate = allProducts.filter(p => 
-            productIdsToUpdate.includes(p.id) && (p.supplierUrl !== null || p.supplierPrice !== null));
+            productIdsToUpdate.includes(p.id));
             
-          console.log(`Found ${productsToUpdate.length} products with supplier data that will be reset`);
+          console.log(`Found ${productsToUpdate.length} products from this CSV that will be reset`);
       } else {
           console.log('No products have been processed yet, so no products need to be updated');
       }
