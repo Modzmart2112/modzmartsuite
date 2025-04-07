@@ -828,7 +828,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
-    const [createdProduct] = await db.insert(products).values(product).returning();
+    console.log(`Creating product ${product.sku} with cost price: ${product.costPrice} (${typeof product.costPrice})`);
+    
+    // Special handling for costPrice
+    const productData = { ...product };
+    if (productData.costPrice !== undefined) {
+      // Make sure it's a number
+      if (typeof productData.costPrice === 'string') {
+        productData.costPrice = parseFloat(productData.costPrice);
+      }
+      
+      console.log(`Final costPrice value for new product: ${productData.costPrice}`);
+    }
+    
+    const [createdProduct] = await db.insert(products).values(productData).returning();
     return createdProduct;
   }
 
@@ -855,6 +868,20 @@ export class DatabaseStorage implements IStorage {
       if (productData.images !== undefined) updateData.images = productData.images;
       if (productData.vendor !== undefined) updateData.vendor = productData.vendor;
       if (productData.productType !== undefined) updateData.productType = productData.productType;
+      
+      // Special handling for costPrice
+      if (productData.costPrice !== undefined) {
+        console.log(`Processing costPrice in updateProduct: ${productData.costPrice} (${typeof productData.costPrice})`);
+        // Make sure it's a number
+        if (typeof productData.costPrice === 'string') {
+          updateData.costPrice = parseFloat(productData.costPrice);
+        } else {
+          updateData.costPrice = productData.costPrice;
+        }
+        
+        // Debug the final value
+        console.log(`Final costPrice value being set: ${updateData.costPrice} (${typeof updateData.costPrice})`);
+      }
       
       // Use Drizzle ORM for the update
       const result = await db

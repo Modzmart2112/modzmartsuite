@@ -1949,23 +1949,65 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
   try {
     const products = await shopifyClient.getAllProducts(apiKey, apiSecret, storeUrl);
     
+    let updatedWithCostCount = 0;
+    
     for (const shopifyProduct of products) {
       try {
+        // Make sure we have a valid SKU
+        if (!shopifyProduct.sku) {
+          console.log(`Skipping product with missing SKU: ${shopifyProduct.title}`);
+          continue;
+        }
+        
         // Check if product exists in our database
         const existingProduct = await storage.getProductBySku(shopifyProduct.sku);
         
+        // Enhanced cost price validation and extraction
+        let costPrice: number | null = null;
+        if (shopifyProduct.cost !== undefined && shopifyProduct.cost !== null) {
+          // Convert string costs to numbers
+          if (typeof shopifyProduct.cost === 'string') {
+            const parsedCost = parseFloat(shopifyProduct.cost);
+            if (!isNaN(parsedCost)) {
+              costPrice = parsedCost;
+            }
+          } 
+          // Already a number
+          else if (typeof shopifyProduct.cost === 'number' && !isNaN(shopifyProduct.cost)) {
+            costPrice = shopifyProduct.cost;
+          }
+        }
+        
+        if (costPrice !== null) {
+          updatedWithCostCount++;
+          console.log(`Saving cost price for ${shopifyProduct.sku}: $${costPrice}`);
+        }
+        
         if (existingProduct) {
           // Update existing product
-          await storage.updateProduct(existingProduct.id, {
+          console.log(`Updating product ${shopifyProduct.sku} with cost price: ${costPrice} (${typeof costPrice})`);
+          
+          const result = await storage.updateProduct(existingProduct.id, {
             title: shopifyProduct.title,
             description: shopifyProduct.description,
             shopifyPrice: shopifyProduct.price,
-            costPrice: shopifyProduct.cost || null, // Add cost price from Shopify
+            costPrice, // Add cost price from Shopify
             images: shopifyProduct.images,
             status: "active",
             vendor: shopifyProduct.vendor,
             productType: shopifyProduct.productType
           });
+          
+          console.log(`After update, product ${shopifyProduct.sku} cost price: ${result?.costPrice}`);
+          
+          // Verify update with direct SQL query
+          const checkResults = await db.select({ costPrice: products.costPrice })
+            .from(products)
+            .where(eq(products.id, existingProduct.id));
+          
+          const checkResult = checkResults.length > 0 ? checkResults[0] : null;
+          console.log(`SQL verification for ${shopifyProduct.sku}: cost_price = ${checkResult?.costPrice}`);
+          
         } else {
           // Create new product
           await storage.createProduct({
@@ -1974,7 +2016,7 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             description: shopifyProduct.description,
             shopifyId: shopifyProduct.id,
             shopifyPrice: shopifyProduct.price,
-            costPrice: shopifyProduct.cost || null, // Add cost price from Shopify
+            costPrice, // Add cost price from Shopify
             images: shopifyProduct.images,
             status: "active",
             vendor: shopifyProduct.vendor,
@@ -1986,7 +2028,19 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
       }
     }
     
-    console.log(`Synced ${products.length} products from Shopify`);
+    // Update the last sync time in stats
+    try {
+      const stats = await storage.getStats();
+      if (stats) {
+        await storage.updateStats({
+          lastShopifySync: new Date()
+        });
+      }
+    } catch (statsErr) {
+      console.error("Failed to update statistics with Shopify sync time:", statsErr);
+    }
+    
+    console.log(`Synced ${products.length} products from Shopify, updated ${updatedWithCostCount} with cost prices`);
   } catch (error) {
     console.error("Error syncing Shopify products:", error);
   }
