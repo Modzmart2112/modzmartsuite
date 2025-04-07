@@ -724,6 +724,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Get Shopify connection information
+  app.get("/api/shopify/connection-info", asyncHandler(async (req, res) => {
+    try {
+      const user = await storage.getUser(1); // Simplified: using first user
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        shopifyApiKey: user.shopifyApiKey,
+        shopifyApiSecret: user.shopifyApiSecret,
+        shopifyStoreUrl: user.shopifyStoreUrl
+      });
+    } catch (error) {
+      console.error("Error getting Shopify connection info:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  }));
+  
+  // Get Shopify brand distribution data
+  app.get("/api/shopify/brands", asyncHandler(async (req, res) => {
+    try {
+      // Get products with vendor information
+      const products = await storage.getProducts(1000, 0);
+      
+      // Count products by vendor (brand)
+      const brands: Record<string, number> = {};
+      
+      products.forEach(product => {
+        const brand = product.vendor || product.productType || 'Unknown';
+        if (!brands[brand]) {
+          brands[brand] = 0;
+        }
+        brands[brand]++;
+      });
+      
+      // Convert to array format for frontend
+      const brandData = Object.entries(brands).map(([name, count]) => ({
+        name,
+        count
+      })).sort((a, b) => b.count - a.count);
+      
+      res.json(brandData);
+    } catch (error) {
+      console.error("Error getting Shopify brand data:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  }));
+  
   // Sync products from Shopify
   app.post("/api/shopify/sync", asyncHandler(async (req, res) => {
     try {

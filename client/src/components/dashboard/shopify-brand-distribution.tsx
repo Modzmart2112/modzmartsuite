@@ -71,26 +71,43 @@ export function ShopifyBrandDistribution() {
   
   const isConnected = connectionInfo?.connected;
   
-  // Get all products from API
-  const { data, isLoading, refetch } = useQuery<{products: Product[]}>({
-    queryKey: ['/api/products'],
+  // Use the dedicated brands endpoint to get brand distribution data
+  const { data: brandData, isLoading: isBrandsLoading, refetch } = useQuery<{name: string, count: number}[]>({
+    queryKey: ['/api/shopify/brands'],
+    enabled: isConnected, // Only run this query if Shopify is connected
   });
   
-  // Safely extract the products array
-  const products = data?.products || [];
+  // Get all products as a fallback
+  const { data: productsData, isLoading: isProductsLoading } = useQuery<{products: Product[]}>({
+    queryKey: ['/api/products'],
+    enabled: !brandData // Only run this query if brandData is not available
+  });
+  
+  // Determine which data source to use
+  const products = productsData?.products || [];
   
   // Process data to get brand statistics
-  const brandStats = products.reduce((stats: Record<string, number>, product: Product) => {
-    // Use vendor as the brand name, or fallback to product type if vendor is missing
-    const brand = product.vendor || product.productType || 'Unknown';
-    
-    if (!stats[brand]) {
-      stats[brand] = 0;
-    }
-    
-    stats[brand]++;
-    return stats;
-  }, {});
+  let brandStats: Record<string, number> = {};
+  
+  // If we have dedicated brand data from API, use it
+  if (brandData) {
+    brandData.forEach(brand => {
+      brandStats[brand.name] = brand.count;
+    });
+  } else {
+    // Fallback to processing products if brand data isn't available
+    brandStats = products.reduce((stats: Record<string, number>, product: Product) => {
+      // Use vendor as the brand name, or fallback to product type if vendor is missing
+      const brand = product.vendor || product.productType || 'Unknown';
+      
+      if (!stats[brand]) {
+        stats[brand] = 0;
+      }
+      
+      stats[brand]++;
+      return stats;
+    }, {});
+  }
   
   // Calculate total products
   const totalProducts = Object.values(brandStats).reduce((sum, count) => sum + count, 0);
@@ -106,7 +123,7 @@ export function ShopifyBrandDistribution() {
     .sort((a, b) => b.count - a.count) // Sort by count in descending order
     .slice(0, 12); // Only show top 12 brands
   
-  if (isLoading || isConnectionLoading) {
+  if (isConnectionLoading || isBrandsLoading || (isProductsLoading && !brandData)) {
     return (
       <Card className="shadow-md">
         <CardHeader className="pb-0">
