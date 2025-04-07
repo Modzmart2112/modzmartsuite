@@ -70,13 +70,19 @@ export function PriceDiscrepancyNotification() {
         description: data.message || "The price discrepancy has been dismissed."
       });
       
-      // Close notification
-      handleDismiss();
-      
-      // Invalidate discrepancies query
+      // Just invalidate the query to refresh data, UI already updated
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+      
+      // Reset dismissing state
+      setTimeout(() => {
+        setDismissing(false);
+      }, 500);
     },
     onError: (error) => {
+      // On error, we need to reset the dismissing state to allow the user to try again
+      setDismissing(false);
+      setVisible(true);
+      
       toast({
         title: "Error dismissing discrepancy",
         description: error.message || "There was an error dismissing the price discrepancy.",
@@ -87,11 +93,22 @@ export function PriceDiscrepancyNotification() {
 
   // Show notification when discrepancies are found
   useEffect(() => {
-    if (discrepancies && discrepancies.length > 0 && !visible && !dismissing) {
+    // Only show notification if:
+    // 1. We have discrepancies
+    // 2. The notification is not already visible
+    // 3. We're not in the process of dismissing a notification
+    // 4. We're not in the middle of an API call to dismiss a discrepancy
+    if (
+      discrepancies && 
+      discrepancies.length > 0 && 
+      !visible && 
+      !dismissing && 
+      !dismissDiscrepancyMutation.isPending
+    ) {
       setCurrentDiscrepancy(discrepancies[0]);
       setVisible(true);
     }
-  }, [discrepancies, visible, dismissing]);
+  }, [discrepancies, visible, dismissing, dismissDiscrepancyMutation.isPending]);
 
   const handleVisualDismiss = () => {
     // This just visually dismisses the notification without affecting the database
@@ -106,19 +123,19 @@ export function PriceDiscrepancyNotification() {
   };
   
   const handleDismiss = () => {
-    if (!currentDiscrepancy) return;
+    if (!currentDiscrepancy || dismissDiscrepancyMutation.isPending) return;
     
     // Dismiss the discrepancy in the database
     dismissDiscrepancyMutation.mutate(currentDiscrepancy.productId);
     
-    // Also do the visual dismissal
+    // Also do the visual dismissal - do this before the API call completes
+    // to prevent flickering and multiple clicks
     setDismissing(true);
     setVisible(false);
     
     // Reset after animation completes
     setTimeout(() => {
       setCurrentDiscrepancy(null);
-      setDismissing(false);
     }, 500);
   };
 
@@ -139,8 +156,9 @@ export function PriceDiscrepancyNotification() {
         <div className="bg-red-500 px-4 py-2 flex items-center justify-between">
           <h3 className="text-white font-medium">Price Discrepancy Alert</h3>
           <button 
-            className="text-white hover:text-red-100"
+            className={`text-white ${dismissDiscrepancyMutation.isPending ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-100'}`}
             onClick={handleDismiss}
+            disabled={dismissDiscrepancyMutation.isPending}
           >
             <X className="h-5 w-5" />
           </button>
@@ -180,8 +198,9 @@ export function PriceDiscrepancyNotification() {
             variant="ghost"
             className="text-sm text-gray-600 mr-4"
             onClick={handleDismiss}
+            disabled={dismissDiscrepancyMutation.isPending}
           >
-            Dismiss
+            {dismissDiscrepancyMutation.isPending ? "Dismissing..." : "Dismiss"}
           </Button>
           <Button 
             variant="ghost" 

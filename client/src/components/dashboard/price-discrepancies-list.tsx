@@ -65,6 +65,12 @@ export function PriceDiscrepancyList() {
       console.error("Error clearing price discrepancy:", error);
     }
   });
+  
+  // Function to handle clearing a single discrepancy with proper UI state management
+  const handleClearDiscrepancy = (productId: number) => {
+    if (clearDiscrepancyMutation.isPending) return;
+    clearDiscrepancyMutation.mutate(productId);
+  };
 
   // Mutation to update a product's price
   const updatePriceMutation = useMutation({
@@ -191,10 +197,10 @@ export function PriceDiscrepancyList() {
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        onClick={() => clearDiscrepancyMutation.mutate(discrepancy.productId)}
+                        onClick={() => handleClearDiscrepancy(discrepancy.productId)}
                         disabled={clearDiscrepancyMutation.isPending}
                       >
-                        Dismiss
+                        {clearDiscrepancyMutation.isPending ? "Dismissing..." : "Dismiss"}
                       </Button>
                       <Button 
                         variant="default" 
