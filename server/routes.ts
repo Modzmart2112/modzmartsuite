@@ -107,6 +107,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(discrepancies);
   }));
   
+  // Endpoint to clear all price discrepancies
+  app.post("/api/products/discrepancies/clear", asyncHandler(async (req, res) => {
+    const clearedCount = await storage.clearPriceDiscrepancies();
+    res.json({ 
+      success: true, 
+      message: `Successfully cleared ${clearedCount} price discrepancies`, 
+      count: clearedCount 
+    });
+  }));
+  
   // Debug route to test price scraping
   app.get("/api/scrape-test", asyncHandler(async (req, res) => {
     const url = req.query.url as string;

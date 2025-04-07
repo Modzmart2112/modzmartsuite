@@ -1,6 +1,10 @@
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   LineChart,
   Line,
@@ -22,6 +26,9 @@ const formatPrice = (price: number): string => {
 };
 
 export function PriceDiscrepancyChart() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
   // Fetch dashboard stats from API
   const { data: stats = { totalRevenue: 0 }, isLoading } = useQuery<{ totalRevenue: number }>({
     queryKey: ['/api/dashboard/stats'],
@@ -30,6 +37,30 @@ export function PriceDiscrepancyChart() {
   // Fetch price discrepancies data
   const { data: discrepancies = [], isLoading: isLoadingDiscrepancies } = useQuery<PriceDiscrepancy[]>({
     queryKey: ['/api/products/discrepancies'],
+  });
+  
+  // Mutation to clear price discrepancies
+  const clearDiscrepanciesMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/products/discrepancies/clear');
+      return await response.json();
+    },
+    onSuccess: (data: {message?: string, count?: number}) => {
+      toast({
+        title: "Success",
+        description: data.message || `Cleared ${data.count || 0} price discrepancies`,
+      });
+      // Invalidate the discrepancies query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: "Failed to clear price discrepancies",
+        variant: "destructive",
+      });
+      console.error("Error clearing price discrepancies:", error);
+    }
   });
   
   // Sample chart data - would come from API in real implementation
@@ -74,6 +105,19 @@ export function PriceDiscrepancyChart() {
                 <span className="text-xs text-gray-600">Shopify Price</span>
               </div>
               <span className="text-sm text-gray-500 ml-4">Last 90 days</span>
+              {discrepancies.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="ml-4 gap-1 text-sm font-medium" 
+                  onClick={() => clearDiscrepanciesMutation.mutate()}
+                  disabled={clearDiscrepanciesMutation.isPending}
+                >
+                  <Trash2 size={14} />
+                  Clear All
+                  {clearDiscrepanciesMutation.isPending && "..."}
+                </Button>
+              )}
             </div>
           </div>
         </div>

@@ -48,6 +48,7 @@ export interface IStorage {
   
   // Price discrepancy operations
   getPriceDiscrepancies(): Promise<PriceDiscrepancy[]>;
+  clearPriceDiscrepancies(): Promise<number>; // Returns count of cleared discrepancies
 }
 
 // In-memory storage implementation
@@ -310,6 +311,22 @@ export class MemStorage implements IStorage {
     
     return discrepancies.sort((a, b) => Math.abs(b.percentageDifference) - Math.abs(a.percentageDifference));
   }
+  
+  async clearPriceDiscrepancies(): Promise<number> {
+    let clearedCount = 0;
+    
+    for (const product of this.products.values()) {
+      if (product.hasPriceDiscrepancy) {
+        product.hasPriceDiscrepancy = false;
+        product.supplierUrl = null;
+        product.supplierPrice = null;
+        product.updatedAt = new Date();
+        clearedCount++;
+      }
+    }
+    
+    return clearedCount;
+  }
 }
 
 // Database storage implementation
@@ -568,6 +585,41 @@ export class DatabaseStorage implements IStorage {
     return discrepancies.sort((a, b) => 
       Math.abs(b.percentageDifference) - Math.abs(a.percentageDifference)
     );
+  }
+  
+  async clearPriceDiscrepancies(): Promise<number> {
+    try {
+      // First, get products with price discrepancies
+      const discrepancyProducts = await db.select({ id: products.id })
+        .from(products)
+        .where(eq(products.hasPriceDiscrepancy, true));
+        
+      const discrepancyIds = discrepancyProducts.map(p => p.id);
+      
+      if (discrepancyIds.length === 0) {
+        return 0; // No discrepancies to clear
+      }
+      
+      // Update all products with price discrepancies in a single query
+      const now = new Date();
+      const result = await db.update(products)
+        .set({
+          hasPriceDiscrepancy: false,
+          supplierUrl: null,
+          supplierPrice: null,
+          updatedAt: now
+        })
+        .where(
+          eq(products.hasPriceDiscrepancy, true)
+        )
+        .returning({ id: products.id });
+      
+      console.log(`Cleared price discrepancies for ${result.length} products`);
+      return result.length;
+    } catch (error) {
+      console.error('Error clearing price discrepancies:', error);
+      return 0;
+    }
   }
 }
 
