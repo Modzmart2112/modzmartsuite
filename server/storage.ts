@@ -94,6 +94,7 @@ export class MemStorage implements IStorage {
       totalRevenue: 298560,
       totalProfit: 89390,
       newCustomers: 4239,
+      newProductsCount: 400,
       salesChannels: {
         channels: [
           { name: "Amazon", percentage: 58.23, orders: 24126, shipments: 15239 },
@@ -110,6 +111,12 @@ export class MemStorage implements IStorage {
           { country: "Australia", customers: 5236, position: { left: "75%", top: "68%" } }
         ]
       },
+      // Price check metrics
+      lastPriceCheck: null,
+      totalPriceChecks: 0,
+      totalDiscrepanciesFound: 0,
+      // Shopify sync metrics
+      lastShopifySync: null,
       lastUpdated: new Date()
     };
   }
@@ -285,13 +292,21 @@ export class MemStorage implements IStorage {
   }
 
   async getRecentCsvUploads(limit: number): Promise<CsvUpload[]> {
-    return Array.from(this.csvUploads.values())
+    const sorted = Array.from(this.csvUploads.values())
       .sort((a, b) => {
         const timeA = a.createdAt ? a.createdAt.getTime() : 0;
         const timeB = b.createdAt ? b.createdAt.getTime() : 0;
         return timeB - timeA;
-      })
-      .slice(0, limit);
+      });
+    
+    // If limit is -1, return all uploads with no limit
+    if (limit === -1) {
+      console.log(`Returning all ${sorted.length} CSV uploads without limit`);
+      return sorted;
+    }
+    
+    // Otherwise apply the limit
+    return sorted.slice(0, limit);
   }
   
   async deleteCsvUpload(id: number): Promise<boolean> {
@@ -591,6 +606,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentCsvUploads(limit: number): Promise<CsvUpload[]> {
+    // If limit is -1, don't apply a limit (get all uploads)
+    if (limit === -1) {
+      console.log('DatabaseStorage: Getting all CSV uploads without limit');
+      return await db.select()
+        .from(csvUploads)
+        .orderBy(desc(csvUploads.createdAt));
+    }
+    
+    // Otherwise, apply the specified limit
     return await db.select()
       .from(csvUploads)
       .orderBy(desc(csvUploads.createdAt))

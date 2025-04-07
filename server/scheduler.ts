@@ -222,7 +222,7 @@ export async function checkAllPrices(): Promise<void> {
  * Automated job to sync products from Shopify
  * This job will run every hour to check for new or updated products in Shopify
  */
-export async function syncShopifyProducts(): Promise<void> {
+export async function scheduledSyncShopifyProducts(): Promise<void> {
   try {
     // Get Shopify credentials from first user (or from environment variables in production)
     const user = await storage.getUser(1); // Using first user as default

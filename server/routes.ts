@@ -14,7 +14,7 @@ import path from "path";
 import os from "os";
 import { processCsvFile } from "./csv-handler";
 import { scheduler, checkAllPrices } from "./scheduler";
-import { syncShopifyProducts } from "./scheduler";
+import { scheduledSyncShopifyProducts } from "./scheduler";
 import { db } from "./db";
 import { sql, eq } from "drizzle-orm";
 
@@ -98,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       productCount,
       activeProductCount,
       offMarketCount: productCount - activeProductCount,
-      newProductsCount: 400, // Example value
+      newProductsCount: stats.newProductsCount || 0,
       withSupplierUrlCount, // Add supplier URL count
       priceDiscrepancyCount, // Add discrepancy count
       totalPriceChecks: stats.totalPriceChecks || 0, // Add price check stats
@@ -264,6 +264,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
       success: true, 
       message: `Successfully cleared ${clearedCount} price discrepancies`, 
       clearedCount
+    });
+  }));
+  
+  // Endpoint to re-check all products with supplier URLs for price discrepancies
+  app.post("/api/products/recheck-all", asyncHandler(async (req, res) => {
+    console.log("Starting re-check of all products with supplier URLs");
+    
+    // Get all products with supplier URLs
+    const productsWithUrls = await storage.getProductsWithSupplierUrls();
+    
+    if (productsWithUrls.length === 0) {
+      return res.json({
+        success: true,
+        message: "No products with supplier URLs found to re-check",
+        updatedCount: 0,
+        checkedCount: 0
+      });
+    }
+    
+    console.log(`Found ${productsWithUrls.length} products with supplier URLs to check`);
+    
+    // Track statistics for the re-check operation
+    let checkedCount = 0;
+    let updatedCount = 0;
+    let errorCount = 0;
+    
+    // Get current stats
+    const stats = await storage.getStats() || undefined;
+    let totalPriceChecks = stats?.totalPriceChecks || 0;
+    let totalDiscrepanciesFound = stats?.totalDiscrepanciesFound || 0;
+    
+    // Process each product
+    for (const product of productsWithUrls) {
+      if (!product.supplierUrl) continue;
+      
+      try {
+        console.log(`Checking price for product ${product.sku} (ID: ${product.id}) from ${product.supplierUrl}`);
+        
+        // Scrape the current price from the supplier
+        const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
+        checkedCount++;
+        totalPriceChecks++;
+        
+        if (scrapeResult.price === null) {
+          console.error(`Failed to scrape price for ${product.sku}: ${scrapeResult.error || 'Unknown error'}`);
+          errorCount++;
+          continue;
+        }
+        
+        const supplierPrice = scrapeResult.price;
+        const shopifyPrice = product.shopifyPrice || 0;
+        
+        // Create a price history record
+        await storage.createPriceHistory({
+          productId: product.id,
+          shopifyPrice,
+          supplierPrice
+        });
+        
+        // Calculate price difference percentage
+        const priceDifference = shopifyPrice - supplierPrice;
+        const percentageDifference = shopifyPrice > 0 
+          ? (priceDifference / shopifyPrice) * 100 
+          : 0;
+        
+        // Only flag as discrepancy if difference is significant (e.g., more than 1%)
+        const hasPriceDiscrepancy = Math.abs(percentageDifference) > 1;
+        
+        if (hasPriceDiscrepancy) {
+          updatedCount++;
+          totalDiscrepanciesFound++;
+        }
+        
+        // Update the product with the new supplier price
+        await storage.updateProduct(product.id, {
+          supplierPrice,
+          hasPriceDiscrepancy,
+          lastChecked: new Date()
+        });
+        
+        console.log(`Re-checked price for product ${product.sku}: $${supplierPrice} (Discrepancy: ${hasPriceDiscrepancy})`);
+      } catch (error) {
+        console.error(`Error re-checking price for product ${product.sku}:`, error);
+        errorCount++;
+      }
+    }
+    
+    // Update stats
+    await storage.updateStats({
+      lastPriceCheck: new Date(),
+      totalPriceChecks,
+      totalDiscrepanciesFound
+    });
+    
+    res.json({
+      success: true,
+      message: `Re-checked ${checkedCount} products, found ${updatedCount} with price discrepancies`,
+      checkedCount,
+      updatedCount,
+      errorCount
     });
   }));
   
@@ -499,9 +599,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
   
   app.get("/api/csv/uploads", asyncHandler(async (req, res) => {
-    const limit = parseInt(req.query.limit as string || "10");
-    const recentUploads = await storage.getRecentCsvUploads(limit);
-    res.json({ uploads: recentUploads });
+    // Get all uploads with no limit (passing -1 means no limit)
+    const recentUploads = await storage.getRecentCsvUploads(-1);
+    
+    console.log(`Returning ${recentUploads.length} CSV uploads without any limit`);
+    
+    res.json({ 
+      uploads: recentUploads,
+      totalCount: recentUploads.length
+    });
   }));
   
   // Delete a CSV upload
@@ -512,8 +618,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid upload ID" });
     }
     
-    // Get the CSV upload to delete
-    const csvUploads = await storage.getRecentCsvUploads(100);
+    // Get the CSV upload to delete (using -1 for no limit)
+    const csvUploads = await storage.getRecentCsvUploads(-1);
     const uploadToDelete = csvUploads.find(upload => upload.id === uploadId);
     
     if (!uploadToDelete) {
@@ -589,8 +695,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid upload ID" });
     }
     
-    // Get the CSV upload to cancel
-    const csvUploads = await storage.getRecentCsvUploads(100);
+    // Get the CSV upload to cancel (using -1 for no limit)
+    const csvUploads = await storage.getRecentCsvUploads(-1);
     const uploadToCancel = csvUploads.find(upload => upload.id === uploadId);
     
     if (!uploadToCancel) {
@@ -700,7 +806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid upload ID" });
     }
     
-    const uploads = await storage.getRecentCsvUploads(100);
+    const uploads = await storage.getRecentCsvUploads(-1); // No limit
     const upload = uploads.find(u => u.id === uploadId);
     
     if (!upload) {
@@ -876,6 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Start syncing products in the background
+      // Use the local implementation, not the scheduled one
       syncShopifyProducts(user.shopifyApiKey, user.shopifyApiSecret, user.shopifyStoreUrl).catch(console.error);
       
       res.json({ success: true, message: "Product sync initiated" });
@@ -994,7 +1101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/scheduler/run-shopify-sync", asyncHandler(async (req, res) => {
     try {
       // Run the Shopify sync job
-      syncShopifyProducts().catch(err => {
+      scheduledSyncShopifyProducts().catch(err => {
         console.error('Error in manual Shopify sync:', err);
       });
       
@@ -1506,6 +1613,22 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
         console.error(`Failed to update CSV upload ${uploadId} status to completed`);
       } else {
         console.log(`Successfully updated CSV upload ${uploadId} status to completed`);
+        
+        // Update dashboard stats to reflect the new product counts
+        try {
+          const stats = await storage.getStats();
+          if (stats) {
+            // Update the stats with new product information
+            await storage.updateStats({
+              lastUpdated: new Date(),
+              // If we added new products via the CSV, update the new products count
+              newProductsCount: (stats.newProductsCount || 0) + newProductCount
+            });
+            console.log('Dashboard stats updated after CSV processing');
+          }
+        } catch (statsError) {
+          console.error('Error updating dashboard stats after CSV processing:', statsError);
+        }
       }
     } catch (error) {
       console.error(`Error updating CSV upload ${uploadId} status:`, error);
@@ -1517,6 +1640,15 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
     await storage.updateCsvUpload(uploadId, {
       status: "error"
     });
+    
+    // Still update the dashboard stats lastUpdated timestamp
+    try {
+      await storage.updateStats({
+        lastUpdated: new Date()
+      });
+    } catch (statsError) {
+      console.error('Error updating dashboard stats after CSV error:', statsError);
+    }
   }
 }
 

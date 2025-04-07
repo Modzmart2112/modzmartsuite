@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { scheduler, checkAllPrices, syncShopifyProducts } from "./scheduler";
+import { scheduler, checkAllPrices, scheduledSyncShopifyProducts } from "./scheduler";
 
 const app = express();
 app.use(express.json());
@@ -94,10 +94,10 @@ app.use((req, res, next) => {
     const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
     
     // Run immediately on startup
-    syncShopifyProducts().catch(err => console.error('Error in initial Shopify sync:', err));
+    scheduledSyncShopifyProducts().catch(err => console.error('Error in initial Shopify sync:', err));
     
     // Then schedule to run every hour
-    scheduler.startJob('hourly-shopify-sync', ONE_HOUR, syncShopifyProducts);
+    scheduler.startJob('hourly-shopify-sync', ONE_HOUR, scheduledSyncShopifyProducts);
     log(`Shopify sync scheduler initialized - running every hour`, 'scheduler');
   });
 })();

@@ -71,6 +71,7 @@ export const stats = pgTable("stats", {
   totalRevenue: real("total_revenue").default(0),
   totalProfit: real("total_profit").default(0),
   newCustomers: integer("new_customers").default(0),
+  newProductsCount: integer("new_products_count").default(0),
   salesChannels: jsonb("sales_channels").default({}),
   geoDistribution: jsonb("geo_distribution").default({}),
   // Price check metrics
