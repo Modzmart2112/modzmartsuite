@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -12,7 +12,20 @@ import {
   Info,
   Trash2,
   X,
-  MoreHorizontal
+  MoreHorizontal,
+  BarChart3,
+  PieChart,
+  Link as LinkIcon,
+  DollarSign,
+  ShoppingBag,
+  FileText as FileCsv,
+  Boxes,
+  ArrowUpDown,
+  Check,
+  Calendar,
+  RefreshCw,
+  Link2,
+  Percent
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -26,6 +39,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  Pie,
+  LabelList,
+  Legend,
+} from "recharts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +63,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { format } from "date-fns";
 
 interface CsvUpload {
   id: number;
@@ -216,23 +245,362 @@ export default function Suppliers() {
     return date.toLocaleString();
   };
 
+  // Get product data for the supplier statistics
+  const { data: productsData, isLoading: isProductsLoading } = useQuery<{products: any[]}>({
+    queryKey: ['/api/products'],
+  });
+  
+  // Get brand distribution data
+  const { data: brandData, isLoading: isBrandsLoading } = useQuery<{name: string, count: number}[]>({
+    queryKey: ['/api/shopify/brands'],
+  });
+  
+  // Get discrepancies
+  const { data: discrepanciesData, isLoading: isDiscrepanciesLoading } = useQuery<any[]>({
+    queryKey: ['/api/products/discrepancies'],
+  });
+  
+  const products = productsData?.products || [];
+  const discrepancies = discrepanciesData || [];
+  
+  // Calculate supplier statistics
+  const totalProducts = products.length;
+  const withSupplierUrl = products.filter(p => p.supplierUrl).length;
+  const withSupplierPrice = products.filter(p => p.supplierPrice !== null && p.supplierPrice !== undefined).length;
+  const withDiscrepancies = products.filter(p => p.hasPriceDiscrepancy).length;
+  
+  // Process vendor distribution data for chart
+  const vendorData = brandData || [];
+  const topVendors = [...vendorData].sort((a, b) => b.count - a.count).slice(0, 7);
+  
+  // Create vendor chart data with colors
+  const colors = [
+    "#3b82f6", "#a855f7", "#ec4899", "#f97316", 
+    "#10b981", "#f43f5e", "#0ea5e9", "#14b8a6"
+  ];
+  
+  const vendorChartData = topVendors.map((vendor, index) => ({
+    name: vendor.name,
+    count: vendor.count,
+    color: colors[index % colors.length]
+  }));
+  
+  // Format number function
+  const formatNumber = (num: number) => {
+    return num.toLocaleString('en-US');
+  };
+  
+  // Format percentage from two numbers
+  const calculatePercentage = (value: number, total: number) => {
+    if (total === 0) return 0;
+    return Math.round((value / total) * 100);
+  };
+  
   return (
     <div className="container mx-auto py-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Supplier Management</h1>
-        <Button onClick={handleOpenUploadModal}>Upload CSV</Button>
+        <div>
+          <h1 className="text-3xl font-bold">Supplier Management</h1>
+          <p className="text-gray-500 mt-1">Manage supplier URLs and monitor price discrepancies</p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Data
+          </Button>
+          <Button onClick={handleOpenUploadModal}>
+            <Upload className="h-4 w-4 mr-2" />
+            Upload CSV
+          </Button>
+        </div>
       </div>
-
-      <Alert className="mb-6">
-        <Info className="h-4 w-4" />
-        <AlertTitle>CSV Import Format</AlertTitle>
-        <AlertDescription>
-          Upload CSV files with <strong>SKU</strong> and <strong>Origin URL</strong> columns. 
-          The system will match SKUs with existing products and use the Origin URLs to 
-          check for price discrepancies.
-        </AlertDescription>
-      </Alert>
-
+      
+      {/* Overview statistics section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Products</p>
+                <div className="flex items-end">
+                  <h3 className="text-2xl font-bold">{formatNumber(totalProducts)}</h3>
+                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
+                </div>
+              </div>
+              <div className="p-3 bg-blue-50 rounded-md">
+                <Boxes className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              All products in your inventory
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">With Supplier URLs</p>
+                <div className="flex items-end">
+                  <h3 className="text-2xl font-bold">{formatNumber(withSupplierUrl)}</h3>
+                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
+                </div>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-md">
+                <LinkIcon className="h-6 w-6 text-purple-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <Progress value={calculatePercentage(withSupplierUrl, totalProducts)} className="h-1" />
+              <p className="text-xs text-gray-500 mt-1">
+                {calculatePercentage(withSupplierUrl, totalProducts)}% of products have supplier URLs
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">With Supplier Prices</p>
+                <div className="flex items-end">
+                  <h3 className="text-2xl font-bold">{formatNumber(withSupplierPrice)}</h3>
+                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
+                </div>
+              </div>
+              <div className="p-3 bg-green-50 rounded-md">
+                <DollarSign className="h-6 w-6 text-green-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <Progress value={calculatePercentage(withSupplierPrice, totalProducts)} className="h-1" />
+              <p className="text-xs text-gray-500 mt-1">
+                {calculatePercentage(withSupplierPrice, totalProducts)}% of products have supplier prices
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Price Discrepancies</p>
+                <div className="flex items-end">
+                  <h3 className="text-2xl font-bold">{formatNumber(withDiscrepancies)}</h3>
+                  <span className="text-xs text-gray-500 mb-1 ml-2">items</span>
+                </div>
+              </div>
+              <div className="p-3 bg-orange-50 rounded-md">
+                <Percent className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+            <div className="mt-2">
+              <Progress 
+                value={calculatePercentage(withDiscrepancies, withSupplierPrice)} 
+                className={`h-1 ${withDiscrepancies > 0 ? '[&>div]:bg-orange-500' : ''}`} 
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {calculatePercentage(withDiscrepancies, withSupplierPrice)}% of products with supplier prices
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Vendor distribution chart */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <Card className="lg:col-span-2 shadow-sm">
+          <CardHeader>
+            <CardTitle>Vendor Distribution</CardTitle>
+            <CardDescription>Top vendors by product count in your catalog</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isBrandsLoading ? (
+              <div className="h-[350px] flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              </div>
+            ) : vendorChartData.length > 0 ? (
+              <div className="h-[350px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={vendorChartData}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis 
+                      type="number" 
+                      tickFormatter={(value) => formatNumber(value)}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      width={150}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [`${formatNumber(value)} products`, 'Count']}
+                      contentStyle={{
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        color: '#fff',
+                        borderRadius: '4px',
+                        border: 'none',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      radius={[0, 4, 4, 0]}
+                      barSize={30}
+                    >
+                      {vendorChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                      <LabelList 
+                        dataKey="count" 
+                        position="insideRight" 
+                        style={{ fill: 'white', fontSize: 12, fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}
+                        formatter={(value: number) => formatNumber(value)}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-[350px] flex flex-col items-center justify-center">
+                <BarChart3 className="h-16 w-16 text-gray-200 mb-4" />
+                <h3 className="font-medium text-lg text-gray-600">No vendor data available</h3>
+                <p className="text-gray-500 text-sm max-w-md text-center mt-2">
+                  Connect your Shopify store or upload products with vendor information to see your vendor distribution
+                </p>
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="border-t bg-gray-50 py-3">
+            <div className="flex flex-wrap gap-2 w-full">
+              {vendorChartData.map((vendor, index) => (
+                <Badge 
+                  key={index} 
+                  variant="outline" 
+                  className="flex items-center gap-1"
+                  style={{ backgroundColor: `${vendor.color}15`, color: vendor.color, borderColor: `${vendor.color}30` }}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: vendor.color }}></span>
+                  {vendor.name}: {formatNumber(vendor.count)}
+                </Badge>
+              ))}
+            </div>
+          </CardFooter>
+        </Card>
+        
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Supplier URLs Status</CardTitle>
+            <CardDescription>Overview of product link status</CardDescription>
+          </CardHeader>
+          <CardContent className="pb-2">
+            {isProductsLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-7 w-full" />
+                <Skeleton className="h-7 w-full" />
+              </div>
+            ) : (
+              <>
+                <div className="h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <defs>
+                        <linearGradient id="gradientWithUrl" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                          <stop offset="100%" stopColor="#3b82f6" stopOpacity={1}/>
+                        </linearGradient>
+                        <linearGradient id="gradientWithoutUrl" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.8}/>
+                          <stop offset="100%" stopColor="#94a3b8" stopOpacity={1}/>
+                        </linearGradient>
+                      </defs>
+                      <Pie
+                        data={[
+                          { name: 'With Supplier URL', value: withSupplierUrl },
+                          { name: 'Without Supplier URL', value: totalProducts - withSupplierUrl }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill="url(#gradientWithUrl)" stroke="#fff" />
+                        <Cell fill="url(#gradientWithoutUrl)" stroke="#fff" />
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [formatNumber(value), name]}
+                        contentStyle={{
+                          backgroundColor: 'rgba(0,0,0,0.8)',
+                          color: '#fff',
+                          borderRadius: '4px',
+                          border: 'none',
+                          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                      <span className="text-sm font-medium">With Supplier URL</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm font-bold">{formatNumber(withSupplierUrl)}</span>
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({calculatePercentage(withSupplierUrl, totalProducts)}%)
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <span className="w-3 h-3 rounded-full bg-gray-400 mr-2"></span>
+                      <span className="text-sm font-medium">Without Supplier URL</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm font-bold">{formatNumber(totalProducts - withSupplierUrl)}</span>
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({100 - calculatePercentage(withSupplierUrl, totalProducts)}%)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+          <CardFooter className="border-t bg-gray-50 py-3">
+            <div className="flex items-center justify-between w-full">
+              <span className="text-sm text-gray-500">
+                <Link2 className="h-4 w-4 inline-block mr-1 mb-1" />
+                Supplier URLs
+              </span>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/products">View All Products</a>
+              </Button>
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
+      
+      <div className="mb-8"></div>
+      
       <Tabs defaultValue="upload">
         <TabsList className="mb-6">
           <TabsTrigger value="upload">CSV Upload</TabsTrigger>
@@ -246,40 +614,73 @@ export default function Suppliers() {
             </CardHeader>
             <CardContent className="p-6">
               <div 
-                className={`border border-dashed rounded-md p-10 ${
-                  isDragging ? "border-primary bg-primary/5" : "border-gray-300"
+                className={`border-2 border-dashed rounded-lg p-6 md:p-10 ${
+                  isDragging ? "border-primary bg-primary/5" : "border-gray-200"
                 }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
               >
-                <div className="flex flex-col items-center justify-center">
-                  <Upload className="h-16 w-16 text-gray-400 mb-4" />
-                  <p className="mb-3 text-lg font-medium text-gray-900">
-                    {uploadMutation.isPending
-                      ? "Uploading files..."
-                      : "Drag and drop CSV files here"}
-                  </p>
-                  <p className="text-sm text-gray-500 mb-5">or</p>
-                  <label 
-                    htmlFor="file-upload" 
-                    className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-md text-sm font-medium cursor-pointer"
-                  >
-                    Browse Files
-                    <input 
-                      id="file-upload" 
-                      type="file" 
-                      className="hidden" 
-                      onChange={handleFileSelection}
-                      multiple 
-                      accept=".csv" 
-                      disabled={uploadMutation.isPending}
-                    />
-                  </label>
-                  <p className="mt-6 text-sm text-gray-500">
-                    Supports multiple CSV files with SKU and Origin URL columns
-                  </p>
-                </div>
+                {uploadMutation.isPending ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="relative w-16 h-16 mb-4">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                        <FileCsv className="h-16 w-16 text-primary" />
+                      </div>
+                    </div>
+                    <h3 className="mb-1 text-lg font-medium text-gray-900">
+                      Processing CSV Files
+                    </h3>
+                    <p className="text-sm text-gray-500 text-center max-w-md">
+                      Your files are being uploaded and processed. This may take a moment depending on the file size.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="bg-gray-50 p-4 rounded-full mb-4">
+                      <Upload className="h-12 w-12 text-primary" />
+                    </div>
+                    <h3 className="mb-1 text-lg font-medium text-gray-900">
+                      Drop your CSV files here
+                    </h3>
+                    <p className="text-sm text-gray-500 text-center max-w-md mb-6">
+                      Upload CSV files with SKU and Origin URL columns. The system will match SKUs with 
+                      existing products and use the Origin URLs to check for price discrepancies.
+                    </p>
+                    
+                    <div className="flex flex-col sm:flex-row gap-3 items-center">
+                      <label 
+                        htmlFor="file-upload" 
+                        className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors"
+                      >
+                        <span className="flex items-center">
+                          <FileCsv className="h-4 w-4 mr-2" />
+                          Browse CSV Files
+                        </span>
+                        <input 
+                          id="file-upload" 
+                          type="file" 
+                          className="hidden" 
+                          onChange={handleFileSelection}
+                          multiple 
+                          accept=".csv" 
+                          disabled={uploadMutation.isPending}
+                        />
+                      </label>
+                      <span className="text-sm text-gray-500">or drag and drop</span>
+                    </div>
+                    
+                    <div className="mt-8 flex items-center gap-3 text-xs text-gray-500">
+                      <Info className="h-4 w-4" />
+                      <span>
+                        <strong>Supplier URLs</strong> will be used to scrape prices and check for discrepancies
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -336,73 +737,113 @@ export default function Suppliers() {
                     </Card>
                   </div>
                   
-                  {recentUploads.uploads.map((upload: CsvUpload) => (
-                    <div key={upload.id} className="py-4 first:pt-0 last:pb-0 border-b last:border-b-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center">
-                          <FileText className="h-5 w-5 text-gray-400 mr-2" />
-                          <span className="font-medium">{upload.filename}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center">
-                            {getStatusIcon(upload.status)}
-                            <span className="ml-2 capitalize">{upload.status}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    {recentUploads.uploads.map((upload: CsvUpload) => (
+                      <Card key={upload.id} className={`shadow-sm border-l-4 ${
+                        upload.status === 'completed' ? 'border-l-green-500' :
+                        upload.status === 'error' ? 'border-l-red-500' :
+                        upload.status === 'processing' ? 'border-l-blue-500' :
+                        'border-l-gray-300'
+                      }`}>
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <FileCsv className="h-5 w-5 text-gray-400" />
+                              <CardTitle className="text-base font-medium">{upload.filename}</CardTitle>
+                            </div>
+                            <Badge variant={
+                              upload.status === 'completed' ? 'outline' :
+                              upload.status === 'error' ? 'destructive' : 
+                              'secondary'
+                            }
+                            className={`flex items-center gap-1 ${
+                              upload.status === 'completed' ? 'bg-green-50 text-green-600 border-green-200' : ''
+                            }`}
+                            >
+                              {getStatusIcon(upload.status)}
+                              <span className="capitalize">{upload.status}</span>
+                            </Badge>
                           </div>
-                          
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {upload.status === 'processing' && (
-                                <DropdownMenuItem 
-                                  onClick={() => setUploadToCancel(upload.id)}
-                                  className="text-red-500 focus:text-red-500"
-                                >
-                                  <X className="h-4 w-4 mr-2" />
-                                  Cancel Processing
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem 
-                                onClick={() => setUploadToDelete(upload.id)}
-                                className="text-red-500 focus:text-red-500"
+                          <CardDescription className="mt-2">
+                            {format(new Date(upload.createdAt), "MMMM dd, yyyy 'at' h:mm a")}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pb-3">
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div className="bg-gray-50 p-2 rounded-md">
+                                <p className="text-gray-500 text-xs mb-1">Records</p>
+                                <p className="font-medium">{formatNumber(upload.recordsCount)}</p>
+                              </div>
+                              <div className="bg-gray-50 p-2 rounded-md">
+                                <p className="text-gray-500 text-xs mb-1">Processed</p>
+                                <p className="font-medium">
+                                  {formatNumber(upload.processedCount)} 
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    ({Math.round((upload.processedCount / upload.recordsCount) * 100)}%)
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                                <span>Progress</span>
+                                <span>{Math.round((upload.processedCount / upload.recordsCount) * 100)}%</span>
+                              </div>
+                              <Progress
+                                className={`h-2 ${
+                                  upload.status === 'completed' ? '[&>div]:bg-green-500' :
+                                  upload.status === 'error' ? '[&>div]:bg-red-500' :
+                                  upload.status === 'processing' ? '[&>div]:bg-blue-500' :
+                                  ''
+                                }`}
+                                value={(upload.processedCount / upload.recordsCount) * 100}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                        <CardFooter className="pt-0 flex justify-end">
+                          <div className="flex items-center gap-2">
+                            {upload.status === 'processing' && (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setUploadToCancel(upload.id)}
+                                className="text-red-500 border-red-200 hover:bg-red-50"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Upload
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                      
-                      <div className="text-sm text-gray-500 mb-2">
-                        Uploaded: {formatDate(upload.createdAt)}
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{upload.processedCount} of {upload.recordsCount} records processed</span>
-                        <span>{Math.round((upload.processedCount / upload.recordsCount) * 100)}%</span>
-                      </div>
-                      
-                      <Progress
-                        className={`mt-2 ${
-                          upload.status === 'completed' ? '[&>div]:bg-green-500' :
-                          upload.status === 'error' ? '[&>div]:bg-red-500' :
-                          upload.status === 'processing' ? '[&>div]:bg-blue-500' :
-                          ''
-                        }`}
-                        value={(upload.processedCount / upload.recordsCount) * 100}
-                      />
-                    </div>
-                  ))}
+                                <X className="h-3.5 w-3.5 mr-1" />
+                                Cancel
+                              </Button>
+                            )}
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setUploadToDelete(upload.id)}
+                              className="text-gray-500"
+                            >
+                              <Trash2 className="h-3.5 w-3.5 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-10 text-gray-500">
-                  <FileText className="h-10 w-10 mx-auto mb-3 text-gray-400" />
-                  <p>No CSV uploads found</p>
-                  <p className="text-sm mt-2">Upload your first supplier price file to get started</p>
+                <div className="text-center py-12 px-4">
+                  <div className="bg-gray-50 w-20 h-20 mx-auto rounded-full flex items-center justify-center mb-4">
+                    <FileCsv className="h-10 w-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-medium text-gray-700 mb-2">No CSV uploads found</h3>
+                  <p className="text-gray-500 max-w-md mx-auto mb-6">
+                    Upload your first supplier price file to map SKUs with supplier URLs and start monitoring price discrepancies
+                  </p>
+                  <Button onClick={handleOpenUploadModal} className="mx-auto">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload First CSV
+                  </Button>
                 </div>
               )}
             </CardContent>
