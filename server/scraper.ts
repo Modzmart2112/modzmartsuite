@@ -904,19 +904,13 @@ async function seleniumProSpeedRacingScraper(url: string): Promise<ScrapedPriceR
  * Special handling for ProSpeedRacing sites using curl command directly
  * This bypasses any browser/JavaScript issues and gets the raw HTML directly
  */
-async function curlProSpeedRacingPrice(url: string, providedSku?: string): Promise<ScrapedPriceResult> {
+async function curlProSpeedRacingPrice(url: string): Promise<ScrapedPriceResult> {
   console.log(`Running curl-based price extraction for ProSpeedRacing: ${url}`);
   
-  // Use provided SKU if available, otherwise generate a placeholder from URL
-  let sku = providedSku || '';
-  
-  if (!sku) {
-    // Generate a fallback SKU from URL only if no SKU was provided
-    sku = url.split('/').pop() || '';
-    if (sku && sku.includes('?')) {
-      sku = sku.split('?')[0];
-    }
-    console.log(`Warning: No SKU provided for curlProSpeedRacingPrice, using URL-based fallback: ${sku}`);
+  // Extract SKU from URL
+  let sku = url.split('/').pop() || '';
+  if (sku && sku.includes('?')) {
+    sku = sku.split('?')[0];
   }
   
   try {
@@ -1026,7 +1020,7 @@ async function curlProSpeedRacingPrice(url: string, providedSku?: string): Promi
   }
 }
 
-export async function scrapePriceFromUrl(url: string, providedSku?: string): Promise<ScrapedPriceResult> {
+export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
   // Note: We've enhanced our scraper to handle JavaScript-rendered prices
   // which often differ from the server-side HTML prices
   
@@ -1034,9 +1028,6 @@ export async function scrapePriceFromUrl(url: string, providedSku?: string): Pro
   const canUsePuppeteer = isPuppeteerAvailable();
   const canUseSelenium = isSeleniumAvailable();
   const isReplit = process.env.REPL_ID ? true : false;
-  
-  // Use the provided SKU if available
-  const sku = providedSku || '';
   
   console.log(`Scraping price from URL: ${url}`);
   console.log(`Environment checks: Puppeteer=${canUsePuppeteer}, Selenium=${canUseSelenium}, Replit=${isReplit}`);
@@ -1067,7 +1058,7 @@ export async function scrapePriceFromUrl(url: string, providedSku?: string): Pro
   // Try the enhanced fetcher method for all URLs - most reliable and efficient
   try {
     console.log(`Attempting enhanced fetcher method for URL: ${url}`);
-    const fetcherResult = await enhancedFetcher(url, providedSku);
+    const fetcherResult = await enhancedFetcher(url);
     
     // If we successfully extracted a price, return that result
     if (fetcherResult.price !== null && !isNaN(fetcherResult.price)) {
@@ -1492,15 +1483,15 @@ export async function scrapePriceFromUrl(url: string, providedSku?: string): Pro
   }
   
   // For non-ProSpeedRacing URLs, continue with the generic scraping methods
-  return await genericScraper(url, providedSku);
+  return await genericScraper(url);
 }
 
 // Generic scraper function for non-specialized sites
-async function genericScraper(urlToScrape: string, providedSku?: string): Promise<ScrapedPriceResult> {
+async function genericScraper(urlToScrape: string): Promise<ScrapedPriceResult> {
   // Use the new enhanced fetcher as primary method
   try {
     console.log(`Using enhanced fetcher for URL: ${urlToScrape}`);
-    const result = await enhancedFetcher(urlToScrape, providedSku);
+    const result = await enhancedFetcher(urlToScrape);
     
     // If we got a price, apply any needed adjustments based on the site
     if (result.price !== null) {

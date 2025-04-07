@@ -180,10 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Testing scrape for URL: ${url}`);
       
       // Use our upgraded scraper with improved price extraction for all URLs
-      // Check if a SKU was provided in the query parameters
-      const sku = req.query.sku as string | undefined;
-      console.log(`SKU provided for test: ${sku || 'None'}`);
-      const result = await scrapePriceFromUrl(url, sku);
+      const result = await scrapePriceFromUrl(url);
       
       // Log the raw HTML content if needed for debugging
       if (req.query.debug === 'true') {
@@ -218,10 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       // Use our improved price extraction for all URLs
-      // Check if sku was provided in the body
-      const sku = req.body.sku as string | undefined;
-      console.log(`SKU provided for scrape: ${sku || 'None'}`);
-      const result = await scrapePriceFromUrl(url, sku);
+      const result = await scrapePriceFromUrl(url);
       
       res.json(result);
     } catch (error) {
@@ -254,7 +248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       // Use our improved price extraction for all products
-      const scrapeResult = await scrapePriceFromUrl(product.supplierUrl, product.sku);
+      const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
       
       if (scrapeResult.price === null) {
         return res.status(400).json({ 
@@ -912,8 +906,8 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
                 note: "Price hardcoded for testing - actual value from website"
               };
             } else {
-              // For all other products, use the normal price scraper and pass the product SKU
-              scrapeResult = await scrapePriceFromUrl(product.supplierUrl, product.sku);
+              // For all other products, use the normal price scraper
+              scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
             }
             
             if (scrapeResult.price !== null) {

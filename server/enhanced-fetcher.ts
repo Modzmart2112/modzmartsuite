@@ -125,23 +125,15 @@ function findSiteSpecificHandler(url: string): ((url: string, html: string) => P
  * Enhanced price extraction using modern fetch techniques with proper headers
  * This function mimics browser requests to reliably extract prices from supplier websites
  */
-export async function enhancedFetcher(url: string, providedSku?: string): Promise<ScrapedPriceResult> {
-  // Use provided SKU if available, otherwise generate a placeholder from URL
-  // Important: We should always use the SKU from the product database in production
-  // This fallback is only for testing scenarios where no SKU is provided
-  let sku = providedSku || '';
-  
-  if (!sku) {
-    // Generate a fallback SKU from URL only if no SKU was provided
-    sku = url.split('/').pop() || '';
-    // Clean the SKU (remove query params, etc.)
-    if (sku && sku.includes('?')) {
-      sku = sku.split('?')[0];
-    }
-    console.log(`Warning: No SKU provided, using URL-based fallback: ${sku}`);
+export async function enhancedFetcher(url: string): Promise<ScrapedPriceResult> {
+  // Extract SKU from URL
+  let sku = url.split('/').pop() || '';
+  // Clean the SKU (remove query params, etc.)
+  if (sku && sku.includes('?')) {
+    sku = sku.split('?')[0];
   }
   
-  console.log(`Enhanced fetcher for URL: ${url}, SKU: ${sku}`);
+  console.log(`Enhanced fetcher for URL: ${url}`);
   
   try {
     // Check if we have a site-specific handler for this URL

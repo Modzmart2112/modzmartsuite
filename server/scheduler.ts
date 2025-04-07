@@ -80,7 +80,7 @@ export async function checkAllPrices(): Promise<void> {
         
         // Scrape the current price
         log(`Checking price for ${product.sku} (${product.title})`, 'price-checker');
-        const result = await scrapePriceFromUrl(product.supplierUrl, product.sku);
+        const result = await scrapePriceFromUrl(product.supplierUrl);
         
         if (result.price) {
           // Update the product with the new price
