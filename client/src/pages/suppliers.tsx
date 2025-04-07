@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -12,20 +12,7 @@ import {
   Info,
   Trash2,
   X,
-  MoreHorizontal,
-  ArrowRight,
-  FileCheck,
-  Car,
-  DollarSign,
-  ShoppingCart,
-  Database,
-  Search,
-  BarChart4,
-  PieChart,
-  Shield,
-  Settings,
-  RefreshCw,
-  Calendar
+  MoreHorizontal
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -49,8 +36,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 interface CsvUpload {
   id: number;
