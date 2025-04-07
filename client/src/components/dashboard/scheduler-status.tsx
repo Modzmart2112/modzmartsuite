@@ -2,14 +2,24 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarClock, PlayCircle, StopCircle, RefreshCw, Clock } from "lucide-react";
+import { 
+  CalendarClock, 
+  PlayCircle, 
+  StopCircle, 
+  RefreshCw, 
+  Clock, 
+  AlertCircle,
+  Calendar
+} from "lucide-react";
 
 interface SchedulerStatus {
   activeJobs: string[];
   lastPriceCheck: string | null;
   totalPriceChecks: number;
   totalDiscrepanciesFound: number;
+  nextScheduledRun?: string | null;
 }
 
 export function SchedulerStatus() {
@@ -38,6 +48,15 @@ export function SchedulerStatus() {
     }
   };
 
+  // Calculate next run time (midnight)
+  const calculateNextRun = () => {
+    const now = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
+  };
+  
   useEffect(() => {
     fetchStatus();
     // Refresh status every 30 seconds
@@ -137,6 +156,38 @@ export function SchedulerStatus() {
       setActionInProgress(null);
     }
   };
+  
+  const resetStats = async () => {
+    try {
+      setActionInProgress("reset");
+      // This endpoint needs to be implemented on the server
+      const response = await fetch("/api/scheduler/stats/reset", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to reset stats: ${response.status}`);
+      }
+      
+      toast({
+        title: "Stats Reset",
+        description: "Price check statistics have been reset",
+      });
+      fetchStatus();
+    } catch (error) {
+      console.error("Failed to reset stats:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reset statistics",
+        variant: "destructive",
+      });
+    } finally {
+      setActionInProgress(null);
+    }
+  };
 
   const isSchedulerActive = status?.activeJobs?.includes("daily-price-check") || false;
 
@@ -158,7 +209,7 @@ export function SchedulerStatus() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Status:</span>
             {loading ? (
@@ -166,86 +217,135 @@ export function SchedulerStatus() {
                 Loading...
               </Badge>
             ) : isSchedulerActive ? (
-              <Badge variant="default" className="bg-green-600">Active</Badge>
+              <Badge variant="default" className="bg-green-600 hover:bg-green-700">Active</Badge>
             ) : (
               <Badge variant="destructive">Inactive</Badge>
             )}
           </div>
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm">Last Check: {formatTime(status?.lastPriceCheck || null)}</span>
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+            {isSchedulerActive ? (
+              <div className="flex items-center gap-3 text-foreground">
+                <Calendar className="h-10 w-10 text-primary" />
+                <div>
+                  <div className="font-medium">Next Price Check:</div>
+                  <div className="text-sm">{formatTime(status?.nextScheduledRun || calculateNextRun().toISOString())}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Checks run daily at midnight</div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-10 w-10 text-destructive" />
+                <div>
+                  <div className="font-medium">Schedule Inactive</div>
+                  <div className="text-sm text-muted-foreground">Price checks are not currently scheduled</div>
+                  <div className="text-xs text-muted-foreground mt-1">Click "Start Scheduler" to begin daily checks</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Last Check</span>
+              </div>
+              <div className="text-sm">{formatTime(status?.lastPriceCheck || null)}</div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span>Total Checks Performed:</span>
-              <span className="font-medium">{status?.totalPriceChecks || 0}</span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span>Total Discrepancies Found:</span>
-              <span className="font-medium">{status?.totalDiscrepanciesFound || 0}</span>
+            
+            <div className="space-y-1">
+              <div className="text-sm font-medium">Recent Activity</div>
+              <div className="text-2xl font-bold">{status?.totalPriceChecks || 0} <span className="text-sm font-normal text-muted-foreground">checks performed</span></div>
+              <div className="text-sm text-muted-foreground">{status?.totalDiscrepanciesFound || 0} discrepancies found</div>
             </div>
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        {isSchedulerActive ? (
+      <CardFooter>
+        <div className="flex w-full flex-col space-y-3">
+          <div className="flex justify-between gap-3">
+            {isSchedulerActive ? (
+              <Button 
+                variant="destructive" 
+                onClick={stopScheduler} 
+                disabled={actionInProgress !== null}
+                className="flex items-center gap-2 w-full"
+              >
+                {actionInProgress === "stop" ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Stopping...
+                  </>
+                ) : (
+                  <>
+                    <StopCircle className="h-4 w-4" />
+                    Stop Scheduler
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button 
+                variant="default" 
+                onClick={startScheduler} 
+                disabled={actionInProgress !== null}
+                className="flex items-center gap-2 w-full"
+              >
+                {actionInProgress === "start" ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="h-4 w-4" />
+                    Start Scheduler
+                  </>
+                )}
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={runCheckNow} 
+              disabled={actionInProgress !== null}
+              className="flex items-center gap-2 w-full"
+            >
+              {actionInProgress === "run" ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Run Check Now
+                </>
+              )}
+            </Button>
+          </div>
+          
           <Button 
-            variant="destructive" 
-            onClick={stopScheduler} 
+            variant="ghost" 
+            onClick={resetStats} 
             disabled={actionInProgress !== null}
-            className="flex items-center gap-2"
+            size="sm"
+            className="flex items-center gap-2 w-full border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50"
           >
-            {actionInProgress === "stop" ? (
+            {actionInProgress === "reset" ? (
               <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Stopping...
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                <span className="text-xs">Resetting Stats...</span>
               </>
             ) : (
               <>
-                <StopCircle className="h-4 w-4" />
-                Stop Scheduler
+                <RefreshCw className="h-3 w-3" />
+                <span className="text-xs">Reset Statistics</span>
               </>
             )}
           </Button>
-        ) : (
-          <Button 
-            variant="default" 
-            onClick={startScheduler} 
-            disabled={actionInProgress !== null}
-            className="flex items-center gap-2"
-          >
-            {actionInProgress === "start" ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Starting...
-              </>
-            ) : (
-              <>
-                <PlayCircle className="h-4 w-4" />
-                Start Scheduler
-              </>
-            )}
-          </Button>
-        )}
-        <Button 
-          variant="outline" 
-          onClick={runCheckNow} 
-          disabled={actionInProgress !== null}
-          className="flex items-center gap-2"
-        >
-          {actionInProgress === "run" ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Running...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4" />
-              Run Now
-            </>
-          )}
-        </Button>
+        </div>
       </CardFooter>
     </Card>
   );

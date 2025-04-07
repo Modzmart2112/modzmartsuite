@@ -788,6 +788,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Reset scheduler statistics
+  app.post("/api/scheduler/stats/reset", asyncHandler(async (req, res) => {
+    try {
+      const stats = await storage.getStats();
+      
+      if (stats) {
+        // Reset only the scheduler-related statistics
+        await storage.updateStats({
+          totalPriceChecks: 0,
+          totalDiscrepanciesFound: 0,
+          // Keep the last check date for historical record
+          lastPriceCheck: stats.lastPriceCheck
+        });
+        
+        console.log("Reset scheduler statistics");
+        res.json({
+          success: true,
+          message: "Scheduler statistics reset successfully"
+        });
+      } else {
+        res.status(404).json({ message: "Stats not found" });
+      }
+    } catch (error) {
+      console.error("Error resetting scheduler stats:", error);
+      res.status(500).json({ 
+        message: "Failed to reset scheduler statistics", 
+        error: (error as Error).message
+      });
+    }
+  }));
+  
   // Create HTTP server
   const httpServer = createServer(app);
   
