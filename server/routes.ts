@@ -14,6 +14,8 @@ import path from "path";
 import os from "os";
 import { processCsvFile } from "./csv-handler";
 import { scheduler, checkAllPrices } from "./scheduler";
+import { db } from "./db";
+import { sql, eq } from "drizzle-orm";
 
 
 // Helper function to handle controller errors
@@ -963,11 +965,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Re-scraping price for product ${product.sku} from ${product.supplierUrl}`);
           const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
           
-          if (!scrapeResult.success || !scrapeResult.price) {
-            console.error(`Failed to extract price for ${product.sku}: ${scrapeResult.message || "Unknown error"}`);
+          if (scrapeResult.price === null || scrapeResult.price === undefined) {
+            console.error(`Failed to extract price for ${product.sku}: ${scrapeResult.error || "Unknown error"}`);
+            console.error(`Raw scrapeResult:`, JSON.stringify(scrapeResult, null, 2));
             results.failed++;
             continue;
           }
+          
+          // Log successful price extraction
+          console.log(`Successfully extracted price for ${product.sku}: $${scrapeResult.price}`);
+          console.log(`Price extraction method: ${scrapeResult.note || "Unknown method"}`);
+          console.log(`URL: ${product.supplierUrl}`);
           
           const newSupplierPrice = scrapeResult.price;
           const oldSupplierPrice = product.supplierPrice || 0;
@@ -982,11 +990,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const hasPriceDiscrepancy = Math.abs(percentageDifference) > 1;
           
           // Update the product with the new supplier price
-          await storage.updateProduct(product.id, {
-            supplierPrice: newSupplierPrice,
-            hasPriceDiscrepancy,
-            lastChecked: new Date()
-          });
+          try {
+            const now = new Date();
+            console.log(`Updating product ${product.id} with supplier price ${newSupplierPrice}, discrepancy ${hasPriceDiscrepancy}`);
+            // Add debugging information if available
+            if (scrapeResult) {
+              console.log('Debugging: Last scraped URL:', scrapeResult.url);
+              console.log('Debugging: Extraction method:', scrapeResult.note || 'No method recorded');
+              console.log('Debugging: Raw extracted price:', scrapeResult.price);
+            }
+            
+            // Try direct SQL update with prepared statement instead
+            try {
+              console.log(`Using direct SQL query to update product ${product.id} with price ${newSupplierPrice}`);
+              
+              // Create a simple update with the products table directly
+              const result = await db.update(products)
+                .set({
+                  supplierPrice: newSupplierPrice,
+                  hasPriceDiscrepancy: hasPriceDiscrepancy,
+                  lastChecked: now,
+                  updatedAt: now
+                })
+                .where(eq(products.id, product.id))
+                .returning();
+              
+              if (!result || result.length === 0) {
+                console.error(`Direct SQL update failed for product ${product.id}`);
+                throw new Error(`Database update failed for ${product.id}`);
+              }
+              
+              console.log(`Direct SQL update successful for product ${product.id}`);
+            } catch (dbError) {
+              console.error(`Database error updating product ${product.id}:`, dbError);
+              throw dbError;
+            }
+            
+            // Record the price history
+            await storage.createPriceHistory({
+              productId: product.id,
+              shopifyPrice: product.shopifyPrice,
+              supplierPrice: newSupplierPrice
+            });
+            
+            console.log(`Successfully updated product ${product.sku} with price ${newSupplierPrice}`);
+          } catch (updateError) {
+            console.error(`Error updating product ${product.id}:`, updateError);
+            throw updateError; // Rethrow to be caught by the outer catch
+          }
           
           console.log(`Re-scraped price for product ${product.sku}: $${newSupplierPrice} (Discrepancy: ${hasPriceDiscrepancy})`);
           

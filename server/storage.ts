@@ -492,12 +492,56 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProduct(id: number, productData: Partial<Product>): Promise<Product | undefined> {
-    const now = new Date();
-    const [updatedProduct] = await db.update(products)
-      .set({ ...productData, updatedAt: now })
-      .where(eq(products.id, id))
-      .returning();
-    return updatedProduct;
+    try {
+      console.log(`Updating product ${id} with data:`, productData);
+      
+      // Convert from camelCase model properties to snake_case DB column names
+      const dbUpdateData: Record<string, any> = {
+        updated_at: new Date()
+      };
+      
+      // Perform property mapping for known fields
+      if (productData.supplierPrice !== undefined) dbUpdateData.supplier_price = productData.supplierPrice;
+      if (productData.hasPriceDiscrepancy !== undefined) dbUpdateData.has_price_discrepancy = productData.hasPriceDiscrepancy;
+      if (productData.lastChecked !== undefined) dbUpdateData.last_checked = productData.lastChecked;
+      if (productData.title !== undefined) dbUpdateData.title = productData.title;
+      if (productData.description !== undefined) dbUpdateData.description = productData.description;
+      if (productData.shopifyPrice !== undefined) dbUpdateData.shopify_price = productData.shopifyPrice;
+      if (productData.supplierUrl !== undefined) dbUpdateData.supplier_url = productData.supplierUrl;
+      if (productData.lastScraped !== undefined) dbUpdateData.last_scraped = productData.lastScraped;
+      if (productData.status !== undefined) dbUpdateData.status = productData.status;
+      if (productData.images !== undefined) dbUpdateData.images = productData.images;
+      if (productData.vendor !== undefined) dbUpdateData.vendor = productData.vendor;
+      if (productData.productType !== undefined) dbUpdateData.product_type = productData.productType;
+      
+      // Use a simple parameterized SQL query for guaranteed simplicity and reliability
+      const updateFields = Object.keys(dbUpdateData).map((key, i) => `${key} = $${i + 2}`).join(', ');
+      const values = [id, ...Object.values(dbUpdateData)];
+      
+      const query = `
+        UPDATE products 
+        SET ${updateFields} 
+        WHERE id = $1 
+        RETURNING *
+      `;
+      
+      console.log(`Executing SQL: ${query}`);
+      console.log(`With ${values.length} parameters: [id=${id}, ${Object.keys(dbUpdateData).join(', ')}]`);
+      
+      const result = await db.execute(sql.raw(query, values));
+      
+      if (!result.rows || result.rows.length === 0) {
+        console.error(`Product update failed, no rows returned for id ${id}`);
+        return undefined;
+      }
+      
+      // Convert DB row to Product type
+      console.log(`Successfully updated product ${id}`);
+      return result.rows[0] as Product;
+    } catch (error) {
+      console.error(`Error updating product ${id}:`, error);
+      return undefined;
+    }
   }
   
   // Search operations
