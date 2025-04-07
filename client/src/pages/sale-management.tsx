@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SaleCampaign, SaleCampaignTarget } from '@shared/schema';
+import { ProductList } from '@/components/products/product-list';
 
 const SaleManagementPage: React.FC = () => {
   const { toast } = useToast();
@@ -74,6 +75,25 @@ const SaleManagementPage: React.FC = () => {
     targetType: 'vendor',
     targetId: null,
     targetValue: '',
+  });
+
+  // Multi-step creation states
+  const [createStep, setCreateStep] = useState<'select-products' | 'campaign-details' | 'select-vendors'>('select-products');
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
+  const [selectedProductType, setSelectedProductType] = useState<string | null>(null);
+  const [excludeBelowCost, setExcludeBelowCost] = useState(true);
+  
+  // Fetch all vendors for the vendor selection step
+  const { data: vendorsData } = useQuery({
+    queryKey: ['/api/products/vendors'],
+    refetchOnWindowFocus: true
+  });
+  
+  // Fetch all product types for the product selection step
+  const { data: productTypesData } = useQuery({
+    queryKey: ['/api/products/product-types'],
+    refetchOnWindowFocus: true
   });
 
   // Fetch all campaigns
@@ -318,6 +338,71 @@ const SaleManagementPage: React.FC = () => {
       targetValue: '',
     });
   };
+  
+  const handleProductSelection = (productIds: number[]) => {
+    setSelectedProductIds(productIds);
+  };
+  
+  const startNewCampaign = () => {
+    setCreateStep('select-products');
+    setSelectedProductIds([]);
+    setSelectedVendor(null);
+    setSelectedProductType(null);
+    setIsCreateDialogOpen(true);
+  };
+  
+  const proceedToCampaignDetails = () => {
+    // Reset the new campaign form with default values
+    resetNewCampaignForm();
+    setCreateStep('campaign-details');
+  };
+  
+  const resetSelectionState = () => {
+    setCreateStep('select-products');
+    setSelectedProductIds([]);
+    setSelectedVendor(null);
+    setSelectedProductType(null);
+  };
+  
+  const handleCreateWithSelection = () => {
+    const campaignData = {
+      name: newCampaign.name,
+      description: newCampaign.description || null,
+      status: newCampaign.isActive ? 'active' : 'draft',
+      startDate: newCampaign.startDate,
+      endDate: newCampaign.endDate,
+      discountType: newCampaign.discountType,
+      discountValue: Number(newCampaign.discountValue),
+      excludeBelowCost: excludeBelowCost,
+      // Add selected products or vendor
+      targets: selectedProductIds.length > 0 
+        ? selectedProductIds.map(id => ({ 
+            targetType: 'product', 
+            targetId: id,
+            targetValue: null 
+          }))
+        : selectedVendor 
+          ? [{ 
+              targetType: 'vendor', 
+              targetId: null,
+              targetValue: selectedVendor 
+            }]
+          : selectedProductType
+            ? [{
+                targetType: 'product_type',
+                targetId: null,
+                targetValue: selectedProductType
+              }]
+            : []
+    };
+    
+    // Create the campaign with the provided targets
+    createCampaignMutation.mutate(campaignData);
+    
+    // Reset state and close dialog
+    setIsCreateDialogOpen(false);
+    resetSelectionState();
+  };
 
   // UI helpers
   const getStatusBadge = (status: string) => {
@@ -387,7 +472,7 @@ const SaleManagementPage: React.FC = () => {
           <h1 className="text-3xl font-bold">Sale Management</h1>
           <p className="text-muted-foreground">Create and manage time-limited discounts</p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
+        <Button onClick={startNewCampaign}>
           <PlusCircleIcon className="h-4 w-4 mr-2" />
           Create New Sale
         </Button>
@@ -466,157 +551,363 @@ const SaleManagementPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Create Campaign Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Multi-Step Create Campaign Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          resetSelectionState();
+        }
+        setIsCreateDialogOpen(open);
+      }}>
+        <DialogContent className={createStep === 'select-products' ? "sm:max-w-[900px] max-h-[80vh] overflow-y-auto" : "sm:max-w-[500px]"}>
           <DialogHeader>
-            <DialogTitle>Create New Sale Campaign</DialogTitle>
+            <DialogTitle>
+              {createStep === 'select-products' && 'Select Products or Vendor for Sale'}
+              {createStep === 'select-vendors' && 'Select Vendor for Sale'}
+              {createStep === 'campaign-details' && 'Create Sale Campaign'}
+            </DialogTitle>
             <DialogDescription>
-              Set up a new sale campaign to apply discounts to your products.
+              {createStep === 'select-products' && 'Choose individual products or a vendor to apply your discount to.'}
+              {createStep === 'select-vendors' && 'Choose a vendor to apply your discount to all their products.'}
+              {createStep === 'campaign-details' && 'Set up discount details for your selected items.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="name"
-                className="col-span-3"
-                value={newCampaign.name}
-                onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
-                placeholder="Summer Sale 2025"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="description" className="text-right">
-                Description
-              </Label>
-              <Textarea
-                id="description"
-                className="col-span-3"
-                value={newCampaign.description}
-                onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
-                placeholder="Special discounts for the summer season"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="startDate" className="text-right">
-                Start Date
-              </Label>
-              <div className="col-span-3">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !newCampaign.startDate && "text-muted-foreground"
+          
+          {createStep === 'select-products' && (
+            <>
+              <Tabs defaultValue="products" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="products">Select Products</TabsTrigger>
+                  <TabsTrigger value="vendor">Select Vendor</TabsTrigger>
+                  <TabsTrigger value="product-type">Select Product Type</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="products" className="mt-4">
+                  <div className="mb-4">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Select individual products to include in this sale. 
+                      You can use the filters to narrow down your selection.
+                    </p>
+                    {selectedProductIds.length > 0 && (
+                      <div className="bg-primary/10 p-2 rounded mt-2 text-sm">
+                        <span className="font-semibold">{selectedProductIds.length} products selected</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="max-h-[500px] overflow-y-auto border rounded-md">
+                    {/* Import and use the ProductList component in selectable mode */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-end mb-4">
+                        <Button onClick={proceedToCampaignDetails} disabled={selectedProductIds.length === 0}>
+                          Continue with {selectedProductIds.length} selected products
+                        </Button>
+                      </div>
+                      
+                      {/* Use the ProductList component with selectable mode */}
+                      <ProductList 
+                        selectable={true} 
+                        onProductSelect={handleProductSelection} 
+                        selectedProductIds={selectedProductIds}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="vendor" className="mt-4">
+                  <div className="mb-4">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Select a vendor to apply the discount to all products from that vendor.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {vendorsData?.vendors ? (
+                        vendorsData.vendors.map((vendor: string) => (
+                          <Card 
+                            key={vendor}
+                            className={cn(
+                              "cursor-pointer transition-all hover:border-primary",
+                              selectedVendor === vendor ? "border-primary bg-primary/5" : ""
+                            )}
+                            onClick={() => setSelectedVendor(vendor)}
+                          >
+                            <CardContent className="p-4 flex items-center justify-between">
+                              <div>
+                                <h3 className="font-medium">{vendor}</h3>
+                              </div>
+                              {selectedVendor === vendor && (
+                                <div className="text-primary">
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="h-5 w-5"
+                                  >
+                                    <path d="M20 6L9 17l-5-5" />
+                                  </svg>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))
+                      ) : (
+                        <div className="col-span-2 text-center py-4">
+                          Loading vendors...
+                        </div>
                       )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newCampaign.startDate ? format(newCampaign.startDate, "PPP") : "Pick a date"}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end mt-6">
+                    <Button onClick={proceedToCampaignDetails} disabled={!selectedVendor}>
+                      Continue with vendor: {selectedVendor || ''}
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={newCampaign.startDate}
-                      onSelect={(date) => date && setNewCampaign({ ...newCampaign, startDate: date })}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="endDate" className="text-right">
-                End Date
-              </Label>
-              <div className="col-span-3">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !newCampaign.endDate && "text-muted-foreground"
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="product-type" className="mt-4">
+                  <div className="mb-4">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Select a product type/category to apply the discount to all products of that type.
+                    </p>
+                    
+                    <div className="max-h-[400px] overflow-y-auto border rounded-md p-4">
+                      {productTypesData?.productTypes ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {productTypesData.productTypes.map((type: string) => (
+                            <Card 
+                              key={type}
+                              className={cn(
+                                "cursor-pointer transition-all hover:border-primary",
+                                selectedProductType === type ? "border-primary bg-primary/5" : ""
+                              )}
+                              onClick={() => setSelectedProductType(type)}
+                            >
+                              <CardContent className="p-4 flex items-center justify-between">
+                                <div>
+                                  <h3 className="font-medium">{type}</h3>
+                                </div>
+                                {selectedProductType === type && (
+                                  <div className="text-primary">
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="h-5 w-5"
+                                    >
+                                      <path d="M20 6L9 17l-5-5" />
+                                    </svg>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4">
+                          Loading product types...
+                        </div>
                       )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newCampaign.endDate ? format(newCampaign.endDate, "PPP") : "Pick a date"}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end mt-6">
+                    <Button onClick={proceedToCampaignDetails} disabled={!selectedProductType}>
+                      Continue with product type: {selectedProductType || ''}
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={newCampaign.endDate}
-                      onSelect={(date) => date && setNewCampaign({ ...newCampaign, endDate: date })}
-                      initialFocus
+                  </div>
+                </TabsContent>
+              </Tabs>
+              
+              <DialogFooter className="mt-6">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+          
+          {createStep === 'campaign-details' && (
+            <>
+              <div className="bg-muted/30 p-3 rounded mb-4">
+                <h3 className="font-medium mb-1">Selected items:</h3>
+                {selectedProductIds.length > 0 && (
+                  <p className="text-sm">{selectedProductIds.length} product(s) selected</p>
+                )}
+                {selectedVendor && (
+                  <p className="text-sm">Vendor: {selectedVendor}</p>
+                )}
+                {selectedProductType && (
+                  <p className="text-sm">Product Type: {selectedProductType}</p>
+                )}
+              </div>
+              
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    className="col-span-3"
+                    value={newCampaign.name}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
+                    placeholder="Summer Sale 2025"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="description" className="text-right">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    className="col-span-3"
+                    value={newCampaign.description}
+                    onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
+                    placeholder="Special discounts for the summer season"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="startDate" className="text-right">
+                    Start Date
+                  </Label>
+                  <div className="col-span-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !newCampaign.startDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newCampaign.startDate ? format(newCampaign.startDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={newCampaign.startDate}
+                          onSelect={(date) => date && setNewCampaign({ ...newCampaign, startDate: date })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="endDate" className="text-right">
+                    End Date
+                  </Label>
+                  <div className="col-span-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !newCampaign.endDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {newCampaign.endDate ? format(newCampaign.endDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={newCampaign.endDate}
+                          onSelect={(date) => date && setNewCampaign({ ...newCampaign, endDate: date })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="discountType" className="text-right">
+                    Discount Type
+                  </Label>
+                  <Select
+                    value={newCampaign.discountType}
+                    onValueChange={(value) => setNewCampaign({ ...newCampaign, discountType: value })}
+                  >
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select discount type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="percentage">Percentage (%)</SelectItem>
+                      <SelectItem value="fixed_amount">Fixed Amount ($)</SelectItem>
+                      <SelectItem value="new_price">New Price ($)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="discountValue" className="text-right">
+                    {newCampaign.discountType === 'percentage' ? 'Percentage' : 
+                     newCampaign.discountType === 'fixed_amount' ? 'Amount' : 'New Price'}
+                  </Label>
+                  <div className="col-span-3 flex items-center">
+                    {newCampaign.discountType !== 'percentage' && <span className="mr-2">$</span>}
+                    <Input
+                      id="discountValue"
+                      type="number"
+                      value={newCampaign.discountValue}
+                      onChange={(e) => setNewCampaign({ ...newCampaign, discountValue: parseFloat(e.target.value) })}
+                      placeholder={newCampaign.discountType === 'percentage' ? "10" : "5.99"}
                     />
-                  </PopoverContent>
-                </Popover>
+                    {newCampaign.discountType === 'percentage' && <span className="ml-2">%</span>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="excludeBelowCost" className="text-right">
+                    Exclude Below Cost
+                  </Label>
+                  <div className="flex items-center space-x-2 col-span-3">
+                    <Switch
+                      id="excludeBelowCost"
+                      checked={excludeBelowCost}
+                      onCheckedChange={setExcludeBelowCost}
+                    />
+                    <Label htmlFor="excludeBelowCost">
+                      {excludeBelowCost ? 'Enabled - Skip products where discount would make price below cost' : 'Disabled - Apply discount to all products'}
+                    </Label>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="isActive" className="text-right">
+                    Active Status
+                  </Label>
+                  <div className="flex items-center space-x-2 col-span-3">
+                    <Switch
+                      id="isActive"
+                      checked={newCampaign.isActive}
+                      onCheckedChange={(checked) => setNewCampaign({ ...newCampaign, isActive: checked })}
+                    />
+                    <Label htmlFor="isActive">
+                      {newCampaign.isActive ? 'Active (apply immediately)' : 'Draft (apply manually later)'}
+                    </Label>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="discountType" className="text-right">
-                Discount Type
-              </Label>
-              <Select
-                value={newCampaign.discountType}
-                onValueChange={(value) => setNewCampaign({ ...newCampaign, discountType: value })}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select discount type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="percentage">Percentage (%)</SelectItem>
-                  <SelectItem value="fixed_amount">Fixed Amount ($)</SelectItem>
-                  <SelectItem value="new_price">New Price ($)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="discountValue" className="text-right">
-                {newCampaign.discountType === 'percentage' ? 'Percentage' : 
-                 newCampaign.discountType === 'fixed_amount' ? 'Amount' : 'New Price'}
-              </Label>
-              <div className="col-span-3 flex items-center">
-                {newCampaign.discountType !== 'percentage' && <span className="mr-2">$</span>}
-                <Input
-                  id="discountValue"
-                  type="number"
-                  value={newCampaign.discountValue}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, discountValue: parseFloat(e.target.value) })}
-                  placeholder={newCampaign.discountType === 'percentage' ? "10" : "5.99"}
-                />
-                {newCampaign.discountType === 'percentage' && <span className="ml-2">%</span>}
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="isActive" className="text-right">
-                Active Status
-              </Label>
-              <div className="flex items-center space-x-2 col-span-3">
-                <Switch
-                  id="isActive"
-                  checked={newCampaign.isActive}
-                  onCheckedChange={(checked) => setNewCampaign({ ...newCampaign, isActive: checked })}
-                />
-                <Label htmlFor="isActive">
-                  {newCampaign.isActive ? 'Active (apply immediately)' : 'Draft (apply manually later)'}
-                </Label>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateCampaign} disabled={!newCampaign.name}>
-              Create Campaign
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateStep('select-products')}>
+                  Back
+                </Button>
+                <Button onClick={handleCreateWithSelection} disabled={!newCampaign.name}>
+                  Create Campaign
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -807,63 +1098,82 @@ const SaleManagementPage: React.FC = () => {
               </Select>
             </div>
             
+            {/* Target Value Field - show different inputs based on target type */}
             {newTarget.targetType === 'vendor' && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="vendorName" className="text-right">
+                <Label htmlFor="targetValue" className="text-right">
                   Vendor Name
                 </Label>
-                <Input
-                  id="vendorName"
-                  className="col-span-3"
+                <Select
                   value={newTarget.targetValue}
-                  onChange={(e) => setNewTarget({ ...newTarget, targetValue: e.target.value })}
-                  placeholder="e.g. Nike, Adidas"
-                />
+                  onValueChange={(value) => setNewTarget({ ...newTarget, targetValue: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select vendor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vendorsData?.vendors ? 
+                      vendorsData.vendors.map((vendor: string) => (
+                        <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
+                      )) : 
+                      <SelectItem value="" disabled>Loading vendors...</SelectItem>
+                    }
+                  </SelectContent>
+                </Select>
               </div>
             )}
             
             {newTarget.targetType === 'product_type' && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="productType" className="text-right">
+                <Label htmlFor="targetValue" className="text-right">
                   Product Type
                 </Label>
-                <Input
-                  id="productType"
-                  className="col-span-3"
+                <Select
                   value={newTarget.targetValue}
-                  onChange={(e) => setNewTarget({ ...newTarget, targetValue: e.target.value })}
-                  placeholder="e.g. Shoes, Shirts"
-                />
+                  onValueChange={(value) => setNewTarget({ ...newTarget, targetValue: value })}
+                >
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select product type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productTypesData?.productTypes ? 
+                      productTypesData.productTypes.map((type: string) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      )) : 
+                      <SelectItem value="" disabled>Loading product types...</SelectItem>
+                    }
+                  </SelectContent>
+                </Select>
               </div>
             )}
             
             {newTarget.targetType === 'product' && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="productId" className="text-right">
+                <Label htmlFor="targetId" className="text-right">
                   Product ID
                 </Label>
                 <Input
-                  id="productId"
-                  type="number"
+                  id="targetId"
                   className="col-span-3"
+                  type="number"
                   value={newTarget.targetId || ''}
-                  onChange={(e) => setNewTarget({ ...newTarget, targetId: parseInt(e.target.value) || null })}
+                  onChange={(e) => setNewTarget({ 
+                    ...newTarget, 
+                    targetId: e.target.value ? parseInt(e.target.value) : null 
+                  })}
                   placeholder="Enter product ID"
                 />
               </div>
             )}
           </div>
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddTargetDialogOpen(false)}>
               Cancel
             </Button>
             <Button 
-              onClick={handleAddTarget}
-              disabled={
-                (newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type') 
-                  ? !newTarget.targetValue 
-                  : !newTarget.targetId
-              }
+              onClick={handleAddTarget} 
+              disabled={(newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type') ? !newTarget.targetValue : !newTarget.targetId}
             >
               Add Target
             </Button>

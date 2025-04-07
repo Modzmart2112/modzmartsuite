@@ -18,10 +18,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, DollarSign } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductFilter } from "@/components/product-filters";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Function to format price with commas
 const formatPrice = (price: number): string => {
@@ -31,7 +32,15 @@ const formatPrice = (price: number): string => {
   });
 };
 
-export function ProductList() {
+export function ProductList({ 
+  selectable = false, 
+  onProductSelect,
+  selectedProductIds = []
+}: { 
+  selectable?: boolean, 
+  onProductSelect?: (productIds: number[]) => void,
+  selectedProductIds?: number[]
+}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -42,6 +51,7 @@ export function ProductList() {
     vendor: null,
     productType: null,
   });
+  const [selected, setSelected] = useState<number[]>(selectedProductIds);
   const limit = 50; // Number of products per page
   
   // Debounce search query input to avoid too many requests
@@ -57,6 +67,18 @@ export function ProductList() {
   useEffect(() => {
     setPage(1);
   }, [filters]);
+  
+  // Update parent component when selection changes
+  useEffect(() => {
+    if (onProductSelect) {
+      onProductSelect(selected);
+    }
+  }, [selected, onProductSelect]);
+
+  // Sync with external selectedProductIds
+  useEffect(() => {
+    setSelected(selectedProductIds);
+  }, [selectedProductIds]);
   
   // Handle filter changes
   const handleFilterChange = (newFilters: {
@@ -97,6 +119,27 @@ export function ProductList() {
     setSearchQuery(e.target.value);
     setPage(1); // Reset to first page when searching
   };
+
+  // Handle product selection
+  const handleProductSelect = (productId: number) => {
+    if (selected.includes(productId)) {
+      setSelected(selected.filter(id => id !== productId));
+    } else {
+      setSelected([...selected, productId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (products.length > 0) {
+      if (selected.length === products.length) {
+        // If all are selected, deselect all
+        setSelected([]);
+      } else {
+        // Otherwise select all products on the current page
+        setSelected(products.map((product: any) => product.id));
+      }
+    }
+  };
   
   const products = data?.products || [];
   const totalPages = data?.total ? Math.ceil(data.total / limit) : 0;
@@ -115,6 +158,11 @@ export function ProductList() {
                   {(filters.vendor || filters.productType) && (
                     <span className="italic ml-1">
                       (filtered)
+                    </span>
+                  )}
+                  {selectable && selected.length > 0 && (
+                    <span className="ml-2 font-medium text-primary">
+                      {selected.length} selected
                     </span>
                   )}
                 </p>
@@ -153,10 +201,22 @@ export function ProductList() {
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && (
+                  <TableHead className="w-[50px]">
+                    <input 
+                      type="checkbox" 
+                      onChange={handleSelectAll}
+                      checked={products.length > 0 && selected.length === products.length}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>SKU</TableHead>
                 <TableHead>Title</TableHead>
-                <TableHead>Shopify Price</TableHead>
+                <TableHead>Retail Price</TableHead>
+                <TableHead>Cost Price</TableHead>
                 <TableHead>Supplier Price</TableHead>
+                <TableHead>Margin</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Updated</TableHead>
               </TableRow>
@@ -166,8 +226,11 @@ export function ProductList() {
                 // Skeleton loader - show a reasonable number of rows
                 Array.from({ length: 10 }).map((_, i) => (
                   <TableRow key={i}>
+                    {selectable && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-52" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
@@ -175,37 +238,88 @@ export function ProductList() {
                   </TableRow>
                 ))
               ) : products.length > 0 ? (
-                products.map((product: any) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.sku}</TableCell>
-                    <TableCell>{product.title}</TableCell>
-                    <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
-                    <TableCell>
-                      {product.supplierPrice 
-                        ? `$${formatPrice(product.supplierPrice)}`
-                        : <span className="text-gray-400">Not available</span>
-                      }
-                    </TableCell>
-                    <TableCell>
-                      {product.hasPriceDiscrepancy ? (
-                        <Badge variant="destructive">Price Discrepancy</Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-green-100 text-green-800">
-                          Synced
-                        </Badge>
+                products.map((product: any) => {
+                  // Calculate margin percentage if both retail and cost price are available
+                  const margin = product.costPrice ? 
+                    ((product.shopifyPrice - product.costPrice) / product.shopifyPrice * 100).toFixed(1) : 
+                    null;
+                  
+                  return (
+                    <TableRow 
+                      key={product.id} 
+                      className={selectable && selected.includes(product.id) ? "bg-primary/5" : ""}
+                    >
+                      {selectable && (
+                        <TableCell>
+                          <input 
+                            type="checkbox" 
+                            checked={selected.includes(product.id)}
+                            onChange={() => handleProductSelect(product.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                        </TableCell>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {product.updatedAt 
-                        ? new Date(product.updatedAt).toLocaleString()
-                        : '-'
-                      }
-                    </TableCell>
-                  </TableRow>
-                ))
+                      <TableCell className="font-medium">{product.sku}</TableCell>
+                      <TableCell>{product.title}</TableCell>
+                      <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
+                      <TableCell>
+                        {product.costPrice 
+                          ? <span className="font-medium">${formatPrice(product.costPrice)}</span>
+                          : <span className="text-gray-400">Not set</span>
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {product.supplierPrice 
+                          ? `$${formatPrice(product.supplierPrice)}`
+                          : <span className="text-gray-400">Not available</span>
+                        }
+                      </TableCell>
+                      <TableCell>
+                        {margin ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger className={`font-medium ${
+                                parseFloat(margin) < 10 ? "text-red-500" : 
+                                parseFloat(margin) < 20 ? "text-amber-500" : 
+                                "text-green-600"
+                              }`}>
+                                {margin}%
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-sm">
+                                  <p>Profit: ${formatPrice(product.shopifyPrice - (product.costPrice || 0))}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    Based on retail vs. cost price
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {product.hasPriceDiscrepancy ? (
+                          <Badge variant="destructive">Price Discrepancy</Badge>
+                        ) : (
+                          <Badge variant="outline" className="bg-green-100 text-green-800">
+                            Synced
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {product.updatedAt 
+                          ? new Date(product.updatedAt).toLocaleString()
+                          : '-'
+                        }
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
+                  <TableCell colSpan={selectable ? 9 : 8} className="text-center py-4">
                     No products found
                   </TableCell>
                 </TableRow>
