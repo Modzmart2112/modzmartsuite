@@ -3,7 +3,15 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { CsvRecord, ScrapedPriceResult } from "@shared/types";
-import { insertProductSchema, insertCsvUploadSchema, User, Product, products } from "@shared/schema";
+import { 
+  insertProductSchema, 
+  insertCsvUploadSchema, 
+  insertSaleCampaignSchema,
+  insertSaleCampaignTargetSchema,
+  User, 
+  Product, 
+  products 
+} from "@shared/schema";
 import { shopifyClient } from "./shopify";
 import { scrapePriceFromUrl } from "./scraper";
 import { sendTelegramNotification } from "./telegram";
@@ -1370,6 +1378,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Sale Campaign Routes
+  app.get('/api/sales/campaigns', asyncHandler(async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+      
+      const campaigns = await storage.getSaleCampaigns(limit, offset);
+      res.json({ campaigns });
+    } catch (error) {
+      console.error("Error fetching sale campaigns:", error);
+      res.status(500).json({ error: "Failed to fetch sale campaigns" });
+    }
+  }));
+  
+  app.get('/api/sales/campaigns/active', asyncHandler(async (req, res) => {
+    try {
+      const campaigns = await storage.getActiveSaleCampaigns();
+      res.json({ campaigns });
+    } catch (error) {
+      console.error("Error fetching active sale campaigns:", error);
+      res.status(500).json({ error: "Failed to fetch active sale campaigns" });
+    }
+  }));
+  
+  app.get('/api/sales/campaigns/:id', asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+      
+      const campaign = await storage.getSaleCampaignById(campaignId);
+      
+      if (!campaign) {
+        return res.status(404).json({ error: "Sale campaign not found" });
+      }
+      
+      // Get targets for this campaign
+      const targets = await storage.getSaleCampaignTargets(campaignId);
+      
+      res.json({ 
+        campaign,
+        targets
+      });
+    } catch (error) {
+      console.error(`Error fetching sale campaign details:`, error);
+      res.status(500).json({ error: "Failed to fetch sale campaign details" });
+    }
+  }));
+  
+  app.post('/api/sales/campaigns', asyncHandler(async (req, res) => {
+    try {
+      const campaignData = insertSaleCampaignSchema.parse(req.body);
+      const campaign = await storage.createSaleCampaign(campaignData);
+      res.status(201).json({ campaign });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error creating sale campaign:", error);
+      res.status(500).json({ error: "Failed to create sale campaign" });
+    }
+  }));
+  
+  app.patch('/api/sales/campaigns/:id', asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+      
+      const updatedCampaign = await storage.updateSaleCampaign(campaignId, req.body);
+      
+      if (!updatedCampaign) {
+        return res.status(404).json({ error: "Sale campaign not found" });
+      }
+      
+      res.json({ campaign: updatedCampaign });
+    } catch (error) {
+      console.error(`Error updating sale campaign:`, error);
+      res.status(500).json({ error: "Failed to update sale campaign" });
+    }
+  }));
+  
+  app.delete('/api/sales/campaigns/:id', asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+      
+      const deleted = await storage.deleteSaleCampaign(campaignId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Sale campaign not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error(`Error deleting sale campaign:`, error);
+      res.status(500).json({ error: "Failed to delete sale campaign" });
+    }
+  }));
+  
+  app.post('/api/sales/campaigns/:id/targets', asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+      
+      // Make sure the campaign exists
+      const campaign = await storage.getSaleCampaignById(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Sale campaign not found" });
+      }
+      
+      const targetData = insertSaleCampaignTargetSchema.parse({
+        ...req.body,
+        campaignId
+      });
+      
+      const target = await storage.addSaleCampaignTarget(targetData);
+      res.status(201).json({ target });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
+      }
+      console.error("Error adding target to sale campaign:", error);
+      res.status(500).json({ error: "Failed to add target to campaign" });
+    }
+  }));
+  
+  app.delete('/api/sales/campaigns/:campaignId/targets/:targetId', asyncHandler(async (req, res) => {
+    try {
+      const targetId = parseInt(req.params.targetId);
+      
+      if (isNaN(targetId)) {
+        return res.status(400).json({ error: "Invalid target ID" });
+      }
+      
+      const deleted = await storage.removeSaleCampaignTarget(targetId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Target not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error(`Error removing target from sale campaign:`, error);
+      res.status(500).json({ error: "Failed to remove target from campaign" });
+    }
+  }));
+  
+  app.post('/api/sales/campaigns/:id/apply', asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+      
+      // Make sure the campaign exists
+      const campaign = await storage.getSaleCampaignById(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Sale campaign not found" });
+      }
+      
+      const affectedProductsCount = await storage.applySaleCampaign(campaignId);
+      
+      res.json({ 
+        success: true, 
+        affectedProductsCount 
+      });
+    } catch (error) {
+      console.error(`Error applying sale campaign:`, error);
+      res.status(500).json({ error: "Failed to apply sale campaign" });
+    }
+  }));
+  
+  app.post('/api/sales/campaigns/:id/revert', asyncHandler(async (req, res) => {
+    try {
+      const campaignId = parseInt(req.params.id);
+      
+      if (isNaN(campaignId)) {
+        return res.status(400).json({ error: "Invalid campaign ID" });
+      }
+      
+      // Make sure the campaign exists
+      const campaign = await storage.getSaleCampaignById(campaignId);
+      if (!campaign) {
+        return res.status(404).json({ error: "Sale campaign not found" });
+      }
+      
+      const revertedProductsCount = await storage.revertSaleCampaign(campaignId);
+      
+      res.json({ 
+        success: true, 
+        revertedProductsCount 
+      });
+    } catch (error) {
+      console.error(`Error reverting sale campaign:`, error);
+      res.status(500).json({ error: "Failed to revert sale campaign" });
+    }
+  }));
+
   // Create HTTP server
   const httpServer = createServer(app);
   

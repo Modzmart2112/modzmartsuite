@@ -6,6 +6,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout";
 import Dashboard from "@/pages/dashboard";
 import Products from "@/pages/products";
 import Suppliers from "@/pages/suppliers";
+import SaleManagement from "@/pages/sale-management";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/products" component={Products} />
       <Route path="/suppliers" component={Suppliers} />
+      <Route path="/sales" component={SaleManagement} />
       <Route path="/settings" component={Settings} />
       {/* Add more routes as needed */}
       <Route component={NotFound} />

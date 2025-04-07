@@ -2,8 +2,10 @@ import {
   User, InsertUser, Product, InsertProduct, 
   PriceHistory, InsertPriceHistory, CsvUpload, 
   InsertCsvUpload, Notification, InsertNotification,
-  Stats, InsertStats, users, products, priceHistories,
-  csvUploads, notifications, stats
+  Stats, InsertStats, SaleCampaign, InsertSaleCampaign,
+  SaleCampaignTarget, InsertSaleCampaignTarget,
+  users, products, priceHistories, csvUploads, 
+  notifications, stats, saleCampaigns, saleCampaignTargets
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
@@ -52,6 +54,19 @@ export interface IStorage {
   // Price discrepancy operations
   getPriceDiscrepancies(): Promise<PriceDiscrepancy[]>;
   clearPriceDiscrepancies(): Promise<number>; // Returns count of cleared discrepancies
+  
+  // Sale campaign operations
+  getSaleCampaigns(limit: number, offset: number): Promise<SaleCampaign[]>;
+  getActiveSaleCampaigns(): Promise<SaleCampaign[]>;
+  getSaleCampaignById(id: number): Promise<SaleCampaign | undefined>;
+  createSaleCampaign(campaign: InsertSaleCampaign): Promise<SaleCampaign>;
+  updateSaleCampaign(id: number, campaign: Partial<SaleCampaign>): Promise<SaleCampaign | undefined>;
+  deleteSaleCampaign(id: number): Promise<boolean>;
+  addSaleCampaignTarget(target: InsertSaleCampaignTarget): Promise<SaleCampaignTarget>;
+  getSaleCampaignTargets(campaignId: number): Promise<SaleCampaignTarget[]>;
+  removeSaleCampaignTarget(id: number): Promise<boolean>;
+  applySaleCampaign(campaignId: number): Promise<number>; // Returns number of affected products
+  revertSaleCampaign(campaignId: number): Promise<number>; // Returns number of reverted products
 }
 
 // In-memory storage implementation
@@ -62,12 +77,16 @@ export class MemStorage implements IStorage {
   private csvUploads: Map<number, CsvUpload>;
   private notifications: Map<number, Notification>;
   private stats: Stats | undefined;
+  private saleCampaigns: Map<number, SaleCampaign>;
+  private saleCampaignTargets: Map<number, SaleCampaignTarget>;
   
   private userIdCounter: number;
   private productIdCounter: number;
   private priceHistoryIdCounter: number;
   private csvUploadIdCounter: number;
   private notificationIdCounter: number;
+  private saleCampaignIdCounter: number;
+  private saleCampaignTargetIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -75,12 +94,16 @@ export class MemStorage implements IStorage {
     this.priceHistories = new Map();
     this.csvUploads = new Map();
     this.notifications = new Map();
+    this.saleCampaigns = new Map();
+    this.saleCampaignTargets = new Map();
     
     this.userIdCounter = 1;
     this.productIdCounter = 1;
     this.priceHistoryIdCounter = 1;
     this.csvUploadIdCounter = 1;
     this.notificationIdCounter = 1;
+    this.saleCampaignIdCounter = 1;
+    this.saleCampaignTargetIdCounter = 1;
     
     // Initialize with default stats
     this.stats = {
@@ -399,6 +422,215 @@ export class MemStorage implements IStorage {
     }
     
     return clearedCount;
+  }
+
+  // Sale campaign operations
+  async getSaleCampaigns(limit: number, offset: number): Promise<SaleCampaign[]> {
+    return Array.from(this.saleCampaigns.values())
+      .sort((a, b) => b.id - a.id)
+      .slice(offset, offset + limit);
+  }
+
+  async getActiveSaleCampaigns(): Promise<SaleCampaign[]> {
+    const now = new Date();
+    return Array.from(this.saleCampaigns.values())
+      .filter(campaign => {
+        if (!campaign.startDate || !campaign.endDate) return false;
+        
+        const startDate = new Date(campaign.startDate);
+        const endDate = new Date(campaign.endDate);
+        
+        return startDate <= now && endDate >= now && campaign.status === 'active';
+      })
+      .sort((a, b) => new Date(a.endDate!).getTime() - new Date(b.endDate!).getTime());
+  }
+
+  async getSaleCampaignById(id: number): Promise<SaleCampaign | undefined> {
+    return this.saleCampaigns.get(id);
+  }
+
+  async createSaleCampaign(campaignData: InsertSaleCampaign): Promise<SaleCampaign> {
+    const id = this.saleCampaignIdCounter++;
+    const now = new Date();
+    
+    const campaign: SaleCampaign = {
+      ...campaignData,
+      id,
+      status: campaignData.status || 'draft',
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.saleCampaigns.set(id, campaign);
+    return campaign;
+  }
+
+  async updateSaleCampaign(id: number, campaignData: Partial<SaleCampaign>): Promise<SaleCampaign | undefined> {
+    const existingCampaign = this.saleCampaigns.get(id);
+    if (!existingCampaign) return undefined;
+    
+    const updatedCampaign = {
+      ...existingCampaign,
+      ...campaignData,
+      updatedAt: new Date()
+    };
+    
+    this.saleCampaigns.set(id, updatedCampaign);
+    return updatedCampaign;
+  }
+
+  async deleteSaleCampaign(id: number): Promise<boolean> {
+    // First delete all associated targets
+    const campaignTargets = Array.from(this.saleCampaignTargets.values())
+      .filter(target => target.campaignId === id);
+    
+    for (const target of campaignTargets) {
+      this.saleCampaignTargets.delete(target.id);
+    }
+    
+    // Then delete the campaign itself
+    return this.saleCampaigns.delete(id);
+  }
+
+  async addSaleCampaignTarget(targetData: InsertSaleCampaignTarget): Promise<SaleCampaignTarget> {
+    const id = this.saleCampaignTargetIdCounter++;
+    const now = new Date();
+    
+    const target: SaleCampaignTarget = {
+      ...targetData,
+      id,
+      createdAt: now
+    };
+    
+    this.saleCampaignTargets.set(id, target);
+    return target;
+  }
+
+  async getSaleCampaignTargets(campaignId: number): Promise<SaleCampaignTarget[]> {
+    return Array.from(this.saleCampaignTargets.values())
+      .filter(target => target.campaignId === campaignId);
+  }
+
+  async removeSaleCampaignTarget(id: number): Promise<boolean> {
+    return this.saleCampaignTargets.delete(id);
+  }
+
+  async applySaleCampaign(campaignId: number): Promise<number> {
+    const campaign = await this.getSaleCampaignById(campaignId);
+    if (!campaign) return 0;
+    
+    const targets = await this.getSaleCampaignTargets(campaignId);
+    if (targets.length === 0) return 0;
+    
+    let affectedProductCount = 0;
+    const now = new Date();
+    
+    // Process and apply the discounts to products
+    for (const target of targets) {
+      let products: Product[] = [];
+      
+      if (target.targetType === 'sku') {
+        // Single product by SKU
+        const product = await this.getProductBySku(target.targetValue);
+        if (product) products = [product];
+      } else if (target.targetType === 'vendor') {
+        // All products by vendor
+        products = Array.from(this.products.values())
+          .filter(p => p.vendor === target.targetValue);
+      } else if (target.targetType === 'product_type') {
+        // All products by product type
+        products = Array.from(this.products.values())
+          .filter(p => p.productType === target.targetValue);
+      } else if (target.targetType === 'tag') {
+        // Products with a specific tag
+        // For in-memory storage, this would need to be implemented if tags are added
+        continue;
+      }
+      
+      // Apply the discount to each product
+      for (const product of products) {
+        // Create a price history record first
+        await this.createPriceHistory({
+          productId: product.id,
+          shopifyPrice: product.shopifyPrice,
+          supplierPrice: product.supplierPrice,
+          notes: `Sale campaign #${campaignId} applied: ${campaign.name}`
+        });
+        
+        let newPrice = product.shopifyPrice;
+        
+        if (campaign.discountType === 'percentage') {
+          // Apply percentage discount
+          const discountAmount = product.shopifyPrice * (campaign.discountValue / 100);
+          newPrice = product.shopifyPrice - discountAmount;
+        } else if (campaign.discountType === 'fixed_amount') {
+          // Apply fixed amount discount
+          newPrice = product.shopifyPrice - campaign.discountValue;
+        } else if (campaign.discountType === 'new_price') {
+          // Set specific price
+          newPrice = campaign.discountValue;
+        }
+        
+        // Ensure price doesn't go below zero
+        newPrice = Math.max(newPrice, 0);
+        
+        // Update the product with the new price
+        await this.updateProduct(product.id, {
+          shopifyPrice: newPrice,
+          updatedAt: now,
+          onSale: true,
+          originalPrice: product.shopifyPrice,
+          saleEndDate: campaign.endDate,
+          saleId: campaign.id
+        });
+        
+        affectedProductCount++;
+      }
+    }
+    
+    // Mark the campaign as active
+    await this.updateSaleCampaign(campaignId, { status: 'active', appliedAt: now });
+    
+    return affectedProductCount;
+  }
+
+  async revertSaleCampaign(campaignId: number): Promise<number> {
+    // Find all products that are on sale with this campaign ID
+    const productsOnSale = Array.from(this.products.values())
+      .filter(p => p.onSale && p.saleId === campaignId);
+    
+    let revertedCount = 0;
+    const now = new Date();
+    
+    for (const product of productsOnSale) {
+      // Only revert if the product has an original price
+      if (product.originalPrice) {
+        // Create a price history record for the reversion
+        await this.createPriceHistory({
+          productId: product.id,
+          shopifyPrice: product.shopifyPrice,
+          supplierPrice: product.supplierPrice,
+          notes: `Sale campaign #${campaignId} reverted`
+        });
+        
+        // Restore the original price
+        await this.updateProduct(product.id, {
+          shopifyPrice: product.originalPrice,
+          updatedAt: now,
+          onSale: false,
+          originalPrice: null,
+          saleEndDate: null,
+          saleId: null
+        });
+        
+        revertedCount++;
+      }
+    }
+    
+    // Mark the campaign as completed
+    await this.updateSaleCampaign(campaignId, { status: 'completed', completedAt: now });
+    
+    return revertedCount;
   }
 }
 
@@ -773,6 +1005,250 @@ export class DatabaseStorage implements IStorage {
       return result.length;
     } catch (error) {
       console.error('Error clearing price discrepancies:', error);
+      return 0;
+    }
+  }
+
+  // Sale campaign operations
+  async getSaleCampaigns(limit: number, offset: number): Promise<SaleCampaign[]> {
+    return await db.select()
+      .from(saleCampaigns)
+      .orderBy(desc(saleCampaigns.id))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getActiveSaleCampaigns(): Promise<SaleCampaign[]> {
+    const now = new Date();
+    return await db.select()
+      .from(saleCampaigns)
+      .where(
+        and(
+          eq(saleCampaigns.status, 'active'),
+          sql`${saleCampaigns.startDate} <= ${now}`,
+          sql`${saleCampaigns.endDate} >= ${now}`
+        )
+      )
+      .orderBy(asc(saleCampaigns.endDate));
+  }
+
+  async getSaleCampaignById(id: number): Promise<SaleCampaign | undefined> {
+    const result = await db.select().from(saleCampaigns).where(eq(saleCampaigns.id, id));
+    return result[0];
+  }
+
+  async createSaleCampaign(campaign: InsertSaleCampaign): Promise<SaleCampaign> {
+    const [createdCampaign] = await db.insert(saleCampaigns).values({
+      ...campaign,
+      status: campaign.status || 'draft',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    
+    return createdCampaign;
+  }
+
+  async updateSaleCampaign(id: number, campaignData: Partial<SaleCampaign>): Promise<SaleCampaign | undefined> {
+    try {
+      const updateData: Record<string, any> = {
+        ...campaignData,
+        updatedAt: new Date()
+      };
+      
+      const [updatedCampaign] = await db.update(saleCampaigns)
+        .set(updateData)
+        .where(eq(saleCampaigns.id, id))
+        .returning();
+      
+      return updatedCampaign;
+    } catch (error) {
+      console.error(`Error updating sale campaign ${id}:`, error);
+      return undefined;
+    }
+  }
+
+  async deleteSaleCampaign(id: number): Promise<boolean> {
+    try {
+      // First delete all targets associated with this campaign
+      await db.delete(saleCampaignTargets)
+        .where(eq(saleCampaignTargets.campaignId, id));
+      
+      // Then delete the campaign itself
+      const result = await db.delete(saleCampaigns)
+        .where(eq(saleCampaigns.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error deleting sale campaign ${id}:`, error);
+      return false;
+    }
+  }
+
+  async addSaleCampaignTarget(target: InsertSaleCampaignTarget): Promise<SaleCampaignTarget> {
+    const [createdTarget] = await db.insert(saleCampaignTargets).values({
+      ...target,
+      createdAt: new Date()
+    }).returning();
+    
+    return createdTarget;
+  }
+
+  async getSaleCampaignTargets(campaignId: number): Promise<SaleCampaignTarget[]> {
+    return await db.select()
+      .from(saleCampaignTargets)
+      .where(eq(saleCampaignTargets.campaignId, campaignId));
+  }
+
+  async removeSaleCampaignTarget(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(saleCampaignTargets)
+        .where(eq(saleCampaignTargets.id, id))
+        .returning();
+      
+      return result.length > 0;
+    } catch (error) {
+      console.error(`Error removing sale campaign target ${id}:`, error);
+      return false;
+    }
+  }
+
+  async applySaleCampaign(campaignId: number): Promise<number> {
+    try {
+      const campaign = await this.getSaleCampaignById(campaignId);
+      if (!campaign) return 0;
+      
+      const targets = await this.getSaleCampaignTargets(campaignId);
+      if (targets.length === 0) return 0;
+      
+      let affectedProductCount = 0;
+      const now = new Date();
+      
+      // Process each target type
+      for (const target of targets) {
+        let targetProducts: Product[] = [];
+        
+        if (target.targetType === 'sku') {
+          // Single product by SKU
+          const product = await this.getProductBySku(target.targetValue);
+          if (product) targetProducts = [product];
+        } else if (target.targetType === 'vendor') {
+          // All products by vendor
+          targetProducts = await db.select()
+            .from(products)
+            .where(eq(products.vendor, target.targetValue));
+        } else if (target.targetType === 'product_type') {
+          // All products by product type
+          targetProducts = await db.select()
+            .from(products)
+            .where(eq(products.productType, target.targetValue));
+        } else if (target.targetType === 'tag') {
+          // Handle tags if implemented
+          continue;
+        }
+        
+        // Apply discount to each product
+        for (const product of targetProducts) {
+          // Record original price in history
+          await this.createPriceHistory({
+            productId: product.id,
+            shopifyPrice: product.shopifyPrice,
+            supplierPrice: product.supplierPrice,
+            notes: `Sale campaign #${campaignId} applied: ${campaign.name}`
+          });
+          
+          // Calculate the new price
+          let newPrice = product.shopifyPrice;
+          
+          if (campaign.discountType === 'percentage') {
+            // Apply percentage discount
+            const discountAmount = product.shopifyPrice * (campaign.discountValue / 100);
+            newPrice = product.shopifyPrice - discountAmount;
+          } else if (campaign.discountType === 'fixed_amount') {
+            // Apply fixed amount discount
+            newPrice = product.shopifyPrice - campaign.discountValue;
+          } else if (campaign.discountType === 'new_price') {
+            // Set specific price
+            newPrice = campaign.discountValue;
+          }
+          
+          // Ensure price doesn't go below zero
+          newPrice = Math.max(newPrice, 0);
+          
+          // Update the product with the new price
+          await this.updateProduct(product.id, {
+            shopifyPrice: newPrice,
+            onSale: true,
+            originalPrice: product.shopifyPrice,
+            saleEndDate: campaign.endDate,
+            saleId: campaign.id
+          });
+          
+          affectedProductCount++;
+        }
+      }
+      
+      // Update campaign status to active
+      await this.updateSaleCampaign(campaignId, { 
+        status: 'active', 
+        appliedAt: now 
+      });
+      
+      return affectedProductCount;
+    } catch (error) {
+      console.error(`Error applying sale campaign ${campaignId}:`, error);
+      return 0;
+    }
+  }
+
+  async revertSaleCampaign(campaignId: number): Promise<number> {
+    try {
+      // Find all products that are on sale with this campaign ID
+      const productsOnSale = await db.select()
+        .from(products)
+        .where(
+          and(
+            eq(products.onSale, true),
+            eq(products.saleId, campaignId)
+          )
+        );
+      
+      let revertedCount = 0;
+      const now = new Date();
+      
+      for (const product of productsOnSale) {
+        // Only revert if there's an original price
+        if (product.originalPrice) {
+          // Create price history entry for the reversion
+          await this.createPriceHistory({
+            productId: product.id,
+            shopifyPrice: product.shopifyPrice,
+            supplierPrice: product.supplierPrice,
+            notes: `Sale campaign #${campaignId} reverted`
+          });
+          
+          // Restore the original price
+          await this.updateProduct(product.id, {
+            shopifyPrice: product.originalPrice,
+            onSale: false,
+            originalPrice: null,
+            saleEndDate: null,
+            saleId: null
+          });
+          
+          revertedCount++;
+        }
+      }
+      
+      // Mark the campaign as completed
+      await this.updateSaleCampaign(campaignId, { 
+        status: 'completed', 
+        completedAt: now 
+      });
+      
+      return revertedCount;
+    } catch (error) {
+      console.error(`Error reverting sale campaign ${campaignId}:`, error);
       return 0;
     }
   }

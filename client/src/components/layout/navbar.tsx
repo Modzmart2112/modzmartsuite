@@ -20,7 +20,8 @@ import {
   Video,
   Mail,
   AlertTriangle,
-  Info
+  Info,
+  Tag as TagIcon
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,7 @@ export default function Navbar() {
     { path: "/", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5 mr-2" /> },
     { path: "/products", label: "Products", icon: <ShoppingBag className="h-5 w-5 mr-2" /> },
     { path: "/suppliers", label: "Suppliers", icon: <Users className="h-5 w-5 mr-2" /> },
+    { path: "/sales", label: "Sales", icon: <TagIcon className="h-5 w-5 mr-2" /> },
     { path: "/settings", label: "Settings", icon: <Settings className="h-5 w-5 mr-2" /> },
   ];
   
