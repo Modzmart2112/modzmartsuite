@@ -643,57 +643,78 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
             updatedProductCount++;
           }
         } else {
-          // If product doesn't exist in our database, try to find it in Shopify
+          // If product doesn't exist, first try Shopify, then create a new one regardless
           try {
+            let shopifyProduct = null;
             const user = await storage.getUser(1); // Simplified: using first user
             
+            // Try to get from Shopify if credentials are available
             if (user?.shopifyApiKey && user?.shopifyApiSecret && user?.shopifyStoreUrl) {
-              const shopifyProduct = await shopifyClient.getProductBySku(
+              shopifyProduct = await shopifyClient.getProductBySku(
                 user.shopifyApiKey,
                 user.shopifyApiSecret,
                 user.shopifyStoreUrl,
                 record.sku
               );
+            }
+            
+            if (shopifyProduct) {
+              // Create product in our database from Shopify data
+              product = await storage.createProduct({
+                sku: record.sku,
+                title: shopifyProduct.title || record.title || `Product ${record.sku}`,
+                description: shopifyProduct.description || record.description || '',
+                shopifyId: shopifyProduct.id,
+                shopifyPrice: shopifyProduct.price,
+                supplierUrl: record.originUrl,
+                images: shopifyProduct.images,
+                status: "active",
+                vendor: shopifyProduct.vendor || record.Vendor || '',
+                productType: shopifyProduct.productType || record["Product Type"] || ''
+              });
+              console.log(`Created new product from Shopify: SKU ${record.sku} with Origin URL: ${record.originUrl}`);
+              newProductCount++;
+            } else {
+              // If not found in Shopify or no Shopify credentials, create a basic product
+              // Use the price from the CSV if available, otherwise default to 0
+              const price = record.price ? parseFloat(record.price.replace(/[^0-9.]/g, '')) : 0;
               
-              if (shopifyProduct) {
-                // Create product in our database
-                product = await storage.createProduct({
-                  sku: record.sku,
-                  title: shopifyProduct.title || record.title || `Product ${record.sku}`,
-                  description: shopifyProduct.description || record.description || '',
-                  shopifyId: shopifyProduct.id,
-                  shopifyPrice: shopifyProduct.price,
-                  supplierUrl: record.originUrl,
-                  images: shopifyProduct.images,
-                  status: "active",
-                  vendor: shopifyProduct.vendor || record.Vendor || '',
-                  productType: shopifyProduct.productType || record["Product Type"] || ''
-                });
-                console.log(`Created new product from Shopify: SKU ${record.sku} with Origin URL: ${record.originUrl}`);
-                newProductCount++;
-              } else if (record.title && record.price) {
-                // If not found in Shopify but we have basic data, create a placeholder product
-                const price = parseFloat(record.price.replace(/[^0-9.]/g, ''));
-                const cost = record.cost ? parseFloat(record.cost.replace(/[^0-9.]/g, '')) : null;
-                
-                product = await storage.createProduct({
-                  sku: record.sku,
-                  title: record.title,
-                  description: record.description || '',
-                  shopifyId: `local-${record.sku}`, // Placeholder ID
-                  shopifyPrice: price || 0,
-                  supplierPrice: cost || null,
-                  supplierUrl: record.originUrl,
-                  status: "inactive", // Mark as inactive since it's not in Shopify yet
-                  vendor: record.Vendor || '',
-                  productType: record["Product Type"] || ''
-                });
-                console.log(`Created placeholder product: SKU ${record.sku} with Origin URL: ${record.originUrl}`);
-                newProductCount++;
-              }
+              // Create a basic product with the supplied data
+              product = await storage.createProduct({
+                sku: record.sku,
+                title: record.title || `Product ${record.sku}`,
+                description: record.description || '',
+                shopifyId: `local-${record.sku}`, // Placeholder ID
+                shopifyPrice: price,
+                supplierUrl: record.originUrl,
+                status: "active", // Mark as active so it appears in lists
+                vendor: record.Vendor || '',
+                productType: record["Product Type"] || ''
+              });
+              console.log(`Created new product with SKU ${record.sku} and Origin URL: ${record.originUrl}`);
+              newProductCount++;
             }
           } catch (error) {
-            console.error(`Error fetching Shopify product for SKU ${record.sku}:`, error);
+            console.error(`Error creating product for SKU ${record.sku}:`, error);
+            
+            // Even if there's an error, still try to create a basic product
+            try {
+              product = await storage.createProduct({
+                sku: record.sku,
+                title: record.title || `Product ${record.sku}`,
+                description: record.description || '',
+                shopifyId: `local-${record.sku}`, // Placeholder ID
+                shopifyPrice: 0,
+                supplierUrl: record.originUrl,
+                status: "active",
+                vendor: '',
+                productType: ''
+              });
+              console.log(`Created fallback product for SKU ${record.sku} with Origin URL: ${record.originUrl}`);
+              newProductCount++;
+            } catch (fallbackError) {
+              console.error(`Failed to create fallback product for SKU ${record.sku}:`, fallbackError);
+            }
           }
         }
         
