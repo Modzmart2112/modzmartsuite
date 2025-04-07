@@ -103,144 +103,141 @@ export function ProductList() {
   const totalProducts = data?.total || 0;
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      {/* Filters sidebar - shown on left on desktop */}
-      <div className="md:col-span-1">
-        <ProductFilter onFilterChange={handleFilterChange} />
-      </div>
-      
-      {/* Main content - spans 3 columns on desktop */}
-      <div className="md:col-span-3">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-full text-left mb-4">
-                <h2 className="text-2xl font-bold">Products</h2>
-                {!isLoading && (
-                  <p className="text-gray-500 mt-1">
-                    Total: {totalProducts} products
-                    {(filters.vendor || filters.productType) && (
-                      <span className="italic ml-1">
-                        (filtered)
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-              
-              <div className="flex items-center w-full max-w-3xl mx-auto">
-                <div className="relative flex-1 mr-2">
-                  <Input
-                    placeholder="Search products by SKU or title across all pages..."
-                    value={searchQuery}
-                    onChange={handleSearchChange}
-                    className="pl-10 h-12"
-                  />
-                  <Search className="absolute left-3 top-4 h-4 w-4 text-gray-400" />
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    refetch();
-                  }}
-                  className="flex items-center gap-1 h-12 px-4"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </Button>
-              </div>
+    <div className="space-y-6">
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex flex-col items-center mb-6">
+            <div className="w-full text-left mb-4">
+              <h2 className="text-2xl font-bold">Products</h2>
+              {!isLoading && (
+                <p className="text-gray-500 mt-1">
+                  Total: {totalProducts} products
+                  {(filters.vendor || filters.productType) && (
+                    <span className="italic ml-1">
+                      (filtered)
+                    </span>
+                  )}
+                </p>
+              )}
             </div>
             
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Shopify Price</TableHead>
-                  <TableHead>Supplier Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  // Skeleton loader - show a reasonable number of rows
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-52" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : products.length > 0 ? (
-                  products.map((product: any) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.sku}</TableCell>
-                      <TableCell>{product.title}</TableCell>
-                      <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
-                      <TableCell>
-                        {product.supplierPrice 
-                          ? `$${formatPrice(product.supplierPrice)}`
-                          : <span className="text-gray-400">Not available</span>
-                        }
-                      </TableCell>
-                      <TableCell>
-                        {product.hasPriceDiscrepancy ? (
-                          <Badge variant="destructive">Price Discrepancy</Badge>
-                        ) : (
-                          <Badge variant="outline" className="bg-green-100 text-green-800">
-                            Synced
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {product.updatedAt 
-                          ? new Date(product.updatedAt).toLocaleString()
-                          : '-'
-                        }
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4">
-                      No products found
+            {/* Filter controls at top */}
+            <div className="w-full mb-4">
+              <ProductFilter onFilterChange={handleFilterChange} />
+            </div>
+            
+            <div className="flex items-center w-full max-w-3xl mx-auto">
+              <div className="relative flex-1 mr-2">
+                <Input
+                  placeholder="Search products by SKU or title across all pages..."
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  className="pl-10 h-12"
+                />
+                <Search className="absolute left-3 top-4 h-4 w-4 text-gray-400" />
+              </div>
+              
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  refetch();
+                }}
+                className="flex items-center gap-1 h-12 px-4"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+            </div>
+          </div>
+          
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>SKU</TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Shopify Price</TableHead>
+                <TableHead>Supplier Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Last Updated</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                // Skeleton loader - show a reasonable number of rows
+                Array.from({ length: 10 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-52" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  </TableRow>
+                ))
+              ) : products.length > 0 ? (
+                products.map((product: any) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.sku}</TableCell>
+                    <TableCell>{product.title}</TableCell>
+                    <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
+                    <TableCell>
+                      {product.supplierPrice 
+                        ? `$${formatPrice(product.supplierPrice)}`
+                        : <span className="text-gray-400">Not available</span>
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {product.hasPriceDiscrepancy ? (
+                        <Badge variant="destructive">Price Discrepancy</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-green-100 text-green-800">
+                          Synced
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {product.updatedAt 
+                        ? new Date(product.updatedAt).toLocaleString()
+                        : '-'
+                      }
                     </TableCell>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-            
-            {totalPages > 1 && (
-              <div className="mt-4 flex justify-end">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious 
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                    <PaginationItem>
-                      Page {page} of {totalPages}
-                    </PaginationItem>
-                    <PaginationItem>
-                      <PaginationNext 
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-4">
+                    No products found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+          
+          {totalPages > 1 && (
+            <div className="mt-4 flex justify-end">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                  <PaginationItem>
+                    Page {page} of {totalPages}
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
