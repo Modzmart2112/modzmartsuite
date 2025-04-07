@@ -65,13 +65,11 @@ export function ShopifyBrandDistribution() {
   const [chartType, setChartType] = useState<'pie' | 'bar'>('bar');
   
   // Get shopify connection status
-  const { data: connectionInfo, isLoading: isConnectionLoading } = useQuery<any>({
-    queryKey: ['/api/shopify/connection-info'],
+  const { data: connectionInfo, isLoading: isConnectionLoading } = useQuery<{ connected: boolean }>({
+    queryKey: ['/api/shopify/status'],
   });
   
-  const isConnected = connectionInfo?.shopifyApiKey && 
-                       connectionInfo?.shopifyApiSecret && 
-                       connectionInfo?.shopifyStoreUrl;
+  const isConnected = connectionInfo?.connected;
   
   // Get all products from API
   const { data, isLoading, refetch } = useQuery<{products: Product[]}>({
