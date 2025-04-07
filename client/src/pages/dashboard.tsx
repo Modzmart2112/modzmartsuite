@@ -3,6 +3,7 @@ import { PriceDiscrepancyList } from "@/components/dashboard/price-discrepancies
 import { ProductsOverview } from "@/components/dashboard/products-overview";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { SchedulerStatus } from "@/components/dashboard/scheduler-status";
+import { ShopifySyncStatus } from "@/components/dashboard/shopify-sync-status";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Upload, PlusCircle } from "lucide-react";
@@ -53,8 +54,9 @@ export default function Dashboard() {
       </div>
       
       {/* Bottom Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <SchedulerStatus />
+        <ShopifySyncStatus />
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
           <div className="p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>

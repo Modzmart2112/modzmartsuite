@@ -14,6 +14,7 @@ import path from "path";
 import os from "os";
 import { processCsvFile } from "./csv-handler";
 import { scheduler, checkAllPrices } from "./scheduler";
+import { syncShopifyProducts } from "./scheduler";
 import { db } from "./db";
 import { sql, eq } from "drizzle-orm";
 
@@ -903,9 +904,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       activeJobs,
       lastPriceCheck: stats?.lastPriceCheck || null,
+      lastShopifySync: stats?.lastShopifySync || null,
       totalPriceChecks: stats?.totalPriceChecks || 0,
       totalDiscrepanciesFound: stats?.totalDiscrepanciesFound || 0
     });
+  }));
+  
+  // Trigger a manual Shopify sync
+  app.post("/api/scheduler/run-shopify-sync", asyncHandler(async (req, res) => {
+    try {
+      // Run the Shopify sync job
+      syncShopifyProducts().catch(err => {
+        console.error('Error in manual Shopify sync:', err);
+      });
+      
+      res.json({
+        success: true,
+        message: 'Shopify sync job started'
+      });
+    } catch (error) {
+      console.error('Failed to start Shopify sync job:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to start Shopify sync job'
+      });
+    }
   }));
   
   app.post("/api/scheduler/price-check/start", asyncHandler(async (req, res) => {

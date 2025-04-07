@@ -77,6 +77,8 @@ export const stats = pgTable("stats", {
   lastPriceCheck: timestamp("last_price_check"),
   totalPriceChecks: integer("total_price_checks").default(0),
   totalDiscrepanciesFound: integer("total_discrepancies_found").default(0),
+  // Shopify sync metrics
+  lastShopifySync: timestamp("last_shopify_sync"),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 

@@ -1,6 +1,7 @@
 import { storage } from './storage';
 import { scrapePriceFromUrl } from './scraper';
 import { sendTelegramNotification } from './telegram';
+import { shopifyClient } from './shopify';
 import { log } from './vite';
 
 /**
@@ -214,6 +215,100 @@ export async function checkAllPrices(): Promise<void> {
     
   } catch (error) {
     log(`Failed to complete price check: ${error}`, 'price-checker');
+  }
+}
+
+/**
+ * Automated job to sync products from Shopify
+ * This job will run every hour to check for new or updated products in Shopify
+ */
+export async function syncShopifyProducts(): Promise<void> {
+  try {
+    // Get Shopify credentials from first user (or from environment variables in production)
+    const user = await storage.getUser(1); // Using first user as default
+    
+    if (!user || !user.shopifyApiKey || !user.shopifyApiSecret || !user.shopifyStoreUrl) {
+      log("Shopify credentials not configured, skipping sync", "shopify-sync");
+      return;
+    }
+    
+    log("Starting Shopify product sync", "shopify-sync");
+    
+    // Get all products from Shopify
+    const shopifyProducts = await shopifyClient.getAllProducts(
+      user.shopifyApiKey,
+      user.shopifyApiSecret,
+      user.shopifyStoreUrl
+    );
+    
+    log(`Retrieved ${shopifyProducts.length} products from Shopify`, "shopify-sync");
+    
+    // Initialize counters for reporting
+    let updatedCount = 0;
+    let createdCount = 0;
+    let errorCount = 0;
+    
+    // Process each Shopify product
+    for (const shopifyProduct of shopifyProducts) {
+      try {
+        if (!shopifyProduct.sku) {
+          log(`Skipping product without SKU: ${shopifyProduct.title}`, "shopify-sync");
+          continue;
+        }
+        
+        // Check if product exists in our database
+        const existingProduct = await storage.getProductBySku(shopifyProduct.sku);
+        
+        if (existingProduct) {
+          // Update existing product
+          await storage.updateProduct(existingProduct.id, {
+            title: shopifyProduct.title,
+            description: shopifyProduct.description,
+            shopifyPrice: shopifyProduct.price,
+            images: shopifyProduct.images,
+            status: "active",
+            vendor: shopifyProduct.vendor,
+            productType: shopifyProduct.productType,
+            // Check for price discrepancy if supplier price exists
+            hasPriceDiscrepancy: existingProduct.supplierPrice 
+              ? Math.abs(shopifyProduct.price - existingProduct.supplierPrice) > 0.01
+              : false
+          });
+          
+          updatedCount++;
+        } else {
+          // Create new product
+          await storage.createProduct({
+            sku: shopifyProduct.sku,
+            title: shopifyProduct.title,
+            description: shopifyProduct.description,
+            shopifyId: shopifyProduct.id,
+            shopifyPrice: shopifyProduct.price,
+            images: shopifyProduct.images,
+            status: "active",
+            vendor: shopifyProduct.vendor,
+            productType: shopifyProduct.productType
+          });
+          
+          createdCount++;
+        }
+      } catch (error) {
+        errorCount++;
+        log(`Error processing Shopify product ${shopifyProduct.sku}: ${error}`, "shopify-sync");
+      }
+    }
+    
+    log(`Shopify sync complete: ${updatedCount} updated, ${createdCount} created, ${errorCount} errors`, "shopify-sync");
+    
+    // Update last sync time in stats
+    const stats = await storage.getStats();
+    if (stats) {
+      await storage.updateStats({
+        lastShopifySync: new Date()
+      });
+    }
+  } catch (error) {
+    log(`Failed to complete Shopify sync: ${error}`, "shopify-sync");
   }
 }
 
