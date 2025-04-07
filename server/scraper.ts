@@ -70,14 +70,13 @@ function isPuppeteerAvailable(): boolean {
 // Helper to check if Selenium is available in this environment
 function isSeleniumAvailable(): boolean {
   try {
-    // Check if we have the required Selenium components and ChromeDriver
+    // In Replit environment, Selenium is often problematic
     if (process.env.REPL_ID) {
-      // In Replit environment, we've installed selenium and chromedriver
-      console.log('Running in Replit environment with Selenium WebDriver');
-      return true;
+      console.log('Running in Replit environment - Selenium may be unreliable, preferring direct fetch');
+      return false; // Prefer direct fetch in Replit
     }
     
-    // For other environments, do a more thorough check
+    // For other environments, do a thorough check
     try {
       // Check if selenium-webdriver is installed
       require.resolve('selenium-webdriver');
@@ -94,9 +93,7 @@ function isSeleniumAvailable(): boolean {
         // ChromeDriver isn't available as a direct dependency
         console.log('ChromeDriver module not found as dependency: ', driverError);
         
-        // Check if ChromeDriver might be in PATH or environment
-        // For simplicity, we'll just trust it exists in Replit (already checked above)
-        // or if running in a production environment setup by the admin
+        // Check if running in a production environment setup by the admin
         if (process.env.NODE_ENV === 'production') {
           console.log('Production environment - assuming ChromeDriver is configured');
           return true;
@@ -107,8 +104,8 @@ function isSeleniumAvailable(): boolean {
       return false;
     }
     
-    // Default to true as the app has Selenium in its requirements
-    return true;
+    // Default to false to be safe, as Selenium can be problematic
+    return false;
   } catch (error) {
     console.warn('Error checking Selenium availability:', error);
     return false;
@@ -675,13 +672,25 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
   // Check if our scraping tools are available in this environment
   const canUsePuppeteer = isPuppeteerAvailable();
   const canUseSelenium = isSeleniumAvailable();
+  const isReplit = process.env.REPL_ID ? true : false;
   
-  // Check if this is a ProSpeedRacing URL - if so, use the selenium scraper first
+  // Check if this is a ProSpeedRacing URL - if so, use the appropriate scraper
   if (url.includes('prospeedracing.com.au')) {
-    // For ProSpeedRacing, priority is now: 1. Selenium, 2. Direct Fetch, 3. Puppeteer (if available)
+    // For Replit environment, always prioritize direct fetch as it's more reliable
+    if (isReplit) {
+      try {
+        console.log(`In Replit environment, using direct fetch for ProSpeedRacing URL: ${url}`);
+        const result = await directFetchProSpeedRacing(url);
+        if (result.price !== null) {
+          return result;
+        }
+      } catch (directFetchError) {
+        console.error(`Direct fetch for ProSpeedRacing failed for ${url}:`, directFetchError);
+      }
+    }
     
-    // First try the Selenium-based method (preferable for ProSpeedRacing) if it's available
-    if (canUseSelenium) {
+    // For non-Replit environments, try Selenium first if available
+    else if (canUseSelenium) {
       try {
         console.log(`Using Selenium scraper for ProSpeedRacing URL: ${url}`);
         const result = await seleniumProSpeedRacingScraper(url);
