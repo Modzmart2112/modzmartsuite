@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Trash2, RefreshCw, ArrowRight } from "lucide-react";
+import { Trash2, RefreshCw, ArrowRight, Redo } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import type { PriceDiscrepancy } from "@shared/types";
@@ -18,16 +18,16 @@ export function PriceDiscrepancyList() {
     queryKey: ['/api/products/discrepancies'],
   });
 
-  // Mutation to clear price discrepancies
+  // Mutation to clear all price discrepancies
   const clearAllDiscrepanciesMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', '/api/products/discrepancies/clear');
+      const response = await apiRequest('POST', '/api/products/discrepancies/clear-all');
       return await response.json();
     },
-    onSuccess: (data: {message?: string, count?: number}) => {
+    onSuccess: (data: {success?: boolean, message?: string, clearedCount?: number}) => {
       toast({
         title: "Success",
-        description: data.message || `Cleared ${data.count || 0} price discrepancies`,
+        description: data.message || `Cleared ${data.clearedCount || 0} price discrepancies`,
       });
       // Invalidate the discrepancies query to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
@@ -39,6 +39,30 @@ export function PriceDiscrepancyList() {
         variant: "destructive",
       });
       console.error("Error clearing price discrepancies:", error);
+    }
+  });
+  
+  // Mutation to re-scrape a product price
+  const reScrapeProductMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const response = await apiRequest('POST', `/api/products/${productId}/rescrape`);
+      return await response.json();
+    },
+    onSuccess: (data: {success?: boolean, message?: string, product?: any}) => {
+      toast({
+        title: "Success",
+        description: `Successfully re-checked product price`,
+      });
+      // Invalidate the discrepancies query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to re-check product price",
+        variant: "destructive",
+      });
+      console.error("Error re-scraping product price:", error);
     }
   });
 
@@ -70,6 +94,12 @@ export function PriceDiscrepancyList() {
   const handleClearDiscrepancy = (productId: number) => {
     if (clearDiscrepancyMutation.isPending) return;
     clearDiscrepancyMutation.mutate(productId);
+  };
+  
+  // Function to handle re-scraping a product with proper UI state management
+  const handleReScrapeProduct = (productId: number) => {
+    if (reScrapeProductMutation.isPending) return;
+    reScrapeProductMutation.mutate(productId);
   };
 
   // Mutation to update a product's price
@@ -193,7 +223,27 @@ export function PriceDiscrepancyList() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => handleReScrapeProduct(discrepancy.productId)}
+                          disabled={reScrapeProductMutation.isPending}
+                        >
+                          <Redo size={14} />
+                          {reScrapeProductMutation.isPending ? "Checking..." : "Re-check"}
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleUpdatePrice(discrepancy)}
+                          disabled={updatePriceMutation.isPending}
+                        >
+                          Update Price
+                        </Button>
+                      </div>
                       <Button 
                         variant="ghost" 
                         size="sm"
@@ -201,14 +251,6 @@ export function PriceDiscrepancyList() {
                         disabled={clearDiscrepancyMutation.isPending}
                       >
                         {clearDiscrepancyMutation.isPending ? "Dismissing..." : "Dismiss"}
-                      </Button>
-                      <Button 
-                        variant="default" 
-                        size="sm"
-                        onClick={() => handleUpdatePrice(discrepancy)}
-                        disabled={updatePriceMutation.isPending}
-                      >
-                        Update Price
                       </Button>
                     </div>
                   </div>

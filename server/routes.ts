@@ -232,6 +232,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Endpoint to re-scrape a product's supplier price
+  app.post("/api/products/:productId/rescrape", asyncHandler(async (req, res) => {
+    const productId = parseInt(req.params.productId);
+    
+    if (isNaN(productId)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+    
+    const product = await storage.getProductById(productId);
+    
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    
+    if (!product.supplierUrl) {
+      return res.status(400).json({ 
+        message: "Product doesn't have a supplier URL to scrape from"
+      });
+    }
+    
+    console.log(`Re-scraping price for product ${product.sku} (ID: ${productId}) from ${product.supplierUrl}`);
+    
+    try {
+      // Scrape the current price from the supplier
+      const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
+      
+      if (scrapeResult.price === null) {
+        return res.status(400).json({ 
+          message: `Failed to scrape price: ${scrapeResult.error || 'Unknown error'}` 
+        });
+      }
+      
+      const supplierPrice = scrapeResult.price;
+      const shopifyPrice = product.shopifyPrice || 0;
+      
+      // Create a price history record
+      await storage.createPriceHistory({
+        productId,
+        shopifyPrice,
+        supplierPrice
+      });
+      
+      // Calculate price difference percentage
+      const priceDifference = shopifyPrice - supplierPrice;
+      const percentageDifference = shopifyPrice > 0 
+        ? (priceDifference / shopifyPrice) * 100 
+        : 0;
+      
+      // Only flag as discrepancy if difference is significant (e.g., more than 1%)
+      const hasPriceDiscrepancy = Math.abs(percentageDifference) > 1;
+      
+      // Update the product with the new supplier price
+      const updatedProduct = await storage.updateProduct(productId, {
+        supplierPrice,
+        hasPriceDiscrepancy,
+        lastChecked: new Date()
+      });
+      
+      console.log(`Re-scraped price for product ${product.sku}: $${supplierPrice} (Discrepancy: ${hasPriceDiscrepancy})`);
+      
+      res.json({
+        success: true,
+        message: hasPriceDiscrepancy 
+          ? `Found price discrepancy: Shopify $${shopifyPrice.toFixed(2)} vs Supplier $${supplierPrice.toFixed(2)}`
+          : `No significant price discrepancy found`,
+        product: updatedProduct,
+        percentageDifference
+      });
+    } catch (error: any) {
+      console.error(`Error re-scraping price for product ${product.sku}:`, error);
+      res.status(500).json({ 
+        message: `Error re-scraping price: ${error.message || 'Unknown error'}`
+      });
+    }
+  }));
+  
   // Debug route to test price scraping
   app.get("/api/scrape-test", asyncHandler(async (req, res) => {
     const url = req.query.url as string;
@@ -292,67 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
-  // Rescrape a product's supplier price
-  app.post("/api/products/:id/rescrape", asyncHandler(async (req, res) => {
-    const productId = parseInt(req.params.id);
-    
-    if (isNaN(productId)) {
-      return res.status(400).json({ message: "Invalid product ID" });
-    }
-    
-    const product = await storage.getProductById(productId);
-    
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-    
-    if (!product.supplierUrl) {
-      return res.status(400).json({ message: "Product has no supplier URL to scrape" });
-    }
-    
-    try {
-      // Use our improved price extraction for all products
-      const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
-      
-      if (scrapeResult.price === null) {
-        return res.status(400).json({ 
-          message: "Failed to extract price from supplier website",
-          error: scrapeResult.error || "No price found"
-        });
-      }
-      
-      // Check for price discrepancy
-      const hasPriceDiscrepancy = Math.abs(scrapeResult.price - product.shopifyPrice) > 0.01;
-      
-      // Update the product with the scraped price
-      const updatedProduct = await storage.updateProduct(product.id, {
-        supplierPrice: scrapeResult.price,
-        lastScraped: new Date(),
-        hasPriceDiscrepancy
-      });
-      
-      // Record the price history
-      await storage.createPriceHistory({
-        productId: product.id,
-        shopifyPrice: product.shopifyPrice,
-        supplierPrice: scrapeResult.price
-      });
-      
-      res.json({
-        success: true,
-        product: updatedProduct,
-        originalPrice: product.supplierPrice,
-        newPrice: scrapeResult.price,
-        hasPriceDiscrepancy
-      });
-    } catch (error) {
-      console.error(`Error rescraping product ${productId}:`, error);
-      res.status(500).json({ 
-        message: "Failed to rescrape product", 
-        error: (error as Error).message,
-      });
-    }
-  }));
+  // The rescrape endpoint is now implemented above with more detailed logic
   
   app.post("/api/products/update-price", asyncHandler(async (req, res) => {
     const { productId, newPrice } = req.body;

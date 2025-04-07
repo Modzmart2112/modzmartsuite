@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { AlertCircle, X, ArrowRight } from "lucide-react";
+import { AlertCircle, X, ArrowRight, Redo } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PriceDiscrepancy } from "@shared/types";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,6 +18,33 @@ export function PriceDiscrepancyNotification() {
     queryKey: ['/api/products/discrepancies'],
     // Only check for discrepancies every minute to avoid excessive API calls
     refetchInterval: 60000,
+  });
+
+  // Re-scrape product mutation
+  const reScrapeProductMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      const response = await apiRequest('POST', `/api/products/${productId}/rescrape`);
+      return await response.json();
+    },
+    onSuccess: (data: {success?: boolean, message?: string, product?: any}) => {
+      toast({
+        title: "Success",
+        description: `Successfully re-checked product price`,
+      });
+      // Invalidate the discrepancies query to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
+      
+      // Close notification
+      handleVisualDismiss();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to re-check product price",
+        variant: "destructive",
+      });
+      console.error("Error re-scraping product price:", error);
+    }
   });
 
   // Update price mutation
@@ -147,6 +174,11 @@ export function PriceDiscrepancyNotification() {
       newPrice: currentDiscrepancy.supplierPrice
     });
   };
+  
+  const handleReCheck = () => {
+    if (!currentDiscrepancy || reScrapeProductMutation.isPending) return;
+    reScrapeProductMutation.mutate(currentDiscrepancy.productId);
+  };
 
   if (!visible || !currentDiscrepancy) return null;
 
@@ -193,18 +225,28 @@ export function PriceDiscrepancyNotification() {
           </div>
         </div>
         
-        <div className="bg-gray-50 px-4 py-3 flex justify-end">
+        <div className="bg-gray-50 px-4 py-3 flex justify-end space-x-2">
           <Button
             variant="ghost"
-            className="text-sm text-gray-600 mr-4"
+            className="text-sm text-gray-600"
             onClick={handleDismiss}
             disabled={dismissDiscrepancyMutation.isPending}
           >
             {dismissDiscrepancyMutation.isPending ? "Dismissing..." : "Dismiss"}
           </Button>
           <Button 
-            variant="ghost" 
-            className="text-sm text-primary font-medium"
+            variant="outline" 
+            size="sm"
+            className="text-sm gap-1"
+            onClick={handleReCheck}
+            disabled={reScrapeProductMutation.isPending}
+          >
+            <Redo size={14} />
+            {reScrapeProductMutation.isPending ? "Checking..." : "Re-check"}
+          </Button>
+          <Button 
+            variant="default" 
+            className="text-sm"
             onClick={handleUpdatePrice}
             disabled={updatePriceMutation.isPending}
           >
