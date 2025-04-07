@@ -1020,40 +1020,65 @@ async function curlProSpeedRacingPrice(url: string): Promise<ScrapedPriceResult>
   }
 }
 
+/**
+ * Robust scraping function that includes fallback mechanisms and guaranteed result structure
+ * @param url The URL to scrape
+ * @returns A standardized ScrapedPriceResult object
+ */
+/**
+ * Primary price scraping function with fallback mechanisms
+ */
 export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResult> {
-  // Note: We've enhanced our scraper to handle JavaScript-rendered prices
-  // which often differ from the server-side HTML prices
+  // Default result in case all scraping methods fail
+  const defaultResult: ScrapedPriceResult = {
+    sku: url.split('/').pop() || 'unknown',
+    url: url,
+    price: null,
+    error: "Failed to extract price with all available methods"
+  };
   
-  // Check if our scraping tools are available in this environment
-  const canUsePuppeteer = isPuppeteerAvailable();
-  const canUseSelenium = isSeleniumAvailable();
-  const isReplit = process.env.REPL_ID ? true : false;
-  
-  console.log(`Scraping price from URL: ${url}`);
-  console.log(`Environment checks: Puppeteer=${canUsePuppeteer}, Selenium=${canUseSelenium}, Replit=${isReplit}`);
-  
-  // Special case for ProSpeedRacing - we've found that direct curl works best for them
-  if (url.includes('prospeedracing.com.au')) {
-    console.log(`ProSpeedRacing URL detected: ${url} - trying curl-based extraction first`);
-    try {
-      const curlResult = await curlProSpeedRacingPrice(url);
-      if (curlResult.price !== null) {
-        console.log(`Successfully extracted price with curl: $${curlResult.price}`);
-        
-        // Apply any site-specific price adjustments
-        const adjustedPrice = adjustPrice(curlResult.price, url);
-        if (adjustedPrice !== curlResult.price) {
-          console.log(`Applied price adjustment: ${curlResult.price} -> ${adjustedPrice}`);
-          curlResult.price = adjustedPrice;
+  try {
+    // Note: We've enhanced our scraper to handle JavaScript-rendered prices
+    // which often differ from the server-side HTML prices
+    
+    // Extract SKU from URL as a fallback
+    const fallbackSku = url.split('/').pop() || 'unknown';
+    
+    // Check if our scraping tools are available in this environment
+    const canUsePuppeteer = isPuppeteerAvailable();
+    const canUseSelenium = isSeleniumAvailable();
+    const isReplit = process.env.REPL_ID ? true : false;
+    
+    console.log(`Scraping price from URL: ${url}`);
+    console.log(`Environment checks: Puppeteer=${canUsePuppeteer}, Selenium=${canUseSelenium}, Replit=${isReplit}`);
+    
+    // Special case for ProSpeedRacing - we've found that direct curl works best for them
+    if (url.includes('prospeedracing.com.au')) {
+      console.log(`ProSpeedRacing URL detected: ${url} - trying curl-based extraction first`);
+      try {
+        const curlResult = await curlProSpeedRacingPrice(url);
+        if (curlResult.price !== null) {
+          console.log(`Successfully extracted price with curl: $${curlResult.price}`);
+          
+          // Apply any site-specific price adjustments
+          const adjustedPrice = adjustPrice(curlResult.price, url);
+          if (adjustedPrice !== curlResult.price) {
+            console.log(`Applied price adjustment: ${curlResult.price} -> ${adjustedPrice}`);
+            curlResult.price = adjustedPrice;
+          }
+          
+          return {
+            sku: curlResult.sku || fallbackSku,
+            url: url,
+            price: curlResult.price,
+            note: curlResult.note || "Price extracted with curl"
+          };
         }
-        
-        return curlResult;
+        console.log(`Curl extraction failed, falling back to other methods`);
+      } catch (curlError) {
+        console.error(`Error during curl extraction: ${(curlError as Error).message}`);
       }
-      console.log(`Curl extraction failed, falling back to other methods`);
-    } catch (curlError) {
-      console.error(`Error during curl extraction: ${(curlError as Error).message}`);
     }
-  }
   
   // Try the enhanced fetcher method for all URLs - most reliable and efficient
   try {
@@ -1484,6 +1509,17 @@ export async function scrapePriceFromUrl(url: string): Promise<ScrapedPriceResul
   
   // For non-ProSpeedRacing URLs, continue with the generic scraping methods
   return await genericScraper(url);
+  } catch (mainError) {
+    console.error(`Error in main scraping function for ${url}:`, mainError);
+    // Return the default result if everything else fails
+    return {
+      sku: url.split('/').pop() || 'unknown',
+      url: url,
+      price: null,
+      error: mainError instanceof Error ? mainError.message : "Unexpected error in price scraping",
+      note: "All scraping methods failed"
+    };
+  }
 }
 
 // Generic scraper function for non-specialized sites

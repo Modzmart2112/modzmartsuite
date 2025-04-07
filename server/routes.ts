@@ -963,19 +963,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Use the same scraper used on the suppliers page
           console.log(`Re-scraping price for product ${product.sku} from ${product.supplierUrl}`);
-          const scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
-          
-          if (scrapeResult.price === null || scrapeResult.price === undefined) {
-            console.error(`Failed to extract price for ${product.sku}: ${scrapeResult.error || "Unknown error"}`);
-            console.error(`Raw scrapeResult:`, JSON.stringify(scrapeResult, null, 2));
+          // Add a safety wrapper to ensure we always get a valid result
+          let scrapeResult;
+          try {
+            scrapeResult = await scrapePriceFromUrl(product.supplierUrl);
+            
+            // Ensure the scrapeResult.price is a valid number
+            if (scrapeResult && typeof scrapeResult.price === 'number' && !isNaN(scrapeResult.price)) {
+              // Log successful price extraction
+              console.log(`Successfully extracted price for ${product.sku}: $${scrapeResult.price}`);
+              console.log(`Price extraction method: ${scrapeResult.note || "Unknown method"}`);
+              console.log(`URL: ${product.supplierUrl}`);
+            } else {
+              console.error(`Invalid or missing price in scrapeResult for ${product.sku}`);
+              console.error(`Raw scrapeResult:`, JSON.stringify(scrapeResult, null, 2));
+              
+              // In case the scraper didn't return a proper format, construct a valid one
+              if (!scrapeResult) {
+                scrapeResult = { 
+                  sku: product.sku, 
+                  url: product.supplierUrl, 
+                  price: null, 
+                  error: "Scraper returned unexpected result" 
+                };
+              } 
+              results.failed++;
+              continue;
+            }
+          } catch (scrapeError) {
+            console.error(`Error during price scraping for ${product.sku}:`, scrapeError);
+            scrapeResult = { 
+              sku: product.sku, 
+              url: product.supplierUrl, 
+              price: null, 
+              error: scrapeError instanceof Error ? scrapeError.message : "Exception during scraping"
+            };
             results.failed++;
             continue;
           }
-          
-          // Log successful price extraction
-          console.log(`Successfully extracted price for ${product.sku}: $${scrapeResult.price}`);
-          console.log(`Price extraction method: ${scrapeResult.note || "Unknown method"}`);
-          console.log(`URL: ${product.supplierUrl}`);
           
           const newSupplierPrice = scrapeResult.price;
           const oldSupplierPrice = product.supplierPrice || 0;
