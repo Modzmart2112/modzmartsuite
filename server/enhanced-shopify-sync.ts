@@ -144,15 +144,18 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
     
     log(`Counting complete: ${productCount} unique products, ${variantCount} variants`);
     
+    // Pause briefly to let frontend update before moving to next step
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
     // Step 2: Process products with clearer labeling
     await storage.updateShopifySyncProgress({
       status: "in-progress",
-      message: `Step 2/3: Processing ${variantCount} variants from ${productCount} products...`,
+      message: `Step 2/3: Getting ready to process ${variantCount} variants from ${productCount} products...`,
       processedItems: 0, // Reset processed items counter
       totalItems: variantCount, // Ensure total items is set correctly
       details: {
         step: 2,
-        stepName: "processing",
+        stepName: "initializing",
         startTime: new Date().toISOString(),
         uniqueProductCount: productCount,
         percentage: 0, // Explicitly set percentage to 0 at start
@@ -160,6 +163,9 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
         estimatedRemainingMs: null
       }
     });
+    
+    // Another brief pause to ensure UI shows the transition between stages
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Process all products
     const processingResult = await processProducts(
@@ -282,6 +288,19 @@ async function processProducts(
   let failedCount = 0;
   
   try {
+    // Before getting products, update progress to show we're retrieving data
+    await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: `Step 2/3: Retrieving products from Shopify...`,
+      processedItems: 0,
+      totalItems: totalVariantCount,
+      details: {
+        step: 2,
+        stepName: "preparing",
+        retrievingProducts: true
+      }
+    });
+
     // Get all products from Shopify
     log(`Retrieving all products from Shopify...`);
     const allProducts = await shopifyClient.getAllProducts(apiKey, apiSecret, storeUrl);
@@ -290,6 +309,19 @@ async function processProducts(
     const productGroups = new Map<string, any[]>();
     
     log(`Organizing ${allProducts.length} variants into product groups...`);
+    
+    // Update progress to show we're organizing data before actual processing
+    await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: `Step 2/3: Organizing ${allProducts.length} products...`,
+      processedItems: 0,
+      totalItems: totalVariantCount,
+      details: {
+        step: 2,
+        stepName: "preparing",
+        organizingProducts: true
+      }
+    });
     
     for (const product of allProducts) {
       if (!product.productId) continue;

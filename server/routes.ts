@@ -1295,6 +1295,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingSync = await storage.getShopifySyncProgress();
       if (existingSync) {
         console.log(`[shopify-sync] Resetting sync ID ${existingSync.id} from ${existingSync.status} state`);
+        
+        // Clear all progress-related logs from the database to prevent the frontend
+        // from incorrectly showing processed items on a fresh sync
+        const shopifyLogs = await storage.getRecentShopifyLogs(5000);
+        console.log(`[shopify-sync] Clearing ${shopifyLogs.length} Shopify logs for clean reset`);
+        
+        try {
+          // Delete cost price logs to ensure clean state
+          await db.execute(sql`DELETE FROM shopify_logs WHERE created_at > NOW() - INTERVAL '1 hour'`);
+          console.log("[shopify-sync] Successfully cleared recent Shopify logs");
+        } catch (dbError) {
+          console.error("[shopify-sync] Error clearing Shopify logs:", dbError);
+        }
+        
         await storage.updateShopifySyncProgress({
           id: existingSync.id,
           status: "reset", // Mark as reset instead of complete
@@ -1308,7 +1322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: {
             reset: true,
             resetTime: new Date().toISOString(),
-            previousStatus: existingSync.status
+            previousStatus: existingSync.status,
+            logsCleared: true
           }
         });
       }
