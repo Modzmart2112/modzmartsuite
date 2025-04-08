@@ -257,6 +257,7 @@ export function ProductList({
                 )}
                 <TableHead>SKU</TableHead>
                 <TableHead>Title</TableHead>
+                <TableHead>Shopify ID</TableHead>
                 <TableHead>Retail Price</TableHead>
                 <TableHead>Cost Price</TableHead>
                 <TableHead>Supplier Price</TableHead>
@@ -273,6 +274,7 @@ export function ProductList({
                     {selectable && <TableCell><Skeleton className="h-4 w-4" /></TableCell>}
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-52" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
@@ -305,6 +307,9 @@ export function ProductList({
                       )}
                       <TableCell className="font-medium">{product.sku}</TableCell>
                       <TableCell>{product.title}</TableCell>
+                      <TableCell>
+                        <span className="font-mono">{product.shopifyId}</span>
+                      </TableCell>
                       <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
                       <TableCell>
                         {product.costPrice 
@@ -367,7 +372,7 @@ export function ProductList({
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={selectable ? 9 : 8} className="text-center py-4">
+                  <TableCell colSpan={selectable ? 10 : 9} className="text-center py-4">
                     No products found
                   </TableCell>
                 </TableRow>

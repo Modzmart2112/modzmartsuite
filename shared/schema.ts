@@ -116,9 +116,9 @@ export const saleCampaigns = pgTable("sale_campaigns", {
 export const saleCampaignTargets = pgTable("sale_campaign_targets", {
   id: serial("id").primaryKey(),
   campaignId: integer("campaign_id").notNull().references(() => saleCampaigns.id),
-  targetType: text("target_type").notNull(), // sku, vendor, product_type, tag
-  targetId: integer("target_id"), // product ID if targeting specific product
-  targetValue: text("target_value"), // vendor name, product type, SKU, or tag value
+  targetType: text("target_type").notNull(), // sku, vendor, product_type, tag, product
+  targetId: integer("target_id"), // internal product ID (if used)
+  targetValue: text("target_value"), // vendor name, product type, SKU, tag value, or Shopify Product ID
   createdAt: timestamp("created_at").defaultNow(),
 });
 

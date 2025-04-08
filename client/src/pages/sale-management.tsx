@@ -269,10 +269,10 @@ const SaleManagementPage: React.FC = () => {
     if (!selectedCampaign) return;
     
     // Ensure we have valid data before proceeding
-    if (newTarget.targetType === 'product' && (newTarget.targetId === null || isNaN(Number(newTarget.targetId)))) {
+    if (newTarget.targetType === 'product' && !newTarget.targetValue) {
       toast({
-        title: "Invalid Product ID",
-        description: "Please enter a valid product ID number",
+        title: "Invalid Shopify Product ID",
+        description: "Please enter a valid Shopify product ID",
         variant: "destructive"
       });
       return;
@@ -289,10 +289,8 @@ const SaleManagementPage: React.FC = () => {
     
     const targetData = {
       targetType: newTarget.targetType,
-      targetId: newTarget.targetType === 'product' ? Number(newTarget.targetId) : null,
-      targetValue: newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type' 
-        ? newTarget.targetValue 
-        : null,
+      targetId: null, // Not used anymore - using targetValue for Shopify ID
+      targetValue: newTarget.targetValue, // Store the value for all target types
     };
     
     addTargetMutation.mutate({ 
@@ -386,58 +384,73 @@ const SaleManagementPage: React.FC = () => {
     
     // Create the campaign using mutation
     createCampaignMutation.mutate(campaignData, {
-      onSuccess: (response) => {
+      onSuccess: async (response) => {
         const newCampaignId = response.campaign.id;
         
-        // Define targets based on selection
-        let targetPromises: Promise<any>[] = [];
-        
-        if (selectedProductIds.length > 0) {
-          // Add product targets
-          targetPromises = selectedProductIds.map(productId => {
+        try {
+          // Define targets based on selection
+          let targetPromises: Promise<any>[] = [];
+          
+          if (selectedProductIds.length > 0) {
+            // Get the products data to extract Shopify IDs
+            const productsResponse = await apiRequest('GET', '/api/products', {
+              ids: selectedProductIds.join(',')
+            });
+            
+            if (productsResponse.products) {
+              // Add product targets using Shopify IDs
+              targetPromises = productsResponse.products.map((product: any) => {
+                const targetData = {
+                  targetType: 'product',
+                  targetId: null,
+                  targetValue: product.shopifyId.toString() // Use Shopify ID as targetValue
+                };
+                return apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData);
+              });
+            }
+          } else if (selectedVendor) {
+            // Add vendor target
             const targetData = {
-              targetType: 'product',
-              targetId: productId,
-              targetValue: null
+              targetType: 'vendor',
+              targetId: null,
+              targetValue: selectedVendor
             };
-            return apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData);
+            targetPromises = [apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData)];
+          } else if (selectedProductType) {
+            // Add product_type target
+            const targetData = {
+              targetType: 'product_type',
+              targetId: null,
+              targetValue: selectedProductType
+            };
+            targetPromises = [apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData)];
+          }
+          
+          // Wait for all target additions to complete
+          await Promise.all(targetPromises);
+          
+          toast({
+            title: 'Success',
+            description: 'Sale campaign created successfully with targets',
           });
-        } else if (selectedVendor) {
-          // Add vendor target
-          const targetData = {
-            targetType: 'vendor',
-            targetId: null,
-            targetValue: selectedVendor
-          };
-          targetPromises = [apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData)];
-        } else if (selectedProductType) {
-          // Add product_type target
-          const targetData = {
-            targetType: 'product_type',
-            targetId: null,
-            targetValue: selectedProductType
-          };
-          targetPromises = [apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData)];
+          
+          queryClient.invalidateQueries({ queryKey: ['/api/sales/campaigns'] });
+          setIsCreateDialogOpen(false);
+          resetSelectionState();
+        } catch (error: any) {
+          toast({
+            title: 'Error',
+            description: `Failed to add targets: ${error.message}`,
+            variant: 'destructive',
+          });
         }
-        
-        // Wait for all target additions to complete
-        Promise.all(targetPromises)
-          .then(() => {
-            toast({
-              title: 'Success',
-              description: 'Sale campaign created successfully with targets',
-            });
-            queryClient.invalidateQueries({ queryKey: ['/api/sales/campaigns'] });
-            setIsCreateDialogOpen(false);
-            resetSelectionState();
-          })
-          .catch(error => {
-            toast({
-              title: 'Error',
-              description: `Failed to add targets: ${error.message}`,
-              variant: 'destructive',
-            });
-          });
+      },
+      onError: (error: any) => {
+        toast({
+          title: 'Error',
+          description: `Failed to create campaign: ${error.message}`,
+          variant: 'destructive',
+        });
       }
     });
   };
@@ -1188,24 +1201,26 @@ const SaleManagementPage: React.FC = () => {
             {newTarget.targetType === 'product' && (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="targetId" className="text-right">
-                  Product ID
+                  Shopify Product ID
                 </Label>
-                <Input
-                  id="targetId"
-                  className="col-span-3"
-                  type="number"
-                  value={newTarget.targetId === null ? '' : newTarget.targetId}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    // Only set valid numbers or null
-                    const parsedValue = value ? Number(value) : null;
-                    setNewTarget({ 
-                      ...newTarget, 
-                      targetId: !isNaN(parsedValue) ? parsedValue : null 
-                    });
-                  }}
-                  placeholder="Enter product ID"
-                />
+                <div className="col-span-3 space-y-1">
+                  <Input
+                    id="targetId"
+                    type="text"
+                    value={newTarget.targetValue}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      setNewTarget({ 
+                        ...newTarget, 
+                        targetValue: value
+                      });
+                    }}
+                    placeholder="Enter Shopify product ID (numeric)"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    You can copy this from the Shopify ID column in the Products table
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -1216,9 +1231,7 @@ const SaleManagementPage: React.FC = () => {
             </Button>
             <Button 
               onClick={handleAddTarget} 
-              disabled={(newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type') 
-                ? !newTarget.targetValue 
-                : (newTarget.targetId === null || isNaN(Number(newTarget.targetId)))}
+              disabled={!newTarget.targetValue}
             >
               Add Target
             </Button>
