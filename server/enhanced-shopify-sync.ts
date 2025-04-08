@@ -441,10 +441,10 @@ async function processProducts(
         const estimatedRemainingMs = msPerItem * itemsRemaining;
         const estimatedCompletionTime = new Date(Date.now() + estimatedRemainingMs);
         
-        // Calculate exact percentage with precise decimal (not rounded)
-        // This ensures we never jump from 0% to 50%
-        const exactPercentComplete = totalVariantCount > 0 
-          ? (processedCount / totalVariantCount) * 100 
+        // Calculate exact percentage based on unique product SKUs processed
+        // This ensures a more accurate, gradual progress display
+        const exactPercentComplete = uniqueProductCount > 0 
+          ? (processedProducts / uniqueProductCount) * 100 
           : 0;
         
         // Round for display, but keep tracking precise
@@ -456,9 +456,9 @@ async function processProducts(
         // Update progress in database with clearer step labeling
         await storage.updateShopifySyncProgress({
           status: "in-progress",
-          message: `Step 2/3: Processing ${processedCount} of ${totalVariantCount} items (${percentComplete}%)`,
-          processedItems: processedCount,
-          totalItems: totalVariantCount, // Always ensure total items is set
+          message: `Step 2/3: Processing ${processedProducts} of ${uniqueProductCount} products (${percentComplete}%)`,
+          processedItems: processedProducts, // Using product count instead of variant count
+          totalItems: uniqueProductCount,    // Using product count as total 
           successItems: successCount,
           failedItems: failedCount,
           details: {
@@ -467,20 +467,21 @@ async function processProducts(
             uniqueProductCount,
             processedProductCount: processedProducts,
             totalProductCount: productGroups.size,
+            trackingMethod: 'skuCount',
             percentage: exactPercentComplete, // Store exact percentage for frontend
             estimatedRemainingMs,
             estimatedCompletionTime: estimatedCompletionTime.toISOString(),
-            processingRate: elapsedMs > 0 ? Math.round((processedCount / elapsedMs) * 60000) : 0, // items per minute
+            processingRate: elapsedMs > 0 ? Math.round((processedProducts / elapsedMs) * 60000) : 0, // products per minute
             elapsedTime: formatDuration(elapsedMs),
-            // Add these fields to help debug the jump from 0% to 50%
-            processedDebug: processedCount,
-            totalDebug: totalVariantCount,
+            // Add these fields to help debug the progress
+            processedSkus: processedProducts,
+            totalUniqueProducts: uniqueProductCount,
             batchSize: BATCH_SIZE,
             batchNumber: Math.ceil(i / STATUS_UPDATE_INTERVAL)
           }
         });
         
-        log(`Step 2/3: Processed ${processedCount}/${totalVariantCount} items (${percentComplete}%) - ETA: ${formatDuration(estimatedRemainingMs)}`);
+        log(`Step 2/3: Processed ${processedProducts}/${uniqueProductCount} products (${percentComplete}%) - ETA: ${formatDuration(estimatedRemainingMs)}`);
         
         // Add a small delay between batches to prevent rate limiting
         if (i < productIds.length - 1) {
@@ -502,6 +503,9 @@ async function processProducts(
  * Process a batch of product variants
  * This function now processes a single product at a time with a delay
  * to ensure more granular progress tracking
+ * 
+ * IMPORTANT: Now tracks progress by unique SKUs processed instead of variant count
+ * for more accurate user-facing progress reporting
  */
 async function processBatch(products: any[]): Promise<{ 
   processed: number; 
@@ -510,6 +514,9 @@ async function processBatch(products: any[]): Promise<{
 }> {
   let success = 0;
   let failed = 0;
+  
+  // Track unique SKUs to count them accurately
+  const processedSkus = new Set<string>();
   
   // Process each product individually with a tiny delay to prevent instant processing appearance
   for (const product of products) {
@@ -523,6 +530,9 @@ async function processBatch(products: any[]): Promise<{
         failed++;
         continue;
       }
+      
+      // Add this SKU to our set of processed SKUs
+      processedSkus.add(product.sku);
       
       // Check if the product already exists in our database
       let existingProduct = await storage.getProductBySku(product.sku);
@@ -602,8 +612,9 @@ async function processBatch(products: any[]): Promise<{
     }
   }
   
+  // Return the count of unique SKUs processed instead of variant count
   return {
-    processed: products.length,
+    processed: processedSkus.size, // Only count unique SKUs processed
     success,
     failed
   };
