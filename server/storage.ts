@@ -794,13 +794,16 @@ export class DatabaseStorage implements IStorage {
       console.log(`Getting products with limit: ${limit}, offset: ${offset}`);
       
       // Use direct SQL instead of ORM
+      // Fixed parameter binding by providing integer values directly in SQL
+      // This avoids the parameter binding issue
       const query = `
         SELECT * FROM products
         ORDER BY id DESC
-        LIMIT $1 OFFSET $2
+        LIMIT ${limit} OFFSET ${offset}
       `;
       
-      const result = await db.execute(query, [limit, offset]);
+      // No parameters needed since values are directly in the query
+      const result = await db.execute(query);
       
       // Check if we got results
       if (result.rows.length === 0) {
@@ -984,18 +987,16 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Getting products for vendor: ${vendor}, limit: ${limit}, offset: ${offset}`);
       
-      // Build query parts
-      let queryStr = `SELECT * FROM products WHERE vendor = $1 ORDER BY title ASC`;
-      const queryParams = [vendor];
+      // Build query with direct value interpolation instead of parameters
+      let queryStr = `SELECT * FROM products WHERE vendor = '${vendor.replace(/'/g, "''")}' ORDER BY title ASC`;
       
       // Add pagination if needed
       if (limit !== undefined && offset !== undefined) {
-        queryStr += ` LIMIT $2 OFFSET $3`;
-        queryParams.push(limit, offset);
+        queryStr += ` LIMIT ${limit} OFFSET ${offset}`;
       }
       
-      // Execute raw query
-      const result = await db.execute(queryStr, queryParams);
+      // Execute raw query without parameters
+      const result = await db.execute(queryStr);
       return result.rows as Product[];
     } catch (error) {
       console.error(`Error fetching products for vendor ${vendor}:`, error);
@@ -1007,18 +1008,16 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Getting products for product type: ${productType}, limit: ${limit}, offset: ${offset}`);
       
-      // Build query parts
-      let queryStr = `SELECT * FROM products WHERE product_type = $1 ORDER BY title ASC`;
-      const queryParams = [productType];
+      // Build query with direct value interpolation instead of parameters
+      let queryStr = `SELECT * FROM products WHERE product_type = '${productType.replace(/'/g, "''")}' ORDER BY title ASC`;
       
       // Add pagination if needed
       if (limit !== undefined && offset !== undefined) {
-        queryStr += ` LIMIT $2 OFFSET $3`;
-        queryParams.push(limit, offset);
+        queryStr += ` LIMIT ${limit} OFFSET ${offset}`;
       }
       
-      // Execute raw query
-      const result = await db.execute(queryStr, queryParams);
+      // Execute raw query without parameters
+      const result = await db.execute(queryStr);
       return result.rows as Product[];
     } catch (error) {
       console.error(`Error fetching products for product type ${productType}:`, error);
@@ -1168,17 +1167,17 @@ export class DatabaseStorage implements IStorage {
   // Search operations
   async searchProducts(query: string, limit: number, offset: number): Promise<Product[]> {
     try {
-      const searchTerm = `%${query.trim()}%`;
+      const searchTerm = `%${query.trim().replace(/'/g, "''")}%`;
       
-      // Direct SQL approach
+      // Direct SQL approach with inline values to avoid parameter binding issues
       const sqlQuery = `
         SELECT * FROM products
-        WHERE LOWER(sku) LIKE LOWER($1) OR LOWER(title) LIKE LOWER($1)
+        WHERE LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}')
         ORDER BY id DESC
-        LIMIT $2 OFFSET $3
+        LIMIT ${limit} OFFSET ${offset}
       `;
       
-      const result = await db.execute(sqlQuery, [searchTerm, limit, offset]);
+      const result = await db.execute(sqlQuery);
       return result.rows as Product[];
     } catch (error) {
       console.error('Error searching products:', error);
@@ -1188,15 +1187,15 @@ export class DatabaseStorage implements IStorage {
   
   async searchProductCount(query: string): Promise<number> {
     try {
-      const searchTerm = `%${query.trim()}%`;
+      const searchTerm = `%${query.trim().replace(/'/g, "''")}%`;
       
-      // Direct SQL count query
+      // Direct SQL count query with inline value to avoid parameter binding issues
       const sqlQuery = `
         SELECT COUNT(*) as count FROM products
-        WHERE LOWER(sku) LIKE LOWER($1) OR LOWER(title) LIKE LOWER($1)
+        WHERE LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}')
       `;
       
-      const result = await db.execute(sqlQuery, [searchTerm]);
+      const result = await db.execute(sqlQuery);
       return Number(result.rows[0].count);
     } catch (error) {
       console.error('Error counting search results:', error);
