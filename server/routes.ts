@@ -1239,13 +1239,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
           syncProgress.processedItems === 0 || 
           syncProgress.processedItems === null) {
           
-        // Get recent logs first
-        const shopifyLogs = await storage.getRecentShopifyLogs(1000);
+        // Get recent logs first - get more to ensure we capture everything from this sync
+        const shopifyLogs = await storage.getRecentShopifyLogs(5000);
         console.log(`Checking ${shopifyLogs.length} Shopify logs for progress updates...`);
 
         // Find "Successfully updated product X" messages
         const updateRegex = /Successfully updated product (\d+)/;
-        const successLogEntries = shopifyLogs.filter(log => 
+        
+        // Only count logs created after the current sync was started
+        // This filters out logs from previous sync sessions
+        const currentSyncLogs = syncProgress.startedAt 
+          ? shopifyLogs.filter(log => {
+              const logDate = new Date(log.createdAt);
+              const syncStartDate = new Date(syncProgress.startedAt);
+              return logDate > syncStartDate;
+            })
+          : shopifyLogs;
+          
+        console.log(`Found ${currentSyncLogs.length} logs from current sync session`);
+        
+        // Filter for successful updates only in this current sync
+        const successLogEntries = currentSyncLogs.filter(log => 
           updateRegex.test(log.message)
         );
 
