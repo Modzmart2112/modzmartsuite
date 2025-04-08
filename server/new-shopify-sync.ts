@@ -110,16 +110,16 @@ export async function newSyncShopifyProducts(): Promise<void> {
       return;
     }
     
-    // Calculate estimated completion time
+    // Calculate estimated completion time based on variants since we process those
     const estimatedTotalTimeMs = uniqueVariantCount * AVERAGE_ITEM_PROCESS_TIME;
     const estimatedCompletionTime = new Date(Date.now() + estimatedTotalTimeMs);
     
     await storage.updateShopifySyncProgress({
-      totalItems: uniqueProductCount,
+      totalItems: uniqueVariantCount, // Use variant count as total items
       processedItems: 0,
       successItems: 0,
       failedItems: 0,
-      message: `Ready to process ${uniqueProductCount} unique products`,
+      message: `Ready to process ${uniqueProductCount} unique products (${uniqueVariantCount} total variants)`,
       details: {
         uniqueProductCount,
         totalVariantCount: uniqueVariantCount,
@@ -288,12 +288,12 @@ async function processAllShopifyProducts(
         successCount += batchResults.success;
         failedCount += batchResults.failed;
         
-        // Update progress
+        // Update progress based on variants processed
         const elapsedTimeMs = Date.now() - startTime;
-        const remainingProducts = uniqueProductCount - processedProducts;
-        const estimatedRemainingTimeMs = remainingProducts * (elapsedTimeMs / processedProducts);
+        const remainingVariants = totalVariantCount - processedCount;
+        const estimatedRemainingTimeMs = remainingVariants * (elapsedTimeMs / processedCount);
         const estimatedCompletionTime = new Date(Date.now() + estimatedRemainingTimeMs);
-        const percentageComplete = Math.round((processedProducts / uniqueProductCount) * 100);
+        const percentageComplete = Math.round((processedCount / totalVariantCount) * 100);
         
         await storage.updateShopifySyncProgress({
           processedItems: processedCount,
