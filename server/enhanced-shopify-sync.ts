@@ -22,10 +22,11 @@ import { shopifyClient } from './shopify';
 import { logCostPrice } from './cost-logger';
 
 // Configuration
-const BATCH_SIZE = 25; // Smaller batches for more frequent UI updates
-const BATCH_DELAY_MS = 750; // Delay between batches to respect rate limits
+const BATCH_SIZE = 10; // Smaller batches for more frequent UI updates
+const BATCH_DELAY_MS = 500; // Delay between batches to respect rate limits
 const MAX_RETRIES = 3; // Maximum retries for failed operations
-const STATUS_UPDATE_INTERVAL = 5; // Update DB status every N products
+const STATUS_UPDATE_INTERVAL = 1; // Update DB status after EVERY batch for more granular progress
+const PROGRESS_UPDATE_THRESHOLD = 1; // Update progress after every 1% change for smoother tracking
 const COST_CAPTURE_ENABLED = true; // Enable cost price capture and display
 
 // Enhanced logging helper with categories
@@ -333,44 +334,56 @@ async function processProducts(
         // Clear the batch
         currentBatch = [];
         
-        // Update sync progress every few products for better UI feedback
-        if (processedProducts % STATUS_UPDATE_INTERVAL === 0 || i === productIds.length - 1) {
-          // Calculate ETA based on current processing rate
-          const elapsedMs = Date.now() - startTime;
-          const itemsRemaining = totalVariantCount - processedCount;
-          const msPerItem = processedCount > 0 ? elapsedMs / processedCount : 0;
-          const estimatedRemainingMs = msPerItem * itemsRemaining;
-          const estimatedCompletionTime = new Date(Date.now() + estimatedRemainingMs);
-          
-          // Percentage complete (based on variants, not products)
-          const percentComplete = totalVariantCount > 0 
-            ? Math.min(100, Math.round((processedCount / totalVariantCount) * 100)) 
-            : 0;
-          
-          // Update progress in database with clearer step labeling
-          await storage.updateShopifySyncProgress({
-            status: "in-progress",
-            message: `Step 2/3: Processing ${processedCount} of ${totalVariantCount} items (${percentComplete}%)`,
-            processedItems: processedCount,
-            totalItems: totalVariantCount, // Always ensure total items is set
-            successItems: successCount,
-            failedItems: failedCount,
-            details: {
-              step: 2,
-              stepName: "processing",
-              uniqueProductCount,
-              processedProductCount: processedProducts,
-              totalProductCount: productGroups.size,
-              percentage: percentComplete,
-              estimatedRemainingMs,
-              estimatedCompletionTime: estimatedCompletionTime.toISOString(),
-              processingRate: elapsedMs > 0 ? Math.round((processedCount / elapsedMs) * 60000) : 0, // items per minute
-              elapsedTime: formatDuration(elapsedMs)
-            }
-          });
-          
-          log(`Step 2/3: Processed ${processedCount}/${totalVariantCount} items (${percentComplete}%) - ETA: ${formatDuration(estimatedRemainingMs)}`);
-        }
+        // ALWAYS update progress after each batch for more precise tracking
+        // No conditional logic - update every time for smoother progress
+        
+        // Calculate ETA based on current processing rate
+        const elapsedMs = Date.now() - startTime;
+        const itemsRemaining = totalVariantCount - processedCount;
+        const msPerItem = processedCount > 0 ? elapsedMs / processedCount : 0;
+        const estimatedRemainingMs = msPerItem * itemsRemaining;
+        const estimatedCompletionTime = new Date(Date.now() + estimatedRemainingMs);
+        
+        // Calculate exact percentage with precise decimal (not rounded)
+        // This ensures we never jump from 0% to 50%
+        const exactPercentComplete = totalVariantCount > 0 
+          ? (processedCount / totalVariantCount) * 100 
+          : 0;
+        
+        // Round for display, but keep tracking precise
+        const percentComplete = Math.min(100, Math.round(exactPercentComplete));
+        
+        // Log exact percentage for debugging
+        log(`Exact progress: ${exactPercentComplete.toFixed(2)}%, Displayed: ${percentComplete}%`);
+        
+        // Update progress in database with clearer step labeling
+        await storage.updateShopifySyncProgress({
+          status: "in-progress",
+          message: `Step 2/3: Processing ${processedCount} of ${totalVariantCount} items (${percentComplete}%)`,
+          processedItems: processedCount,
+          totalItems: totalVariantCount, // Always ensure total items is set
+          successItems: successCount,
+          failedItems: failedCount,
+          details: {
+            step: 2,
+            stepName: "processing",
+            uniqueProductCount,
+            processedProductCount: processedProducts,
+            totalProductCount: productGroups.size,
+            percentage: exactPercentComplete, // Store exact percentage for frontend
+            estimatedRemainingMs,
+            estimatedCompletionTime: estimatedCompletionTime.toISOString(),
+            processingRate: elapsedMs > 0 ? Math.round((processedCount / elapsedMs) * 60000) : 0, // items per minute
+            elapsedTime: formatDuration(elapsedMs),
+            // Add these fields to help debug the jump from 0% to 50%
+            processedDebug: processedCount,
+            totalDebug: totalVariantCount,
+            batchSize: BATCH_SIZE,
+            batchNumber: Math.ceil(i / STATUS_UPDATE_INTERVAL)
+          }
+        });
+        
+        log(`Step 2/3: Processed ${processedCount}/${totalVariantCount} items (${percentComplete}%) - ETA: ${formatDuration(estimatedRemainingMs)}`);
         
         // Add a small delay between batches to prevent rate limiting
         if (i < productIds.length - 1) {

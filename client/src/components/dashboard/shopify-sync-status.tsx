@@ -158,6 +158,21 @@ export function ShopifySyncStatus() {
   const totalItems = syncProgress?.totalItems || 0;
   const uniqueProductCount = syncProgress?.details?.uniqueProductCount || 0;
   
+  // Use exact percentage when available, otherwise calculate
+  // This ensures smoother progress display and prevents jumps
+  const exactPercentage = syncProgress?.details?.percentage;
+  const calculatedPercentage = totalItems > 0 ? (processedItems / totalItems) * 100 : 0;
+  const progressPercentage = exactPercentage !== undefined ? exactPercentage : calculatedPercentage;
+  
+  // For progress bar display, rounded to nearest integer
+  const displayPercentage = Math.min(100, Math.round(progressPercentage));
+  
+  // Display any extra debug info
+  const processedDebug = syncProgress?.details?.processedDebug;
+  const totalDebug = syncProgress?.details?.totalDebug;
+  const batchSize = syncProgress?.details?.batchSize;
+  const batchNumber = syncProgress?.details?.batchNumber;
+  
   // Determine active step
   const isStep1Active = syncProgress?.message?.includes("Counting") || false;
   const isStep2Active = !isStep1Active && (syncProgress?.message?.includes("Processing") || (processedItems > 0 && processedItems < totalItems)) || false;
@@ -482,7 +497,8 @@ export function ShopifySyncStatus() {
                           {processedItems > 0 && totalItems > 0 && (
                             <div className="flex justify-between mt-1 text-xs">
                               <span className="text-blue-600 dark:text-blue-400 font-medium">
-                                {Math.round((processedItems / totalItems) * 100)}% Complete
+                                {/* Use the exact percentage when available */}
+                                {displayPercentage}% Complete
                               </span>
                               <span className="text-muted-foreground">
                                 {processedItems} of {totalItems} items
