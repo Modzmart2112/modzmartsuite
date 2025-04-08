@@ -255,8 +255,8 @@ const SaleManagementPage: React.FC = () => {
       name: newCampaign.name,
       description: newCampaign.description || null,
       status: newCampaign.isActive ? 'active' : 'draft',
-      startDate: newCampaign.startDate,
-      endDate: newCampaign.endDate,
+      startDate: newCampaign.startDate.toISOString(), // Format dates as ISO strings
+      endDate: newCampaign.endDate.toISOString(),     // Format dates as ISO strings
       discountType: newCampaign.discountType,
       discountValue: Number(newCampaign.discountValue),
     };
@@ -358,8 +358,8 @@ const SaleManagementPage: React.FC = () => {
       name: newCampaign.name,
       description: newCampaign.description || null,
       status: newCampaign.isActive ? 'active' : 'draft',
-      startDate: newCampaign.startDate,
-      endDate: newCampaign.endDate,
+      startDate: newCampaign.startDate.toISOString(), // Format dates as ISO strings
+      endDate: newCampaign.endDate.toISOString(),     // Format dates as ISO strings
       discountType: newCampaign.discountType,
       discountValue: Number(newCampaign.discountValue)
       // excludeBelowCost is handled server-side or with targets
