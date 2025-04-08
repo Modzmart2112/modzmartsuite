@@ -4,9 +4,10 @@ import {
   InsertCsvUpload, Notification, InsertNotification,
   Stats, InsertStats, SaleCampaign, InsertSaleCampaign,
   SaleCampaignTarget, InsertSaleCampaignTarget,
-  SyncProgress, InsertSyncProgress,
+  SyncProgress, InsertSyncProgress, ShopifyLog,
   users, products, priceHistories, csvUploads, 
-  notifications, stats, saleCampaigns, saleCampaignTargets, syncProgress
+  notifications, stats, saleCampaigns, saleCampaignTargets, syncProgress,
+  shopifyLogs
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
