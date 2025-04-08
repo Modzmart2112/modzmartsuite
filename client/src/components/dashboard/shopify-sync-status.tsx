@@ -20,7 +20,13 @@ import { cn } from "@/lib/utils";
 
 export function ShopifySyncStatus() {
   // State for cost price log entries
-  const [costPriceLogs, setCostPriceLogs] = useState<Array<{ sku: string, price: string, timestamp: Date }>>([]);
+  const [costPriceLogs, setCostPriceLogs] = useState<Array<{ 
+    sku: string, 
+    price: string, 
+    timestamp: Date,
+    position?: number,
+    totalProducts?: number 
+  }>>([]);
   
   // Fetch scheduler status
   const { data, isLoading, refetch } = useQuery({
@@ -422,9 +428,14 @@ export function ShopifySyncStatus() {
                 <span className="text-sm font-medium">
                   {processedItems} items processed
                   {costPriceLogs.length > 0 && (
-                    <span className="ml-1 text-xs text-blue-500">
-                      (Current: {costPriceLogs[0]?.sku})
-                    </span>
+                    <div className="text-xs flex items-center gap-1 mt-0.5">
+                      <span className="text-blue-500">
+                        Current: <span className="font-mono">{costPriceLogs[0]?.sku}</span>
+                      </span>
+                      <span className="text-gray-500">
+                        (Product {processedItems} of {totalItems})
+                      </span>
+                    </div>
                   )}
                 </span>
               </div>
@@ -546,6 +557,9 @@ export function ShopifySyncStatus() {
                                 <div className="px-1 py-0.5 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-900/30">
                                   <span className="text-blue-700 dark:text-blue-400 font-medium">
                                     Currently processing: <span className="font-mono">{costPriceLogs[0]?.sku}</span>
+                                    <span className="ml-1 text-gray-600 dark:text-gray-400">
+                                      (Product {processedItems} of {totalItems})
+                                    </span>
                                   </span>
                                 </div>
                               )}

@@ -13,8 +13,16 @@ import { storage } from './storage';
  * @param sku Product SKU
  * @param price Cost price
  * @param message Message to log
+ * @param position Current product position (optional)
+ * @param totalProducts Total product count (optional)
  */
-export async function logCostPrice(sku: string, price: number, message?: string): Promise<void> {
+export async function logCostPrice(
+  sku: string, 
+  price: number, 
+  message?: string, 
+  position?: number, 
+  totalProducts?: number
+): Promise<void> {
   try {
     // Get the current sync ID to tag the logs
     const syncProgress = await storage.getShopifySyncProgress();
@@ -36,6 +44,8 @@ export async function logCostPrice(sku: string, price: number, message?: string)
         sku,
         price,
         syncId: currentSyncId,
+        position: position || syncProgress?.processedItems || 0,
+        totalProducts: totalProducts || syncProgress?.totalItems || 0,
         timestamp: new Date().toISOString()
       }
     );
