@@ -136,10 +136,24 @@ export function ShopifySyncStatus() {
   
   // Sync progress data
   const syncProgress = syncProgressQuery.data;
-  const isSyncing = syncProgress && (syncProgress.status === 'pending' || syncProgress.status === 'in-progress');
+  
+  // FIXED: Recognize all valid states where we can start a sync
+  // If a sync was just reset or is in "pending" but not actively started,
+  // we should allow starting a new sync
+  const isReady = !syncProgress || 
+    syncProgress.status === 'ready' || 
+    syncProgress.status === 'complete' || 
+    syncProgress.status === 'reset' || 
+    syncProgress.status === 'failed' ||
+    (syncProgress.status === 'pending' && !syncProgress.message?.includes('Counting'));
+  
+  // Only consider actively syncing when we're actually running an operation
+  const isSyncing = syncProgress && 
+    ((syncProgress.status === 'pending' && syncProgress.message?.includes('Counting')) || 
+     syncProgress.status === 'in-progress');
   
   // Progress message and counts
-  const progressMessage = syncProgress?.message || 'Initializing...';
+  const progressMessage = syncProgress?.message || 'Ready to sync';
   const processedItems = syncProgress?.processedItems || 0;
   const totalItems = syncProgress?.totalItems || 0;
   const uniqueProductCount = syncProgress?.details?.uniqueProductCount || 0;
@@ -164,7 +178,18 @@ export function ShopifySyncStatus() {
   // Handle manual sync
   const handleManualSync = async () => {
     try {
+      // Clear the cost price logs to start with a fresh view
       setCostPriceLogs([]);
+      
+      // First validate that we can actually start a sync
+      if (!isReady) {
+        toast({
+          title: "Cannot Start Sync",
+          description: "Please reset the current sync before starting a new one.",
+          variant: "destructive",
+        });
+        return;
+      }
       
       const response = await fetch("/api/scheduler/run-shopify-sync", {
         method: "POST",
@@ -176,6 +201,7 @@ export function ShopifySyncStatus() {
           description: "Product synchronization has been initiated",
         });
         
+        // Refresh data after a short delay to ensure the backend has updated
         setTimeout(() => {
           refetch();
           syncProgressQuery.refetch();

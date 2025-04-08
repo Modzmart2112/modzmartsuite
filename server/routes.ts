@@ -1297,15 +1297,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`[shopify-sync] Resetting sync ID ${existingSync.id} from ${existingSync.status} state`);
         await storage.updateShopifySyncProgress({
           id: existingSync.id,
-          status: "complete",
+          status: "reset", // Mark as reset instead of complete
           completedAt: new Date(),
           message: "Sync was manually reset by user"
         });
       }
       
-      // STEP 2: Create a completely fresh sync record with pending status
+      // STEP 2: Create a completely fresh sync record with pending status but ready state
       const newSync = await storage.initializeShopifySyncProgress();
-      console.log(`[shopify-sync] Created fresh sync record with ID ${newSync.id} in 'pending' state`);
+      
+      // Update the new sync to indicate it's ready for a new start
+      await storage.updateShopifySyncProgress({
+        id: newSync.id,
+        status: "ready", // Use ready status to clearly indicate it's ready for a new sync
+        message: "Ready for new sync - click Sync Now to begin"
+      });
+      
+      console.log(`[shopify-sync] Created fresh sync record with ID ${newSync.id} in 'ready' state`);
       
       res.json({
         success: true,
@@ -1327,8 +1335,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trigger a manual Shopify sync
   app.post("/api/scheduler/run-shopify-sync", asyncHandler(async (req, res) => {
     try {
-      // Initialize the sync progress
-      await storage.initializeShopifySyncProgress();
+      // Check if there's an existing record in 'ready' or 'pending' state we can use
+      // This fixes the issue where reset doesn't allow starting a sync
+      const existingSync = await storage.getShopifySyncProgress();
+      let syncId;
+      
+      if (existingSync && (existingSync.status === 'ready' || existingSync.status === 'pending')) {
+        // Use the existing sync record if it's in a valid state
+        syncId = existingSync.id;
+        console.log(`[shopify-sync] Using existing sync record with ID ${syncId} in '${existingSync.status}' state`);
+        
+        // Update it to prepare for sync
+        await storage.updateShopifySyncProgress({
+          id: syncId,
+          status: "pending",
+          message: "Preparing to start Shopify sync...",
+        });
+      } else {
+        // Initialize a new sync progress record
+        const newSync = await storage.initializeShopifySyncProgress();
+        syncId = newSync.id;
+        console.log(`[shopify-sync] Created new sync record with ID ${syncId}`);
+      }
       
       // Use the new enhanced Shopify sync implementation
       import('./enhanced-shopify-sync').then(module => {
