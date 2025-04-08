@@ -1946,8 +1946,19 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
         return res.status(404).json({ error: "Sale campaign not found" });
       }
       
+      // Log the target type and value to help with debugging
+      console.log(`Adding target to campaign ${campaignId}: type=${req.body.targetType}, value=${req.body.targetValue}`);
+      
+      // Ensure the targetValue is properly formatted for product targets
+      let formattedBody = { ...req.body };
+      if (formattedBody.targetType === 'product' && formattedBody.targetValue) {
+        // Make sure the Shopify ID is a string (front-end might send it as a number)
+        formattedBody.targetValue = formattedBody.targetValue.toString();
+        console.log(`Formatted product Shopify ID: ${formattedBody.targetValue}`);
+      }
+      
       const targetData = insertSaleCampaignTargetSchema.parse({
-        ...req.body,
+        ...formattedBody,
         campaignId
       });
       

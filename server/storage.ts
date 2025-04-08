@@ -1824,6 +1824,23 @@ export class DatabaseStorage implements IStorage {
           targetProducts = await db.select()
             .from(products)
             .where(eq(products.productType, target.targetValue));
+        } else if (target.targetType === 'product') {
+          // Product by Shopify Product ID
+          try {
+            // Make sure targetValue is a string
+            const shopifyId = target.targetValue;
+            if (shopifyId) {
+              // Find products with matching Shopify ID
+              targetProducts = await db.select()
+                .from(products)
+                .where(eq(products.shopifyId, shopifyId));
+              
+              // Log for debugging
+              console.log(`Targeting product with Shopify ID ${shopifyId}, found ${targetProducts.length} products`);
+            }
+          } catch (error) {
+            console.error(`Error targeting product with ID ${target.targetValue}:`, error);
+          }
         } else if (target.targetType === 'tag') {
           // Handle tags if implemented
           continue;
