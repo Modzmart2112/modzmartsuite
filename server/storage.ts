@@ -4,8 +4,9 @@ import {
   InsertCsvUpload, Notification, InsertNotification,
   Stats, InsertStats, SaleCampaign, InsertSaleCampaign,
   SaleCampaignTarget, InsertSaleCampaignTarget,
+  SyncProgress, InsertSyncProgress,
   users, products, priceHistories, csvUploads, 
-  notifications, stats, saleCampaigns, saleCampaignTargets
+  notifications, stats, saleCampaigns, saleCampaignTargets, syncProgress
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
@@ -71,6 +72,11 @@ export interface IStorage {
   removeSaleCampaignTarget(id: number): Promise<boolean>;
   applySaleCampaign(campaignId: number): Promise<number>; // Returns number of affected products
   revertSaleCampaign(campaignId: number): Promise<number>; // Returns number of reverted products
+  
+  // Sync progress operations
+  initializeShopifySyncProgress(): Promise<SyncProgress>;
+  updateShopifySyncProgress(progress: Partial<SyncProgress>): Promise<SyncProgress | undefined>;
+  getShopifySyncProgress(): Promise<SyncProgress | null>;
 }
 
 // In-memory storage implementation
@@ -83,6 +89,7 @@ export class MemStorage implements IStorage {
   private stats: Stats | undefined;
   private saleCampaigns: Map<number, SaleCampaign>;
   private saleCampaignTargets: Map<number, SaleCampaignTarget>;
+  private syncProgresses: Map<number, SyncProgress>;
   
   private userIdCounter: number;
   private productIdCounter: number;
@@ -91,6 +98,7 @@ export class MemStorage implements IStorage {
   private notificationIdCounter: number;
   private saleCampaignIdCounter: number;
   private saleCampaignTargetIdCounter: number;
+  private syncProgressIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -100,6 +108,7 @@ export class MemStorage implements IStorage {
     this.notifications = new Map();
     this.saleCampaigns = new Map();
     this.saleCampaignTargets = new Map();
+    this.syncProgresses = new Map();
     
     this.userIdCounter = 1;
     this.productIdCounter = 1;
@@ -108,6 +117,7 @@ export class MemStorage implements IStorage {
     this.notificationIdCounter = 1;
     this.saleCampaignIdCounter = 1;
     this.saleCampaignTargetIdCounter = 1;
+    this.syncProgressIdCounter = 1;
     
     // Initialize with default stats
     this.stats = {
@@ -677,6 +687,78 @@ export class MemStorage implements IStorage {
     await this.updateSaleCampaign(campaignId, { status: 'completed', completedAt: now });
     
     return revertedCount;
+  }
+  
+  // Sync progress operations
+  async initializeShopifySyncProgress(): Promise<SyncProgress> {
+    // Delete any existing "shopify-sync" progress records that are pending or in-progress
+    const existingProgresses = Array.from(this.syncProgresses.values())
+      .filter(p => p.type === "shopify-sync" && (p.status === "pending" || p.status === "in-progress"));
+    
+    for (const progress of existingProgresses) {
+      this.syncProgresses.delete(progress.id);
+    }
+    
+    // Create a new progress record
+    const id = this.syncProgressIdCounter++;
+    const progress: SyncProgress = {
+      id,
+      type: "shopify-sync",
+      status: "pending",
+      totalItems: 0,
+      processedItems: 0,
+      successItems: 0,
+      failedItems: 0,
+      message: "Shopify sync initialized and ready to start",
+      details: {},
+      startedAt: new Date(),
+      completedAt: null
+    };
+    
+    this.syncProgresses.set(id, progress);
+    return progress;
+  }
+  
+  async updateShopifySyncProgress(progressData: Partial<SyncProgress>): Promise<SyncProgress | undefined> {
+    // Get the most recent shopify sync progress
+    const sortedProgresses = Array.from(this.syncProgresses.values())
+      .filter(p => p.type === "shopify-sync")
+      .sort((a, b) => b.id - a.id);
+    
+    const currentProgress = sortedProgresses.length > 0 ? sortedProgresses[0] : undefined;
+    if (!currentProgress) return undefined;
+    
+    // Calculate percentage complete
+    const percentage = progressData.totalItems && progressData.processedItems
+      ? Math.round((progressData.processedItems / progressData.totalItems) * 100)
+      : undefined;
+    
+    // If status is being updated to "complete", set the completedAt date
+    const completedAt = progressData.status === "complete" ? new Date() : currentProgress.completedAt;
+    
+    // Update the progress
+    const updatedProgress: SyncProgress = {
+      ...currentProgress,
+      ...progressData,
+      completedAt,
+      details: {
+        ...currentProgress.details,
+        percentage,
+        ...(progressData.details || {})
+      }
+    };
+    
+    this.syncProgresses.set(currentProgress.id, updatedProgress);
+    return updatedProgress;
+  }
+  
+  async getShopifySyncProgress(): Promise<SyncProgress | null> {
+    // Get the most recent shopify sync progress
+    const sortedProgresses = Array.from(this.syncProgresses.values())
+      .filter(p => p.type === "shopify-sync")
+      .sort((a, b) => b.id - a.id);
+    
+    return sortedProgresses.length > 0 ? sortedProgresses[0] : null;
   }
 }
 
@@ -1582,6 +1664,78 @@ export class DatabaseStorage implements IStorage {
       console.error(`Error reverting sale campaign ${campaignId}:`, error);
       return 0;
     }
+  }
+  
+  // Sync progress operations
+  async initializeShopifySyncProgress(): Promise<SyncProgress> {
+    // Delete any existing "shopify-sync" progress records that are pending or in-progress
+    await db.delete(syncProgress)
+      .where(and(
+        eq(syncProgress.type, "shopify-sync"),
+        sql`${syncProgress.status} IN ('pending', 'in-progress')`
+      ));
+    
+    // Create a new progress record
+    const [progress] = await db.insert(syncProgress).values({
+      type: "shopify-sync",
+      status: "pending",
+      totalItems: 0,
+      processedItems: 0,
+      successItems: 0,
+      failedItems: 0,
+      message: "Shopify sync initialized and ready to start"
+    }).returning();
+    
+    return progress;
+  }
+  
+  async updateShopifySyncProgress(progressData: Partial<SyncProgress>): Promise<SyncProgress | undefined> {
+    // Get the most recent shopify sync progress
+    const [currentProgress] = await db
+      .select()
+      .from(syncProgress)
+      .where(eq(syncProgress.type, "shopify-sync"))
+      .orderBy(desc(syncProgress.id))
+      .limit(1);
+    
+    if (!currentProgress) return undefined;
+    
+    // Calculate percentage complete
+    const percentage = progressData.totalItems && progressData.processedItems
+      ? Math.round((progressData.processedItems / progressData.totalItems) * 100)
+      : undefined;
+    
+    // If status is being updated to "complete", set the completedAt date
+    const completedAt = progressData.status === "complete" ? new Date() : undefined;
+    
+    // Update the progress
+    const [updatedProgress] = await db
+      .update(syncProgress)
+      .set({
+        ...progressData,
+        completedAt,
+        details: {
+          ...currentProgress.details,
+          percentage,
+          ...(progressData.details || {})
+        }
+      })
+      .where(eq(syncProgress.id, currentProgress.id))
+      .returning();
+    
+    return updatedProgress;
+  }
+  
+  async getShopifySyncProgress(): Promise<SyncProgress | null> {
+    // Get the most recent shopify sync progress
+    const [progress] = await db
+      .select()
+      .from(syncProgress)
+      .where(eq(syncProgress.type, "shopify-sync"))
+      .orderBy(desc(syncProgress.id))
+      .limit(1);
+    
+    return progress || null;
   }
 }
 

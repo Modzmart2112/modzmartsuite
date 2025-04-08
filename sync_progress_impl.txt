@@ -1,0 +1,71 @@
+  // Sync progress operations
+  async initializeShopifySyncProgress(): Promise<SyncProgress> {
+    // Delete any existing "shopify-sync" progress records that are pending or in-progress
+    await db.delete(syncProgress)
+      .where(and(
+        eq(syncProgress.type, "shopify-sync"),
+        sql`${syncProgress.status} IN ('pending', 'in-progress')`
+      ));
+    
+    // Create a new progress record
+    const [progress] = await db.insert(syncProgress).values({
+      type: "shopify-sync",
+      status: "pending",
+      totalItems: 0,
+      processedItems: 0,
+      successItems: 0,
+      failedItems: 0,
+      message: "Shopify sync initialized and ready to start"
+    }).returning();
+    
+    return progress;
+  }
+  
+  async updateShopifySyncProgress(progressData: Partial<SyncProgress>): Promise<SyncProgress | undefined> {
+    // Get the most recent shopify sync progress
+    const [currentProgress] = await db
+      .select()
+      .from(syncProgress)
+      .where(eq(syncProgress.type, "shopify-sync"))
+      .orderBy(desc(syncProgress.id))
+      .limit(1);
+    
+    if (!currentProgress) return undefined;
+    
+    // Calculate percentage complete
+    const percentage = progressData.totalItems && progressData.processedItems
+      ? Math.round((progressData.processedItems / progressData.totalItems) * 100)
+      : undefined;
+    
+    // If status is being updated to "complete", set the completedAt date
+    const completedAt = progressData.status === "complete" ? new Date() : undefined;
+    
+    // Update the progress
+    const [updatedProgress] = await db
+      .update(syncProgress)
+      .set({
+        ...progressData,
+        completedAt,
+        details: {
+          ...currentProgress.details,
+          percentage,
+          ...(progressData.details || {})
+        }
+      })
+      .where(eq(syncProgress.id, currentProgress.id))
+      .returning();
+    
+    return updatedProgress;
+  }
+  
+  async getShopifySyncProgress(): Promise<SyncProgress | null> {
+    // Get the most recent shopify sync progress
+    const [progress] = await db
+      .select()
+      .from(syncProgress)
+      .where(eq(syncProgress.type, "shopify-sync"))
+      .orderBy(desc(syncProgress.id))
+      .limit(1);
+    
+    return progress || null;
+  }

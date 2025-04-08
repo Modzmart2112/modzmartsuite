@@ -952,6 +952,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Get Shopify sync progress
+  app.get("/api/shopify/sync-progress", asyncHandler(async (req, res) => {
+    try {
+      const progress = await storage.getShopifySyncProgress();
+      res.json(progress || { status: 'none' });
+    } catch (error) {
+      console.error("Error fetching Shopify sync progress:", error);
+      res.status(500).json({ message: "Failed to fetch sync progress" });
+    }
+  }));
+  
   // Enhanced Shopify connection status endpoint for the profile menu
   app.get("/api/shopify/connection-status", asyncHandler(async (req, res) => {
     try {
@@ -1202,12 +1213,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Get Shopify sync progress
+  app.get("/api/scheduler/shopify-sync-progress", asyncHandler(async (req, res) => {
+    // Return current sync progress from storage
+    const syncProgress = await storage.getShopifySyncProgress();
+    res.json(syncProgress);
+  }));
+  
   // Trigger a manual Shopify sync
   app.post("/api/scheduler/run-shopify-sync", asyncHandler(async (req, res) => {
     try {
+      // Initialize the sync progress
+      await storage.initializeShopifySyncProgress();
+      
       // Run the Shopify sync job
       scheduledSyncShopifyProducts().catch(err => {
         console.error('Error in manual Shopify sync:', err);
+        // Update progress to indicate error
+        storage.updateShopifySyncProgress({
+          status: "error",
+          message: "Sync failed with error: " + err.message
+        }).catch(updateErr => {
+          console.error('Error updating sync progress:', updateErr);
+        });
       });
       
       res.json({
@@ -1969,16 +1997,46 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
 }
 
 async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: string): Promise<void> {
+  // Initialize sync progress tracking
+  let syncProgress = await storage.initializeShopifySyncProgress();
+  
   try {
+    // Update progress to in-progress status
+    syncProgress = await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: "Fetching products from Shopify..."
+    }) || syncProgress;
+    
+    // Get all products from Shopify
     const products = await shopifyClient.getAllProducts(apiKey, apiSecret, storeUrl);
     
+    // Update progress with total product count
+    syncProgress = await storage.updateShopifySyncProgress({
+      totalItems: products.length,
+      message: `Processing ${products.length} products from Shopify...`
+    }) || syncProgress;
+    
     let updatedWithCostCount = 0;
+    let processedCount = 0;
+    let successCount = 0;
+    let failedCount = 0;
     
     for (const shopifyProduct of products) {
       try {
         // Make sure we have a valid SKU
         if (!shopifyProduct.sku) {
           console.log(`Skipping product with missing SKU: ${shopifyProduct.title}`);
+          failedCount++;
+          processedCount++;
+          
+          // Update progress
+          await storage.updateShopifySyncProgress({
+            processedItems: processedCount,
+            successItems: successCount,
+            failedItems: failedCount,
+            message: `Processing product ${processedCount} of ${products.length}...`
+          });
+          
           continue;
         }
         
@@ -2095,8 +2153,32 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             }
           }
         }
+        
+        // Update product-specific progress
+        processedCount++;
+        successCount++;
+        
+        // Update progress every 5 products to avoid too many DB writes
+        if (processedCount % 5 === 0 || processedCount === products.length) {
+          await storage.updateShopifySyncProgress({
+            processedItems: processedCount,
+            successItems: successCount,
+            failedItems: failedCount,
+            message: `Processing product ${processedCount} of ${products.length}...`
+          });
+        }
       } catch (error) {
         console.error(`Error processing Shopify product ${shopifyProduct.sku}:`, error);
+        failedCount++;
+        processedCount++;
+        
+        // Update progress for failed items
+        await storage.updateShopifySyncProgress({
+          processedItems: processedCount,
+          successItems: successCount,
+          failedItems: failedCount,
+          message: `Error processing product ${shopifyProduct.sku}`
+        });
       }
     }
     
@@ -2113,8 +2195,23 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
     }
     
     console.log(`Synced ${products.length} products from Shopify, updated ${updatedWithCostCount} with cost prices`);
+    
+    // Mark sync as complete
+    await storage.updateShopifySyncProgress({
+      status: "complete",
+      message: `Completed sync of ${products.length} products. ${successCount} successful, ${failedCount} failed.`,
+      details: {
+        updatedWithCostCount
+      }
+    });
   } catch (error) {
     console.error("Error syncing Shopify products:", error);
+    
+    // Mark sync as failed
+    await storage.updateShopifySyncProgress({
+      status: "failed",
+      message: `Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    });
   }
 }
 

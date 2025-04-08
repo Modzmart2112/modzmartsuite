@@ -178,3 +178,25 @@ export type InsertSaleCampaign = z.infer<typeof insertSaleCampaignSchema>;
 
 export type SaleCampaignTarget = typeof saleCampaignTargets.$inferSelect;
 export type InsertSaleCampaignTarget = z.infer<typeof insertSaleCampaignTargetSchema>;
+
+// Table for tracking sync progress
+export const syncProgress = pgTable("sync_progress", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // e.g. "shopify-sync"
+  status: text("status").notNull(), // "pending", "in-progress", "complete", "error"
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  totalItems: integer("total_items").default(0),
+  processedItems: integer("processed_items").default(0),
+  successItems: integer("success_items").default(0),
+  failedItems: integer("failed_items").default(0),
+  message: text("message"),
+  details: jsonb("details").$type<Record<string, any>>(),
+});
+
+// Insert schema for sync progress
+export const insertSyncProgressSchema = createInsertSchema(syncProgress).omit({ id: true, completedAt: true });
+
+// Types for sync progress
+export type SyncProgress = typeof syncProgress.$inferSelect;
+export type InsertSyncProgress = z.infer<typeof insertSyncProgressSchema>;

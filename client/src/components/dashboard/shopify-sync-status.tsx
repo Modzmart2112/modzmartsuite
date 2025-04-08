@@ -7,8 +7,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { format, formatDistanceToNow } from "date-fns";
-import { Loader2, Clock, RefreshCw, CheckCircle } from "lucide-react";
+import { Loader2, Clock, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 
 export function ShopifySyncStatus() {
@@ -27,6 +28,14 @@ export function ShopifySyncStatus() {
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
+  
+  // Fetch sync progress with aggressive refresh
+  const syncProgressQuery = useQuery({
+    queryKey: ["/api/shopify/sync-progress"],
+    refetchInterval: 2000, // Poll more frequently for sync progress
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
 
   // Formatted last sync time
   const lastSyncTime = data?.lastShopifySync 
@@ -39,6 +48,14 @@ export function ShopifySyncStatus() {
 
   // Is Shopify sync job active
   const isShopifySyncActive = data?.activeJobs?.includes("hourly-shopify-sync") || false;
+  
+  // Sync progress data
+  const syncProgress = syncProgressQuery.data;
+  const isSyncing = syncProgress && (syncProgress.status === 'pending' || syncProgress.status === 'in-progress');
+  const progressPercentage = syncProgress?.details?.percentage || 0;
+  const progressMessage = syncProgress?.message || 'Initializing...';
+  const processedItems = syncProgress?.processedItems || 0;
+  const totalItems = syncProgress?.totalItems || 0;
 
   // Handle manual sync
   const handleManualSync = async () => {
@@ -53,8 +70,11 @@ export function ShopifySyncStatus() {
           description: "Shopify product sync has been initiated.",
         });
         
-        // Refetch after a short delay to show updated status
-        setTimeout(() => refetch(), 3000);
+        // Refetch all data after a short delay
+        setTimeout(() => {
+          refetch();
+          syncProgressQuery.refetch();
+        }, 1000);
       } else {
         toast({
           title: "Sync failed",
@@ -78,7 +98,7 @@ export function ShopifySyncStatus() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center">
-          <RefreshCw className="h-5 w-5 mr-2 text-blue-500" />
+          <RefreshCw className={`h-5 w-5 mr-2 text-blue-500 ${isSyncing ? 'animate-spin' : ''}`} />
           Shopify Sync Status
         </CardTitle>
         <CardDescription>
@@ -111,23 +131,43 @@ export function ShopifySyncStatus() {
             </div>
           </div>
           
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-muted-foreground">Last Sync:</div>
-            <div className="text-sm font-medium">
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                formattedLastSync
-              )}
+          {!isSyncing && (
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-muted-foreground">Last Sync:</div>
+              <div className="text-sm font-medium">
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  formattedLastSync
+                )}
+              </div>
             </div>
-          </div>
+          )}
+          
+          {isSyncing && (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-medium text-blue-500">Sync in progress</span>
+                <span>{processedItems} / {totalItems} products</span>
+              </div>
+              <Progress value={progressPercentage} className="h-2" />
+              <p className="text-xs text-muted-foreground mt-1">{progressMessage}</p>
+            </div>
+          )}
           
           <Button 
             size="sm"
             className="w-full mt-2" 
             onClick={handleManualSync}
-            disabled={!isConnected}>
-            Run Sync Now
+            disabled={!isConnected || isSyncing}>
+            {isSyncing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              "Run Sync Now"
+            )}
           </Button>
         </div>
       </CardContent>
