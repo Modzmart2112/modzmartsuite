@@ -1220,6 +1220,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(syncProgress);
   }));
   
+  // Reset any stuck Shopify sync
+  app.post("/api/scheduler/reset-shopify-sync", asyncHandler(async (req, res) => {
+    try {
+      // Reset the sync progress by marking it as completed
+      await storage.updateShopifySyncProgress({
+        status: "complete",
+        completedAt: new Date(),
+        message: "Sync was manually reset"
+      });
+      
+      res.json({
+        success: true,
+        message: "Shopify sync status has been reset"
+      });
+    } catch (error) {
+      console.error("Error resetting Shopify sync:", error);
+      res.status(500).json({ 
+        message: "Failed to reset Shopify sync status", 
+        error: (error as Error).message
+      });
+    }
+  }));
+  
   // Trigger a manual Shopify sync
   app.post("/api/scheduler/run-shopify-sync", asyncHandler(async (req, res) => {
     try {

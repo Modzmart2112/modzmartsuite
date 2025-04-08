@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { format, formatDistanceToNow } from "date-fns";
-import { Loader2, Clock, RefreshCw, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Clock, RefreshCw, CheckCircle, AlertCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
@@ -104,6 +104,41 @@ export function ShopifySyncStatus() {
       });
     }
   };
+  
+  // Handle reset for stuck sync
+  const handleResetSync = async () => {
+    try {
+      // Use the reset endpoint
+      const response = await fetch("/api/scheduler/reset-shopify-sync", {
+        method: "POST",
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Sync reset",
+          description: "Shopify sync status has been reset.",
+        });
+        
+        // Refetch all data immediately
+        refetch();
+        syncProgressQuery.refetch();
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Reset failed",
+          description: errorData?.message || "Failed to reset Shopify sync.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error resetting sync:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred while trying to reset the sync status.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Connection status
   const isConnected = shopifyConnectionQuery.data?.connected || false;
@@ -169,20 +204,33 @@ export function ShopifySyncStatus() {
             </div>
           )}
           
-          <Button 
-            size="sm"
-            className="w-full mt-2" 
-            onClick={handleManualSync}
-            disabled={!isConnected || isSyncing}>
-            {isSyncing ? (
-              <>
+          {isSyncing ? (
+            <div className="flex gap-2 mt-2">
+              <Button 
+                size="sm"
+                className="flex-1" 
+                variant="outline" 
+                onClick={handleResetSync}>
+                <XCircle className="h-4 w-4 mr-2 text-red-500" />
+                Reset Sync
+              </Button>
+              <Button 
+                size="sm"
+                className="flex-1" 
+                disabled={true}>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Syncing...
-              </>
-            ) : (
-              "Run Sync Now"
-            )}
-          </Button>
+              </Button>
+            </div>
+          ) : (
+            <Button 
+              size="sm"
+              className="w-full mt-2" 
+              onClick={handleManualSync}
+              disabled={!isConnected}>
+              Run Sync Now
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
