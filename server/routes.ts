@@ -962,6 +962,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Debug endpoint to fetch sample products directly from Shopify with cost prices
+  app.get("/api/shopify/sample-products", asyncHandler(async (req, res) => {
+    try {
+      const user = await storage.getUser(1); // Simplified: using first user
+      
+      if (!user || !user.shopifyApiKey || !user.shopifyApiSecret || !user.shopifyStoreUrl) {
+        res.status(400).json({ error: "Shopify settings not configured" });
+        return;
+      }
+      
+      // Fetch a sample of products directly from Shopify for debugging
+      const sampleProducts = await shopifyClient.getSampleProducts(
+        user.shopifyApiKey,
+        user.shopifyApiSecret,
+        user.shopifyStoreUrl
+      );
+      
+      // Get corresponding products from the database to compare
+      const skus = sampleProducts.map(p => p.sku).filter(Boolean);
+      const dbProducts = skus.length > 0 ? await storage.getProductsBySku(skus) : [];
+      
+      // Add database info to the response
+      const response = {
+        shopifyProducts: sampleProducts,
+        databaseProducts: dbProducts,
+        comparison: sampleProducts.map(shopifyProduct => {
+          const dbProduct = dbProducts.find(p => p.sku === shopifyProduct.sku);
+          return {
+            sku: shopifyProduct.sku,
+            title: shopifyProduct.title,
+            shopifyCostPrice: shopifyProduct.costPrice,
+            dbCostPrice: dbProduct?.costPrice,
+            match: dbProduct ? dbProduct.costPrice === shopifyProduct.costPrice : false
+          };
+        })
+      };
+      
+      res.json(response);
+    } catch (error: any) {
+      console.error("Error fetching sample products:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch Shopify products" });
+    }
+  }));
+  
   // Get Shopify sync progress
   app.get("/api/shopify/sync-progress", asyncHandler(async (req, res) => {
     try {

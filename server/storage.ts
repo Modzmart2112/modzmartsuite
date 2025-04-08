@@ -10,7 +10,7 @@ import {
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
-import { eq, desc, and, asc, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, asc, isNotNull, sql, inArray } from "drizzle-orm";
 
 // Define the storage interface
 export interface IStorage {
@@ -837,13 +837,27 @@ export class DatabaseStorage implements IStorage {
     // Using case-insensitive matching for multiple SKUs
     if (skus.length === 0) return [];
     
-    // Normalize all the SKUs by trimming and converting to uppercase
-    const normalizedSkus = skus.map(sku => sku.trim().toUpperCase());
-    
-    // Build a query that uses UPPER() function for case-insensitive matching
-    return await db.select()
-      .from(products)
-      .where(sql`UPPER(${products.sku}) IN (${sql.join(normalizedSkus)})`);
+    try {
+      console.log(`Fetching products by SKUs: ${skus.join(', ')}`);
+      
+      // Need to use a SQL expression directly since we need to normalize the SKUs case-insensitively
+      const normalizedSkus = skus.map(sku => sku.trim().toUpperCase());
+      
+      // Generate placeholders and parameter values for the SQL query
+      const placeholders = normalizedSkus.map((_, i) => `$${i + 1}`).join(', ');
+      const query = `
+        SELECT * FROM products 
+        WHERE UPPER(sku) IN (${placeholders})
+      `;
+      
+      // Execute with normalized SKUs as parameters
+      const result = await db.execute(query, normalizedSkus);
+      
+      return result.rows as Product[];
+    } catch (error) {
+      console.error('Error fetching products by SKU:', error);
+      return [];
+    }
   }
 
   async getProductById(id: number): Promise<Product | undefined> {
@@ -965,97 +979,85 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {
-    let query = db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        title: products.title,
-        description: products.description,
-        shopifyId: products.shopifyId,
-        shopifyPrice: products.shopifyPrice,
-        costPrice: products.costPrice,  // Explicitly include costPrice
-        supplierUrl: products.supplierUrl,
-        supplierPrice: products.supplierPrice,
-        lastScraped: products.lastScraped,
-        lastChecked: products.lastChecked,
-        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
-        createdAt: products.createdAt,
-        updatedAt: products.updatedAt,
-        status: products.status,
-        images: products.images,
-        vendor: products.vendor,
-        productType: products.productType,
-        onSale: products.onSale,
-        originalPrice: products.originalPrice,
-        saleEndDate: products.saleEndDate,
-        saleId: products.saleId
-      })
-      .from(products)
-      .where(eq(products.vendor, vendor))
-      .orderBy(asc(products.title));
-    
-    if (limit !== undefined && offset !== undefined) {
-      query = query.limit(limit).offset(offset);
+    try {
+      console.log(`Getting products for vendor: ${vendor}, limit: ${limit}, offset: ${offset}`);
+      
+      // Build query parts
+      let queryStr = `SELECT * FROM products WHERE vendor = $1 ORDER BY title ASC`;
+      const queryParams = [vendor];
+      
+      // Add pagination if needed
+      if (limit !== undefined && offset !== undefined) {
+        queryStr += ` LIMIT $2 OFFSET $3`;
+        queryParams.push(limit, offset);
+      }
+      
+      // Execute raw query
+      const result = await db.execute(queryStr, queryParams);
+      return result.rows as Product[];
+    } catch (error) {
+      console.error(`Error fetching products for vendor ${vendor}:`, error);
+      return [];
     }
-    
-    return await query;
   }
   
   async getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]> {
-    let query = db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        title: products.title,
-        description: products.description,
-        shopifyId: products.shopifyId,
-        shopifyPrice: products.shopifyPrice,
-        costPrice: products.costPrice,  // Explicitly include costPrice
-        supplierUrl: products.supplierUrl,
-        supplierPrice: products.supplierPrice,
-        lastScraped: products.lastScraped,
-        lastChecked: products.lastChecked,
-        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
-        createdAt: products.createdAt,
-        updatedAt: products.updatedAt,
-        status: products.status,
-        images: products.images,
-        vendor: products.vendor,
-        productType: products.productType,
-        onSale: products.onSale,
-        originalPrice: products.originalPrice,
-        saleEndDate: products.saleEndDate,
-        saleId: products.saleId
-      })
-      .from(products)
-      .where(eq(products.productType, productType))
-      .orderBy(asc(products.title));
-    
-    if (limit !== undefined && offset !== undefined) {
-      query = query.limit(limit).offset(offset);
+    try {
+      console.log(`Getting products for product type: ${productType}, limit: ${limit}, offset: ${offset}`);
+      
+      // Build query parts
+      let queryStr = `SELECT * FROM products WHERE product_type = $1 ORDER BY title ASC`;
+      const queryParams = [productType];
+      
+      // Add pagination if needed
+      if (limit !== undefined && offset !== undefined) {
+        queryStr += ` LIMIT $2 OFFSET $3`;
+        queryParams.push(limit, offset);
+      }
+      
+      // Execute raw query
+      const result = await db.execute(queryStr, queryParams);
+      return result.rows as Product[];
+    } catch (error) {
+      console.error(`Error fetching products for product type ${productType}:`, error);
+      return [];
     }
-    
-    return await query;
   }
   
   async getVendors(): Promise<string[]> {
-    const vendorsQuery = await db
-      .selectDistinct({ vendor: products.vendor })
-      .from(products)
-      .where(isNotNull(products.vendor))
-      .orderBy(asc(products.vendor));
-    
-    return vendorsQuery.map(v => v.vendor).filter(Boolean) as string[];
+    try {
+      const query = `
+        SELECT DISTINCT vendor 
+        FROM products 
+        WHERE vendor IS NOT NULL AND vendor != '' 
+        ORDER BY vendor ASC
+      `;
+      
+      const result = await db.execute(query);
+      // Map the result rows to just return the vendor strings
+      return result.rows.map(row => row.vendor).filter(Boolean) as string[];
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      return [];
+    }
   }
   
   async getProductTypes(): Promise<string[]> {
-    const typesQuery = await db
-      .selectDistinct({ productType: products.productType })
-      .from(products)
-      .where(isNotNull(products.productType))
-      .orderBy(asc(products.productType));
-    
-    return typesQuery.map(t => t.productType).filter(Boolean) as string[];
+    try {
+      const query = `
+        SELECT DISTINCT product_type 
+        FROM products 
+        WHERE product_type IS NOT NULL AND product_type != '' 
+        ORDER BY product_type ASC
+      `;
+      
+      const result = await db.execute(query);
+      // Map the result rows to just return the product_type strings
+      return result.rows.map(row => row.product_type).filter(Boolean) as string[];
+    } catch (error) {
+      console.error('Error fetching product types:', error);
+      return [];
+    }
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
@@ -1163,51 +1165,41 @@ export class DatabaseStorage implements IStorage {
   
   // Search operations
   async searchProducts(query: string, limit: number, offset: number): Promise<Product[]> {
-    const searchTerm = `%${query.trim()}%`;
-    
-    return await db.select({
-      id: products.id,
-      sku: products.sku,
-      title: products.title,
-      description: products.description,
-      shopifyId: products.shopifyId,
-      shopifyPrice: products.shopifyPrice,
-      costPrice: products.costPrice,  // Explicitly include costPrice
-      supplierUrl: products.supplierUrl,
-      supplierPrice: products.supplierPrice,
-      lastScraped: products.lastScraped,
-      lastChecked: products.lastChecked,
-      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-      status: products.status,
-      images: products.images,
-      vendor: products.vendor,
-      productType: products.productType,
-      onSale: products.onSale,
-      originalPrice: products.originalPrice,
-      saleEndDate: products.saleEndDate,
-      saleId: products.saleId
-    })
-      .from(products)
-      .where(
-        sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm}) OR LOWER(${products.title}) LIKE LOWER(${searchTerm})`
-      )
-      .orderBy(desc(products.id))
-      .limit(limit)
-      .offset(offset);
+    try {
+      const searchTerm = `%${query.trim()}%`;
+      
+      // Direct SQL approach
+      const sqlQuery = `
+        SELECT * FROM products
+        WHERE LOWER(sku) LIKE LOWER($1) OR LOWER(title) LIKE LOWER($1)
+        ORDER BY id DESC
+        LIMIT $2 OFFSET $3
+      `;
+      
+      const result = await db.execute(sqlQuery, [searchTerm, limit, offset]);
+      return result.rows as Product[];
+    } catch (error) {
+      console.error('Error searching products:', error);
+      return [];
+    }
   }
   
   async searchProductCount(query: string): Promise<number> {
-    const searchTerm = `%${query.trim()}%`;
-    
-    const result = await db.select({ count: sql`count(*)` })
-      .from(products)
-      .where(
-        sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm}) OR LOWER(${products.title}) LIKE LOWER(${searchTerm})`
-      );
+    try {
+      const searchTerm = `%${query.trim()}%`;
       
-    return Number(result[0].count);
+      // Direct SQL count query
+      const sqlQuery = `
+        SELECT COUNT(*) as count FROM products
+        WHERE LOWER(sku) LIKE LOWER($1) OR LOWER(title) LIKE LOWER($1)
+      `;
+      
+      const result = await db.execute(sqlQuery, [searchTerm]);
+      return Number(result.rows[0].count);
+    } catch (error) {
+      console.error('Error counting search results:', error);
+      return 0;
+    }
   }
 
   // Price history operations

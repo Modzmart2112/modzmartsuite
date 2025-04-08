@@ -81,6 +81,89 @@ class ShopifyClient {
     }
   }
   
+  // Get a sample of products directly from Shopify for debugging
+  async getSampleProducts(apiKey: string, apiSecret: string, storeUrl: string): Promise<any[]> {
+    try {
+      const products = [];
+      const limit = 10; // Only fetch 10 products for the sample
+      
+      const baseUrl = this.buildApiUrl(storeUrl);
+      const url = `${baseUrl}/products.json?limit=${limit}`;
+      
+      log(`Fetching sample products from Shopify: ${url}`, 'shopify-api');
+      
+      // Use our rate-limited fetch
+      const response = await fetch(url, {
+        headers: this.buildHeaders(apiSecret)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Shopify API returned ${response.status}`);
+      }
+      
+      const data = await response.json() as { products: any[] };
+      
+      // Process products to get inventory items with cost prices
+      for (const product of data.products) {
+        for (const variant of product.variants) {
+          // Get inventory item ID to fetch cost
+          const inventoryItemId = variant.inventory_item_id;
+          let costPrice = null;
+          let rawInventoryData = null;
+          
+          if (inventoryItemId) {
+            try {
+              // Fetch the inventory item to get cost
+              log(`Debug: Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`, 'shopify-api');
+              const inventoryUrl = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
+              
+              // Add delay between inventory requests
+              await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
+              
+              const inventoryResponse = await fetch(inventoryUrl, {
+                headers: this.buildHeaders(apiSecret)
+              });
+              
+              if (inventoryResponse.ok) {
+                const inventoryData = await inventoryResponse.json();
+                rawInventoryData = inventoryData;
+                
+                // Extract cost from inventory_item
+                if (inventoryData && inventoryData.inventory_item) {
+                  costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
+                  log(`Debug: Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
+                }
+              }
+            } catch (error) {
+              log(`Debug: Failed to fetch cost for inventory item ${inventoryItemId}: ${error}`, 'shopify-api');
+            }
+          }
+          
+          products.push({
+            id: variant.id.toString(),
+            title: `${product.title} - ${variant.title !== 'Default Title' ? variant.title : ''}`.trim(),
+            sku: variant.sku || "",
+            price: parseFloat(variant.price) || 0,
+            cost: costPrice,
+            costPrice: costPrice, // Add both variants to debug
+            rawInventoryData, // Include raw data for debugging
+            images: product.images?.map((img: any) => img.src) || [],
+            vendor: product.vendor || "",
+            productType: product.product_type || ""
+          });
+          
+          // Only get first variant to keep the response size manageable
+          break;
+        }
+      }
+      
+      return products;
+    } catch (error) {
+      log("Error fetching Shopify sample products: " + error, 'shopify-api');
+      throw error;
+    }
+  }
+  
   // Get all products from Shopify
   async getAllProducts(apiKey: string, apiSecret: string, storeUrl: string): Promise<any[]> {
     try {
