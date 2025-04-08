@@ -132,8 +132,8 @@ export function ProductList({
       if (jsonData.products && jsonData.products.length > 0) {
         console.log('Product sample cost price check: ');
         console.log('\tFirst product SKU:', jsonData.products[0].sku);
-        console.log('\tCost price:', jsonData.products[0].cost_price);
-        console.log('\tCost price type:', typeof jsonData.products[0].cost_price);
+        console.log('\tCost price:', jsonData.products[0].costPrice);
+        console.log('\tCost price type:', typeof jsonData.products[0].costPrice);
         console.log('\tAll properties:', Object.keys(jsonData.products[0]).join(', '));
       }
       
