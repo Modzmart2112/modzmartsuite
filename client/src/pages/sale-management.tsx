@@ -558,7 +558,7 @@ const SaleManagementPage: React.FC = () => {
         }
         setIsCreateDialogOpen(open);
       }}>
-        <DialogContent className={createStep === 'select-products' ? "sm:max-w-[900px] max-h-[80vh] overflow-y-auto" : "sm:max-w-[500px]"}>
+        <DialogContent className={createStep === 'select-products' ? "sm:max-w-full w-[90vw] max-h-[80vh] overflow-y-auto" : "sm:max-w-full w-[90vw]"}>
           <DialogHeader>
             <DialogTitle>
               {createStep === 'select-products' && 'Select Products or Vendor for Sale'}
@@ -913,7 +913,7 @@ const SaleManagementPage: React.FC = () => {
 
       {/* Campaign Details Dialog */}
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-full w-[90vw]">
           <DialogHeader>
             <DialogTitle>Campaign Details</DialogTitle>
             <DialogDescription>
@@ -1066,7 +1066,7 @@ const SaleManagementPage: React.FC = () => {
 
       {/* Add Target Dialog */}
       <Dialog open={isAddTargetDialogOpen} onOpenChange={setIsAddTargetDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-full w-[90vw]">
           <DialogHeader>
             <DialogTitle>Add Campaign Target</DialogTitle>
             <DialogDescription>
