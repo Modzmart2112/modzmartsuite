@@ -1288,19 +1288,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(syncProgress);
   }));
   
-  // Reset any stuck Shopify sync
+  // Enhanced reset for any stuck Shopify sync - completely fresh start
   app.post("/api/scheduler/reset-shopify-sync", asyncHandler(async (req, res) => {
     try {
-      // Reset the sync progress by marking it as completed
-      await storage.updateShopifySyncProgress({
-        status: "complete",
-        completedAt: new Date(),
-        message: "Sync was manually reset"
-      });
+      // STEP 1: Force-mark any existing sync as complete
+      const existingSync = await storage.getShopifySyncProgress();
+      if (existingSync) {
+        console.log(`[shopify-sync] Resetting sync ID ${existingSync.id} from ${existingSync.status} state`);
+        await storage.updateShopifySyncProgress({
+          id: existingSync.id,
+          status: "complete",
+          completedAt: new Date(),
+          message: "Sync was manually reset by user"
+        });
+      }
+      
+      // STEP 2: Create a completely fresh sync record with pending status
+      const newSync = await storage.initializeShopifySyncProgress();
+      console.log(`[shopify-sync] Created fresh sync record with ID ${newSync.id} in 'pending' state`);
       
       res.json({
         success: true,
-        message: "Shopify sync status has been reset"
+        message: "Shopify sync completely reset with fresh start",
+        details: {
+          previousSyncId: existingSync?.id,
+          newSyncId: newSync.id
+        }
       });
     } catch (error) {
       console.error("Error resetting Shopify sync:", error);

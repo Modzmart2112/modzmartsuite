@@ -198,35 +198,45 @@ export function ShopifySyncStatus() {
     }
   };
   
-  // Handle reset for stuck sync
+  // Handle complete reset for stuck sync - forces a fresh start
   const handleResetSync = async () => {
     try {
-      const response = await fetch("/api/scheduler/reset-shopify-sync", {
-        method: "POST",
-      });
-      
-      if (response.ok) {
-        toast({
-          title: "Sync Reset Complete",
-          description: "Shopify sync has been reset successfully",
+      // Show confirmation toast before proceeding
+      if (confirm('This will completely reset the sync process and create a fresh start. Continue?')) {
+        const response = await fetch("/api/scheduler/reset-shopify-sync", {
+          method: "POST",
         });
         
-        setCostPriceLogs([]);
-        refetch();
-        syncProgressQuery.refetch();
-      } else {
-        const errorData = await response.json();
-        toast({
-          title: "Reset Failed",
-          description: errorData?.message || "Could not reset Shopify sync",
-          variant: "destructive",
-        });
+        if (response.ok) {
+          const data = await response.json();
+          toast({
+            title: "Complete Reset Successful",
+            description: "Created fresh sync record. Ready for new start.",
+          });
+          
+          // Clear all UI state
+          setCostPriceLogs([]);
+          
+          // Refresh data
+          setTimeout(() => {
+            refetch();
+            syncProgressQuery.refetch();
+            console.log("Sync fully reset - fresh ID created:", data?.details?.newSyncId);
+          }, 500);
+        } else {
+          const errorData = await response.json();
+          toast({
+            title: "Reset Failed",
+            description: errorData?.message || "Could not reset Shopify sync",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error) {
-      console.error("Error resetting sync:", error);
+      console.error("Error performing complete reset:", error);
       toast({
-        title: "Error",
-        description: "An error occurred while resetting sync status",
+        title: "Reset Error",
+        description: "An error occurred during the complete reset process",
         variant: "destructive",
       });
     }
@@ -535,8 +545,8 @@ export function ShopifySyncStatus() {
                 onClick={handleResetSync}
                 className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-red-900 dark:hover:bg-red-950"
               >
-                <XCircle className="h-4 w-4 mr-1.5" />
-                Cancel Sync
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+                Complete Reset
               </Button>
             </div>
           </div>

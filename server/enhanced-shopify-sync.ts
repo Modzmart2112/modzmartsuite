@@ -41,8 +41,22 @@ function log(message: string, category = 'shopify-sync'): void {
  * and enhanced status reporting for the new UI
  */
 export async function enhancedSyncShopifyProducts(): Promise<void> {
-  // Start with clean state
+  // *** COMPLETE RESET - Force a complete fresh start ***
+  // First, manually mark any existing sync as complete to prevent resuming
+  const existingSync = await storage.getShopifySyncProgress();
+  if (existingSync && (existingSync.status === 'in-progress' || existingSync.status === 'pending')) {
+    log(`Found existing sync in ${existingSync.status} state - marking as complete to prevent resuming`);
+    await storage.updateShopifySyncProgress({
+      id: existingSync.id,
+      status: "complete",
+      completedAt: new Date(),
+      message: "Previous sync marked as complete before starting new sync"
+    });
+  }
+  
+  // Now create a completely fresh sync with a clean slate
   let syncProgress = await storage.initializeShopifySyncProgress();
+  log(`Starting brand new sync with ID ${syncProgress.id} - guaranteed fresh start`);
   const startTime = Date.now();
   
   try {
