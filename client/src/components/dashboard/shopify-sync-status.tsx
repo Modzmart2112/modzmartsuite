@@ -299,8 +299,49 @@ export function ShopifySyncStatus() {
                 <span className="font-medium text-blue-500">Sync in progress</span>
                 <span>
                   {/* Simplified counter that just shows processed items */}
-                  {processedItems} items processed
+                  {processedItems} / {totalItems} items
                 </span>
+              </div>
+              
+              {/* 3-Step Sync Process Tracker */}
+              <div className="mt-3 pt-2 border-t border-gray-200">
+                <div className="flex items-center text-xs font-medium mb-1.5">
+                  <span className={`h-2 w-2 rounded-full mr-1.5 ${
+                    syncProgress?.message?.includes("Counting") 
+                      ? "bg-blue-500 animate-pulse" 
+                      : "bg-green-500"
+                  }`}></span>
+                  <span className={syncProgress?.message?.includes("Counting") ? "text-blue-600" : ""}>
+                    Step 1: Counting products
+                  </span>
+                </div>
+                <div className="flex items-center text-xs font-medium mb-1.5">
+                  <span className={`h-2 w-2 rounded-full mr-1.5 ${
+                    syncProgress?.message?.includes("Processing") && !syncProgress?.message?.includes("Counting")
+                      ? "bg-blue-500 animate-pulse" 
+                      : (syncProgress?.status === "complete" || processedItems > 0 ? "bg-green-500" : "bg-gray-300")
+                  }`}></span>
+                  <span className={syncProgress?.message?.includes("Processing") && !syncProgress?.message?.includes("Counting") ? "text-blue-600" : ""}>
+                    Step 2: Processing with ETA
+                  </span>
+                  
+                  {/* Show ETA if available in details */}
+                  {syncProgress?.details?.estimatedCompletionTime && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (ETA: {format(new Date(syncProgress.details.estimatedCompletionTime), "h:mm a")})
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center text-xs font-medium mb-1.5">
+                  <span className={`h-2 w-2 rounded-full mr-1.5 ${
+                    syncProgress?.status === "complete" 
+                      ? "bg-green-500" 
+                      : "bg-gray-300"
+                  }`}></span>
+                  <span className={syncProgress?.status === "complete" ? "text-blue-600" : ""}>
+                    Step 3: Completing
+                  </span>
+                </div>
               </div>
               
               {/* Cost Price Live Feed */}

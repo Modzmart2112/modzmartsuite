@@ -8,6 +8,11 @@
  * 3. Using batch processing where possible
  * 4. Providing better progress tracking
  * 5. Ensuring clean termination when complete
+ * 
+ * The sync process has 3 clear steps:
+ * Step 1: Count total products needing to be synced
+ * Step 2: Process products with ETA on completion
+ * Step 3: Complete the sync and wait for manual restart
  */
 
 import { shopifyClient } from './shopify';
@@ -15,8 +20,10 @@ import { storage } from './storage';
 import { log } from './vite';
 import { logCostPrice } from './cost-logger';
 
-// Constants for time calculations
+// Constants for time calculations and batch processing
 const AVERAGE_PROCESSING_TIME_MS = 500; // Estimated time to process one product
+const BATCH_SIZE = 50; // Number of products to process in each batch
+const BATCH_DELAY_MS = 1000; // Delay between batches to avoid rate limits
 
 /**
  * Improved Shopify sync implementation
@@ -156,84 +163,101 @@ export async function improvedSyncShopifyProducts(): Promise<void> {
     let failedCount = 0;
     let startTime = Date.now();
     
-    // Process each product
-    for (const shopifyProduct of shopifyProducts) {
-      try {
-        // Skip products without SKUs
-        if (!shopifyProduct.sku) {
-          log(`Skipping product without SKU: ${shopifyProduct.title}`, "shopify-sync");
-          processedCount++;
-          failedCount++;
-          continue;
-        }
-        
-        // Look for existing product in the database
-        const existingProduct = await storage.getProductBySku(shopifyProduct.sku);
-        
-        // Prepare product data
-        const productData = {
-          sku: shopifyProduct.sku,
-          title: shopifyProduct.title,
-          shopifyId: shopifyProduct.productId || null,
-          shopifyPrice: shopifyProduct.price || 0,
-          vendor: shopifyProduct.vendor || "",
-          status: "active",
-          productType: shopifyProduct.productType || "",
-          costPrice: shopifyProduct.cost || null,
-          images: Array.isArray(shopifyProduct.images) ? shopifyProduct.images : []
-        };
-        
-        // Update or create product
-        if (existingProduct) {
-          log(`Updating product ${shopifyProduct.sku}`, "shopify-sync");
-          await storage.updateProduct(existingProduct.id, productData);
-        } else {
-          log(`Creating new product ${shopifyProduct.sku}`, "shopify-sync");
-          await storage.createProduct(productData);
-        }
-        
-        // Log cost price if available
-        if (shopifyProduct.cost) {
-          logCostPrice(shopifyProduct.sku, shopifyProduct.cost);
-        }
-        
-        successCount++;
-      } catch (error) {
-        log(`Error processing product ${shopifyProduct.sku}: ${error}`, "shopify-sync");
-        failedCount++;
-      } finally {
-        // Update counters
-        processedCount++;
-        
-        // Update progress percentage and ETA
-        const elapsedTimeMs = Date.now() - startTime;
-        const averageTimePerItem = elapsedTimeMs / processedCount;
-        const remainingItems = uniqueVariantCount - processedCount;
-        const estimatedRemainingTimeMs = remainingItems * averageTimePerItem;
-        const estimatedCompletionDate = new Date(Date.now() + estimatedRemainingTimeMs);
-        const percentage = Math.round((processedCount / uniqueVariantCount) * 100);
-        
-        // Update progress every 10 items or at specific percentage milestones
-        if (processedCount % 10 === 0 || 
-            percentage % 5 === 0 || 
-            processedCount === uniqueVariantCount) {
-          await storage.updateShopifySyncProgress({
-            processedItems: processedCount,
-            successItems: successCount,
-            failedItems: failedCount,
-            message: `Processed ${processedCount} of ${uniqueVariantCount} products`,
-            details: {
-              uniqueProductCount: uniqueProductIds.size,
-              estimatedCompletionTime: estimatedCompletionDate.toISOString(),
-              percentage,
-              isEstimate: false,
-              elapsedTime: elapsedTimeMs,
-              averageTimePerItem
-            }
-          });
+    // Process products in batches for better performance
+    const processBatch = async (productsToProcess: any[]) => {
+      for (const shopifyProduct of productsToProcess) {
+        try {
+          // Skip products without SKUs
+          if (!shopifyProduct.sku) {
+            log(`Skipping product without SKU: ${shopifyProduct.title}`, "shopify-sync");
+            processedCount++;
+            failedCount++;
+            continue;
+          }
           
-          log(`Progress: ${processedCount}/${uniqueVariantCount} items (${percentage}%)`, "shopify-sync");
+          // Look for existing product in the database
+          const existingProduct = await storage.getProductBySku(shopifyProduct.sku);
+          
+          // Prepare product data
+          const productData = {
+            sku: shopifyProduct.sku,
+            title: shopifyProduct.title,
+            shopifyId: shopifyProduct.productId || null,
+            shopifyPrice: shopifyProduct.price || 0,
+            vendor: shopifyProduct.vendor || "",
+            status: "active",
+            productType: shopifyProduct.productType || "",
+            costPrice: shopifyProduct.cost || null,
+            images: Array.isArray(shopifyProduct.images) ? shopifyProduct.images : []
+          };
+          
+          // Update or create product
+          if (existingProduct) {
+            log(`Updating product ${shopifyProduct.sku}`, "shopify-sync");
+            await storage.updateProduct(existingProduct.id, productData);
+          } else {
+            log(`Creating new product ${shopifyProduct.sku}`, "shopify-sync");
+            await storage.createProduct(productData);
+          }
+          
+          // Log cost price if available
+          if (shopifyProduct.cost) {
+            logCostPrice(shopifyProduct.sku, shopifyProduct.cost);
+          }
+          
+          successCount++;
+        } catch (error) {
+          log(`Error processing product ${shopifyProduct.sku}: ${error}`, "shopify-sync");
+          failedCount++;
+        } finally {
+          // Update counters
+          processedCount++;
+          
+          // Update progress percentage and ETA
+          const elapsedTimeMs = Date.now() - startTime;
+          const averageTimePerItem = elapsedTimeMs / processedCount;
+          const remainingItems = uniqueVariantCount - processedCount;
+          const estimatedRemainingTimeMs = remainingItems * averageTimePerItem;
+          const estimatedCompletionDate = new Date(Date.now() + estimatedRemainingTimeMs);
+          const percentage = Math.round((processedCount / uniqueVariantCount) * 100);
+          
+          // Update progress every 10 items or at specific percentage milestones
+          if (processedCount % 10 === 0 || 
+              percentage % 5 === 0 || 
+              processedCount === uniqueVariantCount) {
+            await storage.updateShopifySyncProgress({
+              processedItems: processedCount,
+              successItems: successCount,
+              failedItems: failedCount,
+              message: `Processing products: ${processedCount} of ${uniqueVariantCount} items processed so far`,
+              details: {
+                uniqueProductCount: uniqueProductIds.size,
+                estimatedCompletionTime: estimatedCompletionDate.toISOString(),
+                percentage,
+                isEstimate: false,
+                elapsedTime: elapsedTimeMs,
+                averageTimePerItem
+              }
+            });
+            
+            log(`Progress: ${processedCount}/${uniqueVariantCount} items (${percentage}%)`, "shopify-sync");
+          }
         }
+      }
+    };
+
+    // Split products into batches and process them
+    for (let i = 0; i < shopifyProducts.length; i += BATCH_SIZE) {
+      const batch = shopifyProducts.slice(i, i + BATCH_SIZE);
+      log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(shopifyProducts.length / BATCH_SIZE)}`, "shopify-sync");
+      
+      // Process this batch
+      await processBatch(batch);
+      
+      // Add a delay between batches to avoid rate limits
+      if (i + BATCH_SIZE < shopifyProducts.length) {
+        log(`Pausing for ${BATCH_DELAY_MS}ms before next batch...`, "shopify-sync");
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
       }
     }
     
