@@ -22,12 +22,13 @@ import { shopifyClient } from './shopify';
 import { logCostPrice } from './cost-logger';
 
 // Configuration
-const BATCH_SIZE = 10; // Smaller batches for more frequent UI updates
-const BATCH_DELAY_MS = 500; // Delay between batches to respect rate limits
+const BATCH_SIZE = 50; // Increased batch size for better performance (was 10)
+const BATCH_DELAY_MS = 100; // Reduced delay between batches for faster processing (was 500ms)
 const MAX_RETRIES = 3; // Maximum retries for failed operations
 const STATUS_UPDATE_INTERVAL = 1; // Update DB status after EVERY batch for more granular progress
 const PROGRESS_UPDATE_THRESHOLD = 1; // Update progress after every 1% change for smoother tracking
 const COST_CAPTURE_ENABLED = true; // Enable cost price capture and display
+const PARALLEL_REQUESTS = 5; // Number of parallel API requests to run
 
 // Enhanced logging helper with categories
 function log(message: string, category = 'shopify-sync'): void {
@@ -518,115 +519,27 @@ async function processBatch(products: any[]): Promise<{
   // Track unique SKUs to count them accurately
   const processedSkus = new Set<string>();
   
-  // Process each product individually with a tiny delay to prevent instant processing appearance
-  for (const product of products) {
-    try {
-      // Add a tiny delay between each product to prevent the app from appearing
-      // to process hundreds of products instantly
-      await new Promise(resolve => setTimeout(resolve, 5)); // 5ms delay is nearly imperceptible
-      
-      // Skip products without required fields
-      if (!product.sku || !product.title || !product.shopifyId) {
-        failed++;
-        continue;
-      }
-      
-      // Add this SKU to our set of processed SKUs
-      processedSkus.add(product.sku);
-      
-      // Check if the product already exists in our database
-      let existingProduct = await storage.getProductBySku(product.sku);
-      
-      if (existingProduct) {
-        // Update existing product
-        await storage.updateProduct(existingProduct.id, {
-          title: product.title,
-          description: product.description || existingProduct.description,
-          shopifyPrice: product.price,
-          status: product.status || 'active'
-        });
-        
-        // Log successful update with product count and current sync ID - important for progress tracking
-        const currentSyncId = await getCurrentSyncId();
-        log(`Successfully updated product ${existingProduct.id} [SyncID: ${currentSyncId}]`);
-        
-        // Get cost price if available - improved error handling and retry logic
-        if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
-          try {
-            const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
-            
-            if (costPrice !== null && costPrice > 0) {
-              // Get current sync ID for consistent tag format
-              const currentSyncId = await getCurrentSyncId();
-              
-              // Use consistent format for log message with SyncID tag at the end
-              const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
-              log(logMessage);
-              
-              // Log cost price for UI display - use the exact same format for consistency
-              await logCostPrice(product.sku, costPrice, logMessage);
-              
-              // Update cost price in database
-              await storage.updateProduct(existingProduct.id, {
-                costPrice
-              });
-            }
-          } catch (err) {
-            log(`Error getting cost price for ${product.sku}: ${err}`, 'shopify-sync-error');
-            // Continue processing - cost price errors are non-fatal
-          }
-        }
-        
+  // Create chunks for parallel processing
+  const chunks: any[][] = [];
+  
+  // Split products into chunks for parallel processing
+  for (let i = 0; i < products.length; i += PARALLEL_REQUESTS) {
+    chunks.push(products.slice(i, i + PARALLEL_REQUESTS));
+  }
+  
+  // Process each chunk with parallel execution
+  for (const chunk of chunks) {
+    const results = await Promise.all(
+      chunk.map(product => processProduct(product, processedSkus))
+    );
+    
+    // Count success and failures
+    for (const result of results) {
+      if (result.success) {
         success++;
       } else {
-        // Create new product
-        const newProduct = await storage.createProduct({
-          sku: product.sku,
-          title: product.title,
-          description: product.description || null,
-          shopifyId: product.shopifyId,
-          shopifyPrice: product.price,
-          status: product.status || 'active',
-          vendor: product.vendor || null,
-          productType: product.productType || null
-        });
-        
-        // Log successful creation with product count and current sync ID - important for progress tracking
-        const currentSyncId = await getCurrentSyncId();
-        log(`Successfully updated product ${newProduct.id} [SyncID: ${currentSyncId}]`);
-        
-        // Get cost price if available
-        if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
-          try {
-            const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
-            
-            if (costPrice !== null && costPrice > 0) {
-              // Get current sync ID for consistent tag format
-              const currentSyncId = await getCurrentSyncId();
-              
-              // Use consistent format for log message with SyncID tag at the end
-              const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
-              log(logMessage);
-              
-              // Log cost price for UI display - use the exact same format for consistency
-              await logCostPrice(product.sku, costPrice, logMessage);
-              
-              // Update cost price in database
-              await storage.updateProduct(newProduct.id, {
-                costPrice
-              });
-            }
-          } catch (err) {
-            log(`Error getting cost price for ${product.sku}: ${err}`, 'shopify-sync-error');
-            // Continue processing - cost price errors are non-fatal
-          }
-        }
-        
-        success++;
+        failed++;
       }
-    } catch (error) {
-      log(`Error processing product ${product.sku || 'unknown'}: ${error}`, 'shopify-sync-error');
-      failed++;
     }
   }
   
@@ -639,6 +552,117 @@ async function processBatch(products: any[]): Promise<{
     success,
     failed
   };
+}
+
+/**
+ * Process a single product with proper error handling
+ * This helper function enables parallel processing
+ */
+async function processProduct(product: any, processedSkus: Set<string>): Promise<{ success: boolean }> {
+  try {
+    // Skip products without required fields
+    if (!product.sku || !product.title || !product.shopifyId) {
+      return { success: false };
+    }
+    
+    // Add this SKU to our set of processed SKUs
+    processedSkus.add(product.sku);
+    
+    // Check if the product already exists in our database
+    let existingProduct = await storage.getProductBySku(product.sku);
+    
+    if (existingProduct) {
+      // Update existing product
+      await storage.updateProduct(existingProduct.id, {
+        title: product.title,
+        description: product.description || existingProduct.description,
+        shopifyPrice: product.price,
+        status: product.status || 'active'
+      });
+      
+      // Log successful update with product count and current sync ID - important for progress tracking
+      const currentSyncId = await getCurrentSyncId();
+      log(`Successfully updated product ${existingProduct.id} [SyncID: ${currentSyncId}]`);
+      
+      // Get cost price if available - improved error handling and retry logic
+      if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
+        try {
+          const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
+          
+          if (costPrice !== null && costPrice > 0) {
+            // Get current sync ID for consistent tag format
+            const currentSyncId = await getCurrentSyncId();
+            
+            // Use consistent format for log message with SyncID tag at the end
+            const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+            log(logMessage);
+            
+            // Log cost price for UI display - use the exact same format for consistency
+            await logCostPrice(product.sku, costPrice, logMessage);
+            
+            // Update cost price in database
+            await storage.updateProduct(existingProduct.id, {
+              costPrice
+            });
+          }
+        } catch (err) {
+          log(`Error getting cost price for ${product.sku}: ${err}`, 'shopify-sync-error');
+          // Continue processing - cost price errors are non-fatal
+        }
+      }
+      
+      return { success: true };
+    } else {
+      // Create new product
+      const newProduct = await storage.createProduct({
+        sku: product.sku,
+        title: product.title,
+        description: product.description || null,
+        shopifyId: product.shopifyId,
+        shopifyPrice: product.price,
+        status: product.status || 'active',
+        vendor: product.vendor || null,
+        productType: product.productType || null
+      });
+      
+      // Log successful creation with product count and current sync ID - important for progress tracking
+      const currentSyncId = await getCurrentSyncId();
+      log(`Successfully updated product ${newProduct.id} [SyncID: ${currentSyncId}]`);
+      
+      // Get cost price if available
+      if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
+        try {
+          const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
+          
+          if (costPrice !== null && costPrice > 0) {
+            // Get current sync ID for consistent tag format
+            const currentSyncId = await getCurrentSyncId();
+            
+            // Use consistent format for log message with SyncID tag at the end
+            const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+            log(logMessage);
+            
+            // Log cost price for UI display - use the exact same format for consistency
+            await logCostPrice(product.sku, costPrice, logMessage);
+            
+            // Update cost price in database
+            await storage.updateProduct(newProduct.id, {
+              costPrice
+            });
+          }
+        } catch (err) {
+          log(`Error getting cost price for ${product.sku}: ${err}`, 'shopify-sync-error');
+          // Continue processing - cost price errors are non-fatal
+        }
+      }
+      
+      return { success: true };
+    }
+  } catch (error) {
+    log(`Error processing product ${product?.sku || 'unknown'}: ${error}`, 'shopify-sync-error');
+    return { success: false };
+  }
+}
 }
 
 /**
