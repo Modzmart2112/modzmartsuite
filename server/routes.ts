@@ -1318,9 +1318,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If no processed items are set but we're in the middle of a sync
       // This is used to show progress while the sync is determining the total
-      if (syncProgress.processedItems === 0 || syncProgress.processedItems === null) {
-        // Get the shopify logs to analyze actual progress
-        const logs = await storage.getRecentShopifyLogs(20);
+      if (syncProgress.processedItems === 0 || syncProgress.processedItems === null || syncProgress.processedItems === 20) {
+        // Get the shopify logs to analyze actual progress - increased from 20 to 2000 to show all processed items
+        const logs = await storage.getRecentShopifyLogs(2000);
         
         // Extract SKUs from the logs to determine how many items we've processed
         const processedSKUs = new Set();
@@ -1332,6 +1332,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             processedSKUs.add(match[1]);
           }
         }
+        
+        console.log(`Found ${processedSKUs.size} processed SKUs from ${logs.length} logs`);
         
         // If we have processed SKUs from the logs
         if (processedSKUs.size > 0) {
