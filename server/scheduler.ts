@@ -232,13 +232,30 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
       return;
     }
     
-    log("Starting Shopify product sync", "shopify-sync");
+    // Make sure the store URL is valid
+    let storeUrl = user.shopifyStoreUrl;
+    
+    // Add protocol if missing
+    if (!storeUrl.startsWith('http://') && !storeUrl.startsWith('https://')) {
+      storeUrl = 'https://' + storeUrl;
+      log(`Added https:// protocol to store URL: ${storeUrl}`, "shopify-sync");
+    }
+    
+    // Check if URL is valid
+    try {
+      new URL(storeUrl);
+    } catch (error) {
+      log(`Invalid Shopify store URL: ${storeUrl}`, "shopify-sync");
+      return;
+    }
+    
+    log(`Starting Shopify product sync with URL: ${storeUrl}`, "shopify-sync");
     
     // Get all products from Shopify
     const shopifyProducts = await shopifyClient.getAllProducts(
       user.shopifyApiKey,
       user.shopifyApiSecret,
-      user.shopifyStoreUrl
+      storeUrl
     );
     
     log(`Retrieved ${shopifyProducts.length} products from Shopify`, "shopify-sync");

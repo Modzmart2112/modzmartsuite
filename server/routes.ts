@@ -965,7 +965,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let shopName = "Modz Mart";
       if (user?.shopifyStoreUrl) {
         try {
-          const url = new URL(user.shopifyStoreUrl);
+          // Make sure URL has protocol
+          let fullUrl = user.shopifyStoreUrl;
+          if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+            fullUrl = 'https://' + fullUrl;
+          }
+          
+          const url = new URL(fullUrl);
           shopName = url.hostname.split('.')[0];
           // Convert from kebab-case to Title Case
           shopName = shopName
@@ -1063,9 +1069,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Shopify connection not configured" });
       }
       
+      // Make sure the store URL is valid
+      let storeUrl = user.shopifyStoreUrl;
+      
+      // Add protocol if missing
+      if (!storeUrl.startsWith('http://') && !storeUrl.startsWith('https://')) {
+        storeUrl = 'https://' + storeUrl;
+      }
+      
+      // Check if URL is valid
+      try {
+        new URL(storeUrl);
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid Shopify store URL. Please update your connection info." });
+      }
+      
+      console.log(`Starting Shopify sync with URL: ${storeUrl}`);
+      
       // Start syncing products in the background
       // Use the local implementation, not the scheduled one
-      syncShopifyProducts(user.shopifyApiKey, user.shopifyApiSecret, user.shopifyStoreUrl).catch(console.error);
+      syncShopifyProducts(user.shopifyApiKey, user.shopifyApiSecret, storeUrl).catch(console.error);
       
       res.json({ success: true, message: "Product sync initiated" });
     } catch (error) {
@@ -1964,7 +1987,11 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
         
         // Enhanced cost price validation and extraction
         let costPrice: number | null = null;
+        
         if (shopifyProduct.cost !== undefined && shopifyProduct.cost !== null) {
+          // Log the raw cost price for debugging
+          console.log(`Raw cost price for ${shopifyProduct.sku}: ${shopifyProduct.cost} (type: ${typeof shopifyProduct.cost})`);
+          
           // Convert string costs to numbers
           if (typeof shopifyProduct.cost === 'string') {
             const parsedCost = parseFloat(shopifyProduct.cost);
@@ -1976,6 +2003,8 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
           else if (typeof shopifyProduct.cost === 'number' && !isNaN(shopifyProduct.cost)) {
             costPrice = shopifyProduct.cost;
           }
+        } else {
+          console.log(`No cost price found for ${shopifyProduct.sku} - product will use default cost price`);
         }
         
         if (costPrice !== null) {

@@ -55,15 +55,27 @@ class ShopifyClient {
             if (inventoryItemId) {
               try {
                 // Fetch the inventory item to get cost
-                const inventoryResponse = await fetch(`${baseUrl}/inventory_items/${inventoryItemId}.json`, {
+                console.log(`Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`);
+                const inventoryUrl = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
+                console.log(`Request URL: ${inventoryUrl}`);
+                
+                const inventoryResponse = await fetch(inventoryUrl, {
                   headers: this.buildHeaders(apiSecret)
                 });
                 
                 if (inventoryResponse.ok) {
                   const inventoryData = await inventoryResponse.json();
-                  // Extract cost from inventory item data
-                  costPrice = parseFloat(inventoryData.inventory_item?.cost || '0');
-                  console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                  console.log(`Inventory data for ${variant.sku}:`, JSON.stringify(inventoryData).substring(0, 300));
+                  
+                  // Correctly extract cost from inventory_item
+                  if (inventoryData && inventoryData.inventory_item) {
+                    costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
+                    console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                  } else {
+                    console.warn(`No inventory_item data found for SKU ${variant.sku}`);
+                  }
+                } else {
+                  console.error(`Failed to fetch inventory: ${inventoryResponse.status} ${inventoryResponse.statusText}`);
                 }
               } catch (error) {
                 console.error(`Failed to fetch cost for inventory item ${inventoryItemId}:`, error);
@@ -131,15 +143,27 @@ class ShopifyClient {
             if (inventoryItemId) {
               try {
                 // Fetch the inventory item to get cost
-                const inventoryResponse = await fetch(`${baseUrl}/inventory_items/${inventoryItemId}.json`, {
+                console.log(`Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`);
+                const inventoryUrl = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
+                console.log(`Request URL: ${inventoryUrl}`);
+                
+                const inventoryResponse = await fetch(inventoryUrl, {
                   headers: this.buildHeaders(apiSecret)
                 });
                 
                 if (inventoryResponse.ok) {
                   const inventoryData = await inventoryResponse.json();
-                  // Extract cost from inventory item data
-                  costPrice = parseFloat(inventoryData.inventory_item?.cost || '0');
-                  console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                  console.log(`Inventory data for ${variant.sku}:`, JSON.stringify(inventoryData).substring(0, 300));
+                  
+                  // Correctly extract cost from inventory_item
+                  if (inventoryData && inventoryData.inventory_item) {
+                    costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
+                    console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                  } else {
+                    console.warn(`No inventory_item data found for SKU ${variant.sku}`);
+                  }
+                } else {
+                  console.error(`Failed to fetch inventory: ${inventoryResponse.status} ${inventoryResponse.statusText}`);
                 }
               } catch (error) {
                 console.error(`Failed to fetch cost for inventory item ${inventoryItemId}:`, error);
@@ -177,7 +201,26 @@ class ShopifyClient {
   
   // Helper methods
   private buildApiUrl(storeUrl: string): string {
-    const normalizedUrl = storeUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    // Make sure the storeUrl includes both protocol and myshopify.com domain
+    let normalizedUrl = storeUrl;
+    
+    // Add protocol if missing
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://' + normalizedUrl;
+    }
+    
+    // Add myshopify.com if missing
+    if (!normalizedUrl.includes('myshopify.com')) {
+      normalizedUrl = normalizedUrl.replace(/\/$/, '');
+      if (!normalizedUrl.includes('.')) {
+        normalizedUrl += '.myshopify.com';
+      }
+    }
+    
+    // Strip protocol for final URL construction
+    normalizedUrl = normalizedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    console.log(`Normalized Shopify URL: ${normalizedUrl}`);
     return `https://${normalizedUrl}/admin/api/2022-10`;
   }
   
