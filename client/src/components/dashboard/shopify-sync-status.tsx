@@ -182,14 +182,21 @@ export function ShopifySyncStatus() {
   const totalItems = syncProgress?.totalItems || 0;
   const uniqueProductCount = syncProgress?.details?.uniqueProductCount || 0;
   
+  // Only show progress when sync is actually in progress and we have valid items
+  // This prevents showing misleading percentage before sync starts
+  const shouldShowProgress = isSyncing && totalItems > 0 && processedItems >= 0;
+  
   // Use exact percentage when available, otherwise calculate
   // This ensures smoother progress display and prevents jumps
   const exactPercentage = syncProgress?.details?.percentage;
-  const calculatedPercentage = totalItems > 0 ? (processedItems / totalItems) * 100 : 0;
-  const progressPercentage = exactPercentage !== undefined ? exactPercentage : calculatedPercentage;
+  const calculatedPercentage = shouldShowProgress && totalItems > 0 ? 
+    (processedItems / totalItems) * 100 : 0;
+  const progressPercentage = exactPercentage !== undefined ? 
+    exactPercentage : calculatedPercentage;
   
-  // For progress bar display, rounded to nearest integer
-  const displayPercentage = Math.min(100, Math.round(progressPercentage));
+  // For progress bar display, rounded to nearest integer, only show if we're syncing
+  const displayPercentage = shouldShowProgress ? 
+    Math.min(100, Math.round(progressPercentage)) : 0;
   
   // Display any extra debug info
   const processedDebug = syncProgress?.details?.processedDebug;
@@ -518,7 +525,7 @@ export function ShopifySyncStatus() {
                             Processing products and extracting cost prices...
                           </p>
                           
-                          {processedItems > 0 && totalItems > 0 && (
+                          {shouldShowProgress && totalItems > 0 && (
                             <div className="flex justify-between mt-1 text-xs">
                               <span className="text-blue-600 dark:text-blue-400 font-medium">
                                 {/* Use the exact percentage when available */}
