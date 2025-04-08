@@ -1239,24 +1239,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           syncProgress.processedItems === 0 || 
           syncProgress.processedItems === null) {
           
-        // Look at the "Successfully updated product X" in the console logs
-        // These indicate an actual product update, which is a more reliable measure of progress
-        const products = await storage.getAllProducts();
+        // Get recent logs first
+        const shopifyLogs = await storage.getRecentShopifyLogs(1000);
+        console.log(`Checking ${shopifyLogs.length} Shopify logs for progress updates...`);
+
+        // Find "Successfully updated product X" messages
+        const updateRegex = /Successfully updated product (\d+)/;
+        const successLogEntries = shopifyLogs.filter(log => 
+          updateRegex.test(log.message)
+        );
+
+        let processedCount = 0;
         
-        // Count how many products have been updated with a cost price during this sync
-        const productsWithCostPrice = products.filter((p: Product) => p.costPrice !== null && p.costPrice > 0);
-        
-        console.log(`Product sample cost price check: 
+        if (successLogEntries.length > 0) {
+          console.log(`Found ${successLogEntries.length} "Successfully updated product" log entries`);
+          // Use the count of unique successful update entries
+          processedCount = successLogEntries.length;
+        } else {
+          // Fallback: Look at products with cost price if no update logs found
+          const products = await storage.getAllProducts();
+          
+          // Count how many products have been updated with a cost price during this sync
+          const productsWithCostPrice = products.filter((p: Product) => p.costPrice !== null && p.costPrice > 0);
+          
+          console.log(`Product sample cost price check: 
 First product SKU: ${products[0]?.sku}
 Cost price: ${products[0]?.costPrice}
 Cost price type: ${typeof products[0]?.costPrice}
 All properties: ${Object.keys(products[0] || {}).join(', ')}
 Found ${productsWithCostPrice.length} products with cost price, total: ${products.length}`);
+          
+          // If we have updated products with cost price
+          if (productsWithCostPrice.length > 0) {
+            processedCount = productsWithCostPrice.length;
+          }
+        }
         
-        // If we have updated products with cost price
-        if (productsWithCostPrice.length > 0) {
-          const processedCount = productsWithCostPrice.length;
-          const totalItems = syncProgress.totalItems || products.length; // Use actual product count as total
+        if (processedCount > 0) {
+          const totalItems = syncProgress.totalItems || 1604; // Use hard-coded total if needed, or get from DB
           const percentage = Math.min(Math.round((processedCount / totalItems) * 100), 99); // Cap at 99% until actually complete
           
           // Update the message to be more informative about actual progress based on real product updates

@@ -546,6 +546,9 @@ async function processBatch(products: any[]): Promise<{
           status: product.status || 'active'
         });
         
+        // Log successful update with product count - important for progress tracking
+        log(`Successfully updated product ${existingProduct.id}`);
+        
         // Get cost price if available - improved error handling and retry logic
         if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
           try {
@@ -581,6 +584,9 @@ async function processBatch(products: any[]): Promise<{
           vendor: product.vendor || null,
           productType: product.productType || null
         });
+        
+        // Log successful creation with product count - important for progress tracking
+        log(`Successfully updated product ${newProduct.id}`);
         
         // Get cost price if available
         if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
