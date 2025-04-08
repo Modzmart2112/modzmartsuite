@@ -790,35 +790,37 @@ export class DatabaseStorage implements IStorage {
 
   // Product operations
   async getProducts(limit: number, offset: number): Promise<Product[]> {
-    // Explicitly select all fields including costPrice to ensure it's included in the response
-    return await db.select({
-      id: products.id,
-      sku: products.sku,
-      title: products.title,
-      description: products.description,
-      shopifyId: products.shopifyId,
-      shopifyPrice: products.shopifyPrice,
-      costPrice: products.costPrice,  // Explicitly include costPrice
-      supplierUrl: products.supplierUrl,
-      supplierPrice: products.supplierPrice,
-      lastScraped: products.lastScraped,
-      lastChecked: products.lastChecked,
-      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
-      createdAt: products.createdAt,
-      updatedAt: products.updatedAt,
-      status: products.status,
-      images: products.images,
-      vendor: products.vendor,
-      productType: products.productType,
-      onSale: products.onSale,
-      originalPrice: products.originalPrice,
-      saleEndDate: products.saleEndDate,
-      saleId: products.saleId
-    })
-    .from(products)
-    .orderBy(desc(products.id))
-    .limit(limit)
-    .offset(offset);
+    try {
+      console.log(`Getting products with limit: ${limit}, offset: ${offset}`);
+      
+      // Use direct SQL instead of ORM
+      const query = `
+        SELECT * FROM products
+        ORDER BY id DESC
+        LIMIT $1 OFFSET $2
+      `;
+      
+      const result = await db.execute(query, [limit, offset]);
+      
+      // Check if we got results
+      if (result.rows.length === 0) {
+        console.log('No products found');
+      } else {
+        // Log a sample product to debug
+        const sampleProduct = result.rows[0];
+        console.log('Product sample cost price check: ');
+        console.log(`\tFirst product SKU: ${sampleProduct.sku}`);
+        console.log(`\tCost price: ${sampleProduct.cost_price}`);
+        console.log(`\tCost price type: ${typeof sampleProduct.cost_price}`);
+        console.log(`\tAll properties: ${Object.keys(sampleProduct).join(', ')}`);
+      }
+      
+      console.log(`Found ${result.rows.length} products, total: ${result.rowCount || 'unknown'}`);
+      return result.rows as Product[];
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      return [];
+    }
   }
 
   async getProductCount(): Promise<number> {
