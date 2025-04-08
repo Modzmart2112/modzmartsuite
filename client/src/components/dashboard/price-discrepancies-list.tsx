@@ -116,7 +116,7 @@ export function PriceDiscrepancyList() {
     onSuccess: (data) => {
       toast({
         title: "Re-check Complete",
-        description: `Re-checked all products with discrepancies. Found ${data.updatedCount || 0} updates.`,
+        description: `Re-checked ${data.totalChecked || 0} products with price discrepancies. Found ${data.updatedCount || 0} updates.`,
       });
       // Invalidate the discrepancies query and dashboard stats to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/products/discrepancies'] });
@@ -220,7 +220,7 @@ export function PriceDiscrepancyList() {
                 disabled={reCheckAllMutation.isPending}
               >
                 <Redo size={14} />
-                Re-check All
+                Re-check Discrepancies
                 {reCheckAllMutation.isPending && "..."}
               </Button>
               <Button 
