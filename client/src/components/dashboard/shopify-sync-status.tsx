@@ -29,9 +29,9 @@ export function ShopifySyncStatus() {
     refetchOnWindowFocus: true,
   });
   
-  // Fetch sync progress with aggressive refresh - ensure correct endpoint
+  // Fetch sync progress with aggressive refresh - using the scheduler endpoint
   const syncProgressQuery = useQuery({
-    queryKey: ["/api/shopify/sync-progress"],
+    queryKey: ["/api/scheduler/shopify-sync-progress"],
     refetchInterval: 2000, // Poll more frequently for sync progress
     staleTime: 0,
     refetchOnWindowFocus: true,
