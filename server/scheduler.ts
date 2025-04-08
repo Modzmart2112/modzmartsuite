@@ -222,13 +222,13 @@ export async function checkAllPrices(): Promise<void> {
  * Automated job to sync products from Shopify
  * This job will run every hour to check for new or updated products in Shopify
  * 
- * NOTE: This function now uses the improved implementation for better progress tracking
- * and performance instead of the original implementation.
+ * NOTE: This function now uses the new implementation for better counting of unique products
+ * and ensuring proper progress tracking with accurate counts and ETA.
  */
 export async function scheduledSyncShopifyProducts(): Promise<void> {
   try {
-    // Call the improved implementation directly
-    return await import('./improved-shopify-sync').then(module => module.improvedSyncShopifyProducts());
+    // Call the new implementation directly with accurate product counting
+    return await import('./new-shopify-sync').then(module => module.newSyncShopifyProducts());
   } catch (error) {
     log(`Error in scheduled Shopify sync: ${error}`, "shopify-sync");
     

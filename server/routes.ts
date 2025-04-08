@@ -2093,8 +2093,9 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
   }
 }
 
-// The syncShopifyProducts function has been replaced with the improved implementation
-// in improved-shopify-sync.ts. This old implementation is kept for reference.
+// The syncShopifyProducts function has been replaced with the new implementation
+// in new-shopify-sync.ts which correctly counts unique products instead of variants.
+// This old implementation is kept for reference only.
 async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: string): Promise<void> {
   // Initialize sync progress tracking
   let syncProgress = await storage.initializeShopifySyncProgress();

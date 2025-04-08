@@ -10,6 +10,51 @@ class ShopifyClient {
   private readonly RATE_LIMIT_RETRY_DELAY_MS = 2000; // 2 seconds after a 429 error
   private readonly MAX_RETRIES = 3; // Maximum retries for rate-limited requests
   private lastRequestTime = 0;
+  
+  /**
+   * Get the count of unique products (not variants) from Shopify
+   * This uses the dedicated count endpoint which is efficient
+   */
+  async getProductCount(apiKey: string, apiSecret: string, storeUrl: string): Promise<number> {
+    try {
+      const baseUrl = this.buildApiUrl(storeUrl);
+      const countUrl = `${baseUrl}/products/count.json`;
+      
+      log(`Fetching product count from: ${countUrl}`, 'shopify-api');
+      
+      const response = await this.rateLimit<{ count: number }>(countUrl, {
+        headers: this.buildHeaders(apiSecret)
+      });
+      
+      return response.count;
+    } catch (error) {
+      log(`Error getting product count: ${error}`, 'shopify-api');
+      throw error;
+    }
+  }
+  
+  /**
+   * Get the count of all variants from Shopify
+   * This uses the variant count endpoint
+   */
+  async getVariantCount(apiKey: string, apiSecret: string, storeUrl: string): Promise<number> {
+    try {
+      const baseUrl = this.buildApiUrl(storeUrl);
+      const countUrl = `${baseUrl}/variants/count.json`;
+      
+      log(`Fetching variant count from: ${countUrl}`, 'shopify-api');
+      
+      const response = await this.rateLimit<{ count: number }>(countUrl, {
+        headers: this.buildHeaders(apiSecret)
+      });
+      
+      return response.count;
+    } catch (error) {
+      log(`Error getting variant count, falling back to product count: ${error}`, 'shopify-api');
+      // Return 0 and let the caller handle the fallback
+      return 0;
+    }
+  }
 
   /**
    * Make a rate-limited API request
