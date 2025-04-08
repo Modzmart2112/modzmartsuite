@@ -294,8 +294,8 @@ export function ShopifySyncStatus() {
               <div className="flex justify-between items-center text-sm">
                 <span className="font-medium text-blue-500">Sync in progress</span>
                 <span>
-                  {processedItems} / {totalItems} products
-                  {progressPercentage > 0 && ` (${progressPercentage}%)`}
+                  {/* Simplified counter that just shows processed items, not total */}
+                  {processedItems} products processed
                 </span>
               </div>
               

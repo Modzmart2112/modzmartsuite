@@ -91,6 +91,19 @@ export function ProductList({
     setFilters(newFilters);
   };
   
+  // Check if there's an active Shopify sync operation
+  const { data: syncStatus } = useQuery({
+    queryKey: ['/api/scheduler/shopify-sync-progress'],
+    queryFn: async () => {
+      const res = await fetch('/api/scheduler/shopify-sync-progress');
+      if (!res.ok) return null;
+      return res.json();
+    },
+    refetchInterval: 2000, // Check every 2 seconds
+  });
+  
+  const isShopifySyncInProgress = syncStatus?.status === 'in-progress';
+
   // Fetch products from API - includes search functionality and filters
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['/api/products', page, limit, debouncedSearch, filters.vendor, filters.productType],
@@ -117,15 +130,18 @@ export function ProductList({
       
       // Add debug log to inspect the first product's data
       if (jsonData.products && jsonData.products.length > 0) {
-        console.log('First product data:', jsonData.products[0]);
-        console.log('Cost price property exists:', 'costPrice' in jsonData.products[0]);
-        console.log('Cost price value:', jsonData.products[0].costPrice);
-        console.log('Cost price type:', typeof jsonData.products[0].costPrice);
+        console.log('Product sample cost price check: ');
+        console.log('\tFirst product SKU:', jsonData.products[0].sku);
+        console.log('\tCost price:', jsonData.products[0].cost_price);
+        console.log('\tCost price type:', typeof jsonData.products[0].cost_price);
+        console.log('\tAll properties:', Object.keys(jsonData.products[0]).join(', '));
       }
       
       return jsonData;
     },
     refetchOnWindowFocus: true,
+    // Use a short refresh interval during Shopify sync operations to keep cost prices updated in real-time
+    refetchInterval: isShopifySyncInProgress ? 2000 : false,
   });
   
   // Handle search changes
@@ -177,6 +193,11 @@ export function ProductList({
                   {selectable && selected.length > 0 && (
                     <span className="ml-2 font-medium text-primary">
                       {selected.length} selected
+                    </span>
+                  )}
+                  {isShopifySyncInProgress && (
+                    <span className="ml-2 text-blue-500 font-medium animate-pulse">
+                      Receiving cost price data...
                     </span>
                   )}
                 </p>
