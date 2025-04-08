@@ -898,8 +898,16 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  /**
+   * Get the total count of unique products by shopify_id
+   * This ensures variants of the same product are counted as a single product
+   * @returns The count of unique products
+   */
   async getProductCount(): Promise<number> {
-    const result = await db.select({ count: sql`count(*)` }).from(products);
+    // Count distinct shopify_id values to get unique products
+    const result = await db.select({ 
+      count: sql`count(DISTINCT ${products.shopifyId})` 
+    }).from(products);
     return Number(result[0].count);
   }
   
@@ -911,8 +919,15 @@ export class DatabaseStorage implements IStorage {
     return this.getProductCount();
   }
 
+  /**
+   * Get the count of active products with unique shopify_id values
+   * This ensures variants of the same product are counted as a single product
+   * @returns The count of unique active products
+   */
   async getActiveProductCount(): Promise<number> {
-    const result = await db.select({ count: sql`count(*)` })
+    const result = await db.select({ 
+      count: sql`count(DISTINCT ${products.shopifyId})` 
+    })
       .from(products)
       .where(eq(products.status, 'active'));
     return Number(result[0].count);
