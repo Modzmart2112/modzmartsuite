@@ -24,8 +24,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProductFilter } from "@/components/product-filters";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Function to format price with commas
-const formatPrice = (price: number): string => {
+// Function to format price with commas - handles null/undefined values
+const formatPrice = (price: number | null | undefined): string => {
+  if (price === null || price === undefined) {
+    return '0.00';
+  }
   return price.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
