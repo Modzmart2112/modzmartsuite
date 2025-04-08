@@ -8,6 +8,8 @@ import { storage } from './storage';
 
 /**
  * Log a cost price event to the database for real-time UI display
+ * Also updates the product's cost_price field in real-time
+ * 
  * @param sku Product SKU
  * @param price Cost price
  * @param message Message to log
@@ -32,6 +34,19 @@ export async function logCostPrice(sku: string, price: number, message?: string)
         timestamp: new Date().toISOString()
       }
     );
+    
+    // Update the cost_price field in the products table in real-time
+    try {
+      const product = await storage.getProductBySku(sku);
+      if (product) {
+        log(`Updating cost price for product ${sku} to $${price.toFixed(2)}`, 'shopify-api');
+        await storage.updateProduct(product.id, {
+          costPrice: price
+        });
+      }
+    } catch (updateError) {
+      log(`Error updating cost price for product ${sku}: ${updateError}`, 'shopify-api');
+    }
   } catch (error) {
     log(`Error logging cost price for SKU ${sku}: ${error}`, 'shopify-api');
   }
