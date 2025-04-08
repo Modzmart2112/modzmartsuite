@@ -708,11 +708,35 @@ export class DatabaseStorage implements IStorage {
 
   // Product operations
   async getProducts(limit: number, offset: number): Promise<Product[]> {
-    return await db.select()
-      .from(products)
-      .orderBy(desc(products.id))
-      .limit(limit)
-      .offset(offset);
+    // Explicitly select all fields including costPrice to ensure it's included in the response
+    return await db.select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      description: products.description,
+      shopifyId: products.shopifyId,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,  // Explicitly include costPrice
+      supplierUrl: products.supplierUrl,
+      supplierPrice: products.supplierPrice,
+      lastScraped: products.lastScraped,
+      lastChecked: products.lastChecked,
+      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      status: products.status,
+      images: products.images,
+      vendor: products.vendor,
+      productType: products.productType,
+      onSale: products.onSale,
+      originalPrice: products.originalPrice,
+      saleEndDate: products.saleEndDate,
+      saleId: products.saleId
+    })
+    .from(products)
+    .orderBy(desc(products.id))
+    .limit(limit)
+    .offset(offset);
   }
 
   async getProductCount(): Promise<number> {
@@ -741,7 +765,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductById(id: number): Promise<Product | undefined> {
-    const result = await db.select().from(products).where(eq(products.id, id));
+    const result = await db.select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      description: products.description,
+      shopifyId: products.shopifyId,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,  // Explicitly include costPrice
+      supplierUrl: products.supplierUrl,
+      supplierPrice: products.supplierPrice,
+      lastScraped: products.lastScraped,
+      lastChecked: products.lastChecked,
+      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      status: products.status,
+      images: products.images,
+      vendor: products.vendor,
+      productType: products.productType,
+      onSale: products.onSale,
+      originalPrice: products.originalPrice,
+      saleEndDate: products.saleEndDate,
+      saleId: products.saleId
+    })
+    .from(products)
+    .where(eq(products.id, id));
+    
     return result[0];
   }
 
@@ -749,8 +799,36 @@ export class DatabaseStorage implements IStorage {
     // Normalize the SKU by trimming and converting to uppercase for consistent matching
     const normalizedSku = sku.trim().toUpperCase();
     
+    // Define the fields we want to select explicitly
+    const selectFields = {
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      description: products.description,
+      shopifyId: products.shopifyId,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,  // Explicitly include costPrice
+      supplierUrl: products.supplierUrl,
+      supplierPrice: products.supplierPrice,
+      lastScraped: products.lastScraped,
+      lastChecked: products.lastChecked,
+      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      status: products.status,
+      images: products.images,
+      vendor: products.vendor,
+      productType: products.productType,
+      onSale: products.onSale,
+      originalPrice: products.originalPrice,
+      saleEndDate: products.saleEndDate,
+      saleId: products.saleId
+    };
+    
     // First try exact matching
-    let result = await db.select().from(products).where(sql`UPPER(${products.sku}) = ${normalizedSku}`);
+    let result = await db.select(selectFields)
+      .from(products)
+      .where(sql`UPPER(${products.sku}) = ${normalizedSku}`);
     
     if (result.length > 0) {
       return result[0];
@@ -758,7 +836,9 @@ export class DatabaseStorage implements IStorage {
     
     // If no exact match, try a more fuzzy match (removing any spaces)
     const noSpaceSku = normalizedSku.replace(/\s+/g, '');
-    result = await db.select().from(products).where(sql`REPLACE(UPPER(${products.sku}), ' ', '') = ${noSpaceSku}`);
+    result = await db.select(selectFields)
+      .from(products)
+      .where(sql`REPLACE(UPPER(${products.sku}), ' ', '') = ${noSpaceSku}`);
     
     if (result.length > 0) {
       console.log(`Found product by fuzzy SKU match: "${sku}" matched with "${result[0].sku}"`);
@@ -768,7 +848,30 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getProductsWithSupplierUrls(): Promise<Product[]> {
-    return await db.select()
+    return await db.select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      description: products.description,
+      shopifyId: products.shopifyId,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,  // Explicitly include costPrice
+      supplierUrl: products.supplierUrl,
+      supplierPrice: products.supplierPrice,
+      lastScraped: products.lastScraped,
+      lastChecked: products.lastChecked,
+      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      status: products.status,
+      images: products.images,
+      vendor: products.vendor,
+      productType: products.productType,
+      onSale: products.onSale,
+      originalPrice: products.originalPrice,
+      saleEndDate: products.saleEndDate,
+      saleId: products.saleId
+    })
       .from(products)
       .where(
         and(
@@ -781,7 +884,30 @@ export class DatabaseStorage implements IStorage {
   
   async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {
     let query = db
-      .select()
+      .select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      })
       .from(products)
       .where(eq(products.vendor, vendor))
       .orderBy(asc(products.title));
@@ -795,7 +921,30 @@ export class DatabaseStorage implements IStorage {
   
   async getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]> {
     let query = db
-      .select()
+      .select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      })
       .from(products)
       .where(eq(products.productType, productType))
       .orderBy(asc(products.title));
@@ -934,7 +1083,30 @@ export class DatabaseStorage implements IStorage {
   async searchProducts(query: string, limit: number, offset: number): Promise<Product[]> {
     const searchTerm = `%${query.trim()}%`;
     
-    return await db.select()
+    return await db.select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      description: products.description,
+      shopifyId: products.shopifyId,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,  // Explicitly include costPrice
+      supplierUrl: products.supplierUrl,
+      supplierPrice: products.supplierPrice,
+      lastScraped: products.lastScraped,
+      lastChecked: products.lastChecked,
+      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      status: products.status,
+      images: products.images,
+      vendor: products.vendor,
+      productType: products.productType,
+      onSale: products.onSale,
+      originalPrice: products.originalPrice,
+      saleEndDate: products.saleEndDate,
+      saleId: products.saleId
+    })
       .from(products)
       .where(
         sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm}) OR LOWER(${products.title}) LIKE LOWER(${searchTerm})`
@@ -1093,7 +1265,16 @@ export class DatabaseStorage implements IStorage {
   async getPriceDiscrepancies(): Promise<PriceDiscrepancy[]> {
     const discrepancies: PriceDiscrepancy[] = [];
     
-    const discrepancyProducts = await db.select()
+    const discrepancyProducts = await db.select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,  // Explicitly include costPrice
+      supplierPrice: products.supplierPrice,
+      vendor: products.vendor,
+      productType: products.productType
+    })
       .from(products)
       .where(and(
         eq(products.hasPriceDiscrepancy, true),
@@ -1112,7 +1293,10 @@ export class DatabaseStorage implements IStorage {
           supplierPrice: product.supplierPrice,
           difference,
           percentageDifference,
-          productId: product.id
+          productId: product.id,
+          costPrice: product.costPrice,  // Include costPrice in the result
+          vendor: product.vendor,
+          productType: product.productType
         });
       }
     }
