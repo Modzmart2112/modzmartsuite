@@ -224,11 +224,27 @@ export async function checkAllPrices(): Promise<void> {
  */
 export async function scheduledSyncShopifyProducts(): Promise<void> {
   try {
+    // Initialize sync progress
+    let syncProgress = await storage.initializeShopifySyncProgress();
+    
+    // Update progress status to in-progress
+    syncProgress = await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: "Starting Shopify product synchronization"
+    });
+    
     // Get Shopify credentials from first user (or from environment variables in production)
     const user = await storage.getUser(1); // Using first user as default
     
     if (!user || !user.shopifyApiKey || !user.shopifyApiSecret || !user.shopifyStoreUrl) {
       log("Shopify credentials not configured, skipping sync", "shopify-sync");
+      
+      // Update progress to error
+      await storage.updateShopifySyncProgress({
+        status: "error",
+        message: "Shopify credentials not configured"
+      });
+      
       return;
     }
     
@@ -246,10 +262,22 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
       new URL(storeUrl);
     } catch (error) {
       log(`Invalid Shopify store URL: ${storeUrl}`, "shopify-sync");
+      
+      // Update progress to error
+      await storage.updateShopifySyncProgress({
+        status: "error",
+        message: "Invalid Shopify store URL"
+      });
+      
       return;
     }
     
     log(`Starting Shopify product sync with URL: ${storeUrl}`, "shopify-sync");
+    
+    // Update progress
+    await storage.updateShopifySyncProgress({
+      message: "Connecting to Shopify and fetching products"
+    });
     
     // Get all products from Shopify
     const shopifyProducts = await shopifyClient.getAllProducts(
@@ -260,12 +288,19 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     
     log(`Retrieved ${shopifyProducts.length} products from Shopify`, "shopify-sync");
     
+    // Update progress with total items
+    await storage.updateShopifySyncProgress({
+      totalItems: shopifyProducts.length,
+      message: `Retrieved ${shopifyProducts.length} products from Shopify`
+    });
+    
     // Initialize counters for reporting
     let updatedCount = 0;
     let createdCount = 0;
     let errorCount = 0;
     
     // Process each Shopify product
+    let processedCount = 0;
     for (const shopifyProduct of shopifyProducts) {
       try {
         if (!shopifyProduct.sku) {
@@ -309,13 +344,44 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
           
           createdCount++;
         }
+        
+        // Update success count
+        processedCount++;
+        
+        // Update sync progress every 10 items to avoid too many DB operations
+        if (processedCount % 10 === 0 || processedCount === shopifyProducts.length) {
+          await storage.updateShopifySyncProgress({
+            processedItems: processedCount,
+            successItems: updatedCount + createdCount,
+            failedItems: errorCount,
+            message: `Processing products (${processedCount}/${shopifyProducts.length})`
+          });
+        }
       } catch (error) {
         errorCount++;
+        processedCount++;
         log(`Error processing Shopify product ${shopifyProduct.sku}: ${error}`, "shopify-sync");
+        
+        // Update sync progress on errors immediately
+        await storage.updateShopifySyncProgress({
+          processedItems: processedCount,
+          successItems: updatedCount + createdCount,
+          failedItems: errorCount,
+          message: `Processing products (${processedCount}/${shopifyProducts.length})`
+        });
       }
     }
     
     log(`Shopify sync complete: ${updatedCount} updated, ${createdCount} created, ${errorCount} errors`, "shopify-sync");
+    
+    // Update sync progress to complete
+    await storage.updateShopifySyncProgress({
+      status: "complete",
+      processedItems: processedCount,
+      successItems: updatedCount + createdCount,
+      failedItems: errorCount,
+      message: `Sync complete: ${updatedCount} updated, ${createdCount} created, ${errorCount} errors`
+    });
     
     // Update last sync time in stats
     const stats = await storage.getStats();
@@ -326,6 +392,16 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     }
   } catch (error) {
     log(`Failed to complete Shopify sync: ${error}`, "shopify-sync");
+    
+    // Make sure we update the progress to error state if an exception occurs
+    try {
+      await storage.updateShopifySyncProgress({
+        status: "error",
+        message: `Sync failed with error: ${error.message || "Unknown error"}`
+      });
+    } catch (updateError) {
+      log(`Error updating sync progress: ${updateError}`, "shopify-sync");
+    }
   }
 }
 
