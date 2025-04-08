@@ -43,6 +43,17 @@ export async function logCostPrice(sku: string, price: number, message?: string)
         await storage.updateProduct(product.id, {
           costPrice: price
         });
+        
+        // Fallback: Direct SQL update to ensure the cost price is properly stored
+        try {
+          const { Pool } = require('pg');
+          const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+          await pool.query('UPDATE products SET cost_price = $1 WHERE sku = $2', [price, sku]);
+          log(`Direct SQL update for cost_price: ${sku} = $${price.toFixed(2)}`, 'shopify-api');
+          pool.end();
+        } catch (sqlError) {
+          log(`Error in direct SQL cost price update: ${sqlError}`, 'shopify-api');
+        }
       }
     } catch (updateError) {
       log(`Error updating cost price for product ${sku}: ${updateError}`, 'shopify-api');
