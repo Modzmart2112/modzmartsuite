@@ -90,14 +90,14 @@ app.use((req, res, next) => {
     
     log(`Price check scheduler initialized - first run in ${Math.round(msUntilMidnight/3600000)} hours at midnight`, 'scheduler');
     
-    // Start the Shopify sync scheduler - run every hour to check for new products
-    const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
+    // Shopify sync is now manual only - no automatic scheduling
+    log(`Shopify sync is set to manual mode - will only run when triggered by the user`, 'scheduler');
     
+    // Commented out the automatic sync
+    // const ONE_HOUR = 60 * 60 * 1000; // 1 hour in milliseconds
     // Run immediately on startup
-    scheduledSyncShopifyProducts().catch(err => console.error('Error in initial Shopify sync:', err));
-    
+    // scheduledSyncShopifyProducts().catch(err => console.error('Error in initial Shopify sync:', err));
     // Then schedule to run every hour
-    scheduler.startJob('hourly-shopify-sync', ONE_HOUR, scheduledSyncShopifyProducts);
-    log(`Shopify sync scheduler initialized - running every hour`, 'scheduler');
+    // scheduler.startJob('hourly-shopify-sync', ONE_HOUR, scheduledSyncShopifyProducts);
   });
 })();
