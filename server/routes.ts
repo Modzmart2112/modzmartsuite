@@ -1239,32 +1239,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           syncProgress.processedItems === 0 || 
           syncProgress.processedItems === null) {
           
-        // Get the shopify logs to analyze actual progress - using 3000 to get as many processed items as possible
-        const logs = await storage.getRecentShopifyLogs(3000);
+        // Look at the "Successfully updated product X" in the console logs
+        // These indicate an actual product update, which is a more reliable measure of progress
+        const products = await storage.getAllProducts();
         
-        // Extract SKUs from the logs to determine how many items we've processed
-        const processedSKUs = new Set();
+        // Count how many products have been updated with a cost price during this sync
+        const productsWithCostPrice = products.filter((p: Product) => p.costPrice !== null && p.costPrice > 0);
         
-        for (const log of logs) {
-          // Extract SKU from log message like "Got cost price for AB-123456: $100.00"
-          const match = /Got cost price for ([A-Za-z0-9-]+): \$[\d.]+/.exec(log.message);
-          if (match && match[1]) {
-            processedSKUs.add(match[1]);
-          }
-        }
+        console.log(`Product sample cost price check: 
+First product SKU: ${products[0]?.sku}
+Cost price: ${products[0]?.costPrice}
+Cost price type: ${typeof products[0]?.costPrice}
+All properties: ${Object.keys(products[0] || {}).join(', ')}
+Found ${productsWithCostPrice.length} products with cost price, total: ${products.length}`);
         
-        console.log(`Found ${processedSKUs.size} processed SKUs from ${logs.length} logs`);
-        
-        // If we have processed SKUs from the logs
-        if (processedSKUs.size > 0) {
-          const processedCount = processedSKUs.size;
-          const totalItems = syncProgress.totalItems || 1800; // Better estimate based on historical data
+        // If we have updated products with cost price
+        if (productsWithCostPrice.length > 0) {
+          const processedCount = productsWithCostPrice.length;
+          const totalItems = syncProgress.totalItems || products.length; // Use actual product count as total
           const percentage = Math.min(Math.round((processedCount / totalItems) * 100), 99); // Cap at 99% until actually complete
           
-          // Update the message to be more informative about actual progress
-          const progressMessage = `Processing products: ${processedCount} items processed so far`;
+          // Update the message to be more informative about actual progress based on real product updates
+          const progressMessage = `Processing products: ${processedCount} of ${totalItems} products updated`;
           
-          // Update progress based on log analysis
+          // Update progress based on actual product updates
           await storage.updateShopifySyncProgress({
             processedItems: processedCount,
             successItems: processedCount,
@@ -1272,7 +1270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             details: {
               ...syncProgress.details,
               percentage,
-              calculatedFromLogs: true
+              calculatedFromProducts: true
             }
           });
           

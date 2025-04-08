@@ -23,6 +23,7 @@ export interface IStorage {
   
   // Product operations
   getProducts(limit: number, offset: number): Promise<Product[]>;
+  getAllProducts(): Promise<Product[]>;
   getProductCount(): Promise<number>;
   getActiveProductCount(): Promise<number>;
   getProductsBySku(skus: string[]): Promise<Product[]>;
@@ -448,6 +449,12 @@ export class MemStorage implements IStorage {
     return this.stats;
   }
 
+  // Product retrieval operations
+  async getAllProducts(): Promise<Product[]> {
+    // Return all products in the database as an array
+    return Array.from(this.products.values());
+  }
+  
   // Price discrepancy operations
   async getPriceDiscrepancies(): Promise<PriceDiscrepancy[]> {
     const discrepancies: PriceDiscrepancy[] = [];
@@ -917,6 +924,66 @@ export class DatabaseStorage implements IStorage {
    */
   async getTotalProductCount(): Promise<number> {
     return this.getProductCount();
+  }
+  
+  /**
+   * Get all products in the database
+   * This is used for bulk operations where we need to process all products
+   * regardless of pagination limits
+   */
+  async getAllProducts(): Promise<Product[]> {
+    try {
+      console.log('Getting all products from database');
+      
+      // Use direct SQL for better performance on large datasets
+      const query = `
+        SELECT * FROM products
+        ORDER BY id ASC
+      `;
+      
+      const result = await db.execute(query);
+      
+      // Convert snake_case column names to camelCase for consistency
+      const mappedProducts = result.rows.map(product => {
+        const { 
+          id, sku, title, description, status, images, vendor, 
+          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
+          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
+          product_type, on_sale, original_price, sale_end_date, sale_id
+        } = product;
+        
+        // Parse cost_price to a number if it exists
+        const costPrice = cost_price !== null && cost_price !== undefined 
+          ? Number(cost_price) 
+          : null;
+        
+        // Return a new object with only the fields we need
+        return {
+          id, sku, title, description, status, images, vendor,
+          costPrice,
+          shopifyId: shopify_id,
+          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
+          supplierUrl: supplier_url,
+          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
+          lastScraped: last_scraped,
+          lastChecked: last_checked,
+          hasPriceDiscrepancy: has_price_discrepancy,
+          createdAt: created_at,
+          updatedAt: updated_at,
+          productType: product_type,
+          onSale: on_sale,
+          originalPrice: original_price !== null ? Number(original_price) : null,
+          saleEndDate: sale_end_date,
+          saleId: sale_id
+        };
+      });
+      
+      console.log(`Found ${mappedProducts.length} total products in database`);
+      return mappedProducts as Product[];
+    } catch (error) {
+      console.error('Error fetching all products:', error);
+      return [];
+    }
   }
 
   /**

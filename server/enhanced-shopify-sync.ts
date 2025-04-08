@@ -612,9 +612,12 @@ async function processBatch(products: any[]): Promise<{
     }
   }
   
-  // Return the count of unique SKUs processed instead of variant count
+  // Return actual product update counts
+  console.log(`Batch completed: Updated ${success} products successfully, ${failed} failed`);
+  
+  // Return the count based on actual product updates
   return {
-    processed: processedSkus.size, // Only count unique SKUs processed
+    processed: success, // Use the count of successfully updated products
     success,
     failed
   };
