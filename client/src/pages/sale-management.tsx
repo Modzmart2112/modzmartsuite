@@ -105,10 +105,7 @@ const SaleManagementPage: React.FC = () => {
   // Create new campaign
   const createCampaignMutation = useMutation({
     mutationFn: async (campaignData: any) => {
-      return apiRequest('/api/sales/campaigns', {
-        method: 'POST',
-        body: JSON.stringify(campaignData),
-      });
+      return apiRequest('POST', '/api/sales/campaigns', campaignData);
     },
     onSuccess: () => {
       toast({
@@ -131,9 +128,7 @@ const SaleManagementPage: React.FC = () => {
   // Delete campaign
   const deleteCampaignMutation = useMutation({
     mutationFn: async (campaignId: number) => {
-      return apiRequest(`/api/sales/campaigns/${campaignId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/sales/campaigns/${campaignId}`);
     },
     onSuccess: () => {
       toast({
@@ -154,10 +149,7 @@ const SaleManagementPage: React.FC = () => {
   // Add target
   const addTargetMutation = useMutation({
     mutationFn: async ({ campaignId, targetData }: any) => {
-      return apiRequest(`/api/sales/campaigns/${campaignId}/targets`, {
-        method: 'POST',
-        body: JSON.stringify(targetData),
-      });
+      return apiRequest('POST', `/api/sales/campaigns/${campaignId}/targets`, targetData);
     },
     onSuccess: () => {
       toast({
@@ -182,9 +174,7 @@ const SaleManagementPage: React.FC = () => {
   // Remove target
   const removeTargetMutation = useMutation({
     mutationFn: async ({ campaignId, targetId }: any) => {
-      return apiRequest(`/api/sales/campaigns/${campaignId}/targets/${targetId}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/sales/campaigns/${campaignId}/targets/${targetId}`);
     },
     onSuccess: () => {
       toast({
@@ -207,9 +197,7 @@ const SaleManagementPage: React.FC = () => {
   // Apply campaign
   const applyCampaignMutation = useMutation({
     mutationFn: async (campaignId: number) => {
-      return apiRequest(`/api/sales/campaigns/${campaignId}/apply`, {
-        method: 'POST',
-      });
+      return apiRequest('POST', `/api/sales/campaigns/${campaignId}/apply`);
     },
     onSuccess: (data) => {
       toast({
@@ -233,9 +221,7 @@ const SaleManagementPage: React.FC = () => {
   // Revert campaign
   const revertCampaignMutation = useMutation({
     mutationFn: async (campaignId: number) => {
-      return apiRequest(`/api/sales/campaigns/${campaignId}/revert`, {
-        method: 'POST',
-      });
+      return apiRequest('POST', `/api/sales/campaigns/${campaignId}/revert`);
     },
     onSuccess: (data) => {
       toast({
