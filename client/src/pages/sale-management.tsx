@@ -393,9 +393,9 @@ const SaleManagementPage: React.FC = () => {
           
           if (selectedProductIds.length > 0) {
             // Get the products data to extract Shopify IDs
-            const productsResponse = await apiRequest('GET', '/api/products', {
-              ids: selectedProductIds.join(',')
-            });
+            // Using URL parameters for GET request instead of body
+            const queryParams = new URLSearchParams({ ids: selectedProductIds.join(',') }).toString();
+            const productsResponse = await apiRequest('GET', `/api/products?${queryParams}`);
             
             if (productsResponse.products) {
               // Add product targets using Shopify IDs
