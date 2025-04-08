@@ -109,7 +109,18 @@ export function ProductList({
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch products');
-      return res.json();
+      
+      const jsonData = await res.json();
+      
+      // Add debug log to inspect the first product's data
+      if (jsonData.products && jsonData.products.length > 0) {
+        console.log('First product data:', jsonData.products[0]);
+        console.log('Cost price property exists:', 'costPrice' in jsonData.products[0]);
+        console.log('Cost price value:', jsonData.products[0].costPrice);
+        console.log('Cost price type:', typeof jsonData.products[0].costPrice);
+      }
+      
+      return jsonData;
     },
     refetchOnWindowFocus: true,
   });

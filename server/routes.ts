@@ -170,6 +170,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       total = await storage.getProductCount();
     }
     
+    // Add debug log to check cost prices in the response products
+    if (products.length > 0) {
+      console.log(`Product sample cost price check: 
+        First product SKU: ${products[0].sku}
+        Cost price: ${products[0].costPrice}
+        Cost price type: ${typeof products[0].costPrice}
+        All properties: ${Object.keys(products[0]).join(', ')}
+      `);
+    }
+    
     console.log(`Found ${products.length} products, total: ${total}`);
     res.json({ products, total });
   }));
