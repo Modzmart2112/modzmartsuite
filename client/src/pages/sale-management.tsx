@@ -260,6 +260,8 @@ const SaleManagementPage: React.FC = () => {
       discountType: newCampaign.discountType,
       discountValue: Number(newCampaign.discountValue),
     };
+    
+    // Use the mutation directly instead of apiRequest
     createCampaignMutation.mutate(campaignData);
   };
 
@@ -351,6 +353,7 @@ const SaleManagementPage: React.FC = () => {
   };
   
   const handleCreateWithSelection = () => {
+    // First create the campaign without targets
     const campaignData = {
       name: newCampaign.name,
       description: newCampaign.description || null,
@@ -358,36 +361,66 @@ const SaleManagementPage: React.FC = () => {
       startDate: newCampaign.startDate,
       endDate: newCampaign.endDate,
       discountType: newCampaign.discountType,
-      discountValue: Number(newCampaign.discountValue),
-      excludeBelowCost: excludeBelowCost,
-      // Add selected products or vendor
-      targets: selectedProductIds.length > 0 
-        ? selectedProductIds.map(id => ({ 
-            targetType: 'product', 
-            targetId: id,
-            targetValue: null 
-          }))
-        : selectedVendor 
-          ? [{ 
-              targetType: 'vendor', 
-              targetId: null,
-              targetValue: selectedVendor 
-            }]
-          : selectedProductType
-            ? [{
-                targetType: 'product_type',
-                targetId: null,
-                targetValue: selectedProductType
-              }]
-            : []
+      discountValue: Number(newCampaign.discountValue)
+      // excludeBelowCost is handled server-side or with targets
     };
     
-    // Create the campaign with the provided targets
-    createCampaignMutation.mutate(campaignData);
-    
-    // Reset state and close dialog
-    setIsCreateDialogOpen(false);
-    resetSelectionState();
+    // Create the campaign using mutation
+    createCampaignMutation.mutate(campaignData, {
+      onSuccess: (response) => {
+        const newCampaignId = response.campaign.id;
+        
+        // Define targets based on selection
+        let targetPromises: Promise<any>[] = [];
+        
+        if (selectedProductIds.length > 0) {
+          // Add product targets
+          targetPromises = selectedProductIds.map(productId => {
+            const targetData = {
+              targetType: 'product',
+              targetId: productId,
+              targetValue: null
+            };
+            return apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData);
+          });
+        } else if (selectedVendor) {
+          // Add vendor target
+          const targetData = {
+            targetType: 'vendor',
+            targetId: null,
+            targetValue: selectedVendor
+          };
+          targetPromises = [apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData)];
+        } else if (selectedProductType) {
+          // Add product_type target
+          const targetData = {
+            targetType: 'product_type',
+            targetId: null,
+            targetValue: selectedProductType
+          };
+          targetPromises = [apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData)];
+        }
+        
+        // Wait for all target additions to complete
+        Promise.all(targetPromises)
+          .then(() => {
+            toast({
+              title: 'Success',
+              description: 'Sale campaign created successfully with targets',
+            });
+            queryClient.invalidateQueries({ queryKey: ['/api/sales/campaigns'] });
+            setIsCreateDialogOpen(false);
+            resetSelectionState();
+          })
+          .catch(error => {
+            toast({
+              title: 'Error',
+              description: `Failed to add targets: ${error.message}`,
+              variant: 'destructive',
+            });
+          });
+      }
+    });
   };
 
   // UI helpers
