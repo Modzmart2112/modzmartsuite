@@ -23,6 +23,7 @@ import os from "os";
 import { processCsvFile } from "./csv-handler";
 import { scheduler, checkAllPrices } from "./scheduler";
 import { scheduledSyncShopifyProducts } from "./scheduler";
+import { improvedSyncShopifyProducts } from "./improved-shopify-sync";
 import { db } from "./db";
 import { sql, eq } from "drizzle-orm";
 
@@ -1073,8 +1074,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Starting Shopify sync with URL: ${storeUrl}`);
       
       // Start syncing products in the background
-      // Use the local implementation, not the scheduled one
-      syncShopifyProducts(user.shopifyApiKey, user.shopifyApiSecret, storeUrl).catch(console.error);
+      // Use the improved implementation for better progress tracking and performance
+      improvedSyncShopifyProducts().catch(console.error);
       
       res.json({ success: true, message: "Product sync initiated" });
     } catch (error) {
@@ -1218,11 +1219,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      // If no processed items are set but we're in the middle of a sync
-      // This is used to show progress while the sync is determining the total
-      if (syncProgress.processedItems === 0 || syncProgress.processedItems === null || syncProgress.processedItems === 20) {
-        // Get the shopify logs to analyze actual progress - increased from 20 to 2000 to show all processed items
-        const logs = await storage.getRecentShopifyLogs(2000);
+      // If we're in the 'Connecting to Shopify and fetching products' phase or no processed items are set
+      // We'll look at the logs to calculate a more accurate progress status
+      if (syncProgress.message === "Connecting to Shopify and fetching products" || 
+          syncProgress.processedItems === 0 || 
+          syncProgress.processedItems === null) {
+          
+        // Get the shopify logs to analyze actual progress - using 3000 to get as many processed items as possible
+        const logs = await storage.getRecentShopifyLogs(3000);
         
         // Extract SKUs from the logs to determine how many items we've processed
         const processedSKUs = new Set();
@@ -1240,13 +1244,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If we have processed SKUs from the logs
         if (processedSKUs.size > 0) {
           const processedCount = processedSKUs.size;
-          const totalItems = syncProgress.totalItems || 100; // Fallback to 100 if no estimate
+          const totalItems = syncProgress.totalItems || 1800; // Better estimate based on historical data
           const percentage = Math.min(Math.round((processedCount / totalItems) * 100), 99); // Cap at 99% until actually complete
+          
+          // Update the message to be more informative about actual progress
+          const progressMessage = `Processing products: ${processedCount} items processed so far`;
           
           // Update progress based on log analysis
           await storage.updateShopifySyncProgress({
             processedItems: processedCount,
             successItems: processedCount,
+            message: progressMessage,
             details: {
               ...syncProgress.details,
               percentage,
@@ -1295,8 +1303,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Initialize the sync progress
       await storage.initializeShopifySyncProgress();
       
-      // Run the Shopify sync job
-      scheduledSyncShopifyProducts().catch(err => {
+      // Run the improved Shopify sync job
+      improvedSyncShopifyProducts().catch(err => {
         console.error('Error in manual Shopify sync:', err);
         // Update progress to indicate error
         storage.updateShopifySyncProgress({
@@ -1309,7 +1317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         success: true,
-        message: 'Shopify sync job started'
+        message: 'Shopify sync job started with improved implementation'
       });
     } catch (error) {
       console.error('Failed to start Shopify sync job:', error);
@@ -2085,6 +2093,8 @@ async function processRecords(records: CsvRecord[], uploadId: number): Promise<v
   }
 }
 
+// The syncShopifyProducts function has been replaced with the improved implementation
+// in improved-shopify-sync.ts. This old implementation is kept for reference.
 async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: string): Promise<void> {
   // Initialize sync progress tracking
   let syncProgress = await storage.initializeShopifySyncProgress();
