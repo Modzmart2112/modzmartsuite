@@ -482,6 +482,124 @@ class ShopifyClient {
       'Content-Type': 'application/json'
     };
   }
+  /**
+   * Get inventory cost price by ID
+   */
+  async getInventoryCostPrice(inventoryItemId: string): Promise<number | null> {
+    try {
+      // Get credentials from the database
+      const credentials = await storage.getShopifyCredentials();
+      if (!credentials) {
+        log('No Shopify credentials found', 'shopify-api');
+        return null;
+      }
+      
+      const baseUrl = this.buildApiUrl(credentials.storeUrl);
+      const url = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
+      
+      log(`Fetching inventory item ${inventoryItemId}`, 'shopify-api');
+      
+      const response = await this.rateLimit<{ inventory_item: any }>(url, {
+        headers: this.buildHeaders(credentials.apiSecret)
+      });
+      
+      if (response && response.inventory_item && response.inventory_item.cost) {
+        const costPrice = parseFloat(response.inventory_item.cost);
+        log(`Got cost price for ${response.inventory_item.sku || inventoryItemId}: $${costPrice}`, 'shopify-api');
+        return costPrice;
+      }
+      
+      return null;
+    } catch (error) {
+      log(`Error getting inventory cost price: ${error}`, 'shopify-api');
+      return null;
+    }
+  }
+  
+  /**
+   * Get multiple inventory cost prices in bulk
+   */
+  async getBulkInventoryCostPrices(items: {inventoryItemId: string, sku: string}[]): Promise<Map<string, {costPrice: number, sku: string}>> {
+    const costPrices = new Map<string, {costPrice: number, sku: string}>();
+    const credentials = await storage.getShopifyCredentials();
+    
+    if (!credentials) {
+      log('No Shopify credentials found', 'shopify-api');
+      return costPrices;
+    }
+    
+    // Process in chunks of 50 items to avoid API limits
+    const CHUNK_SIZE = 50;
+    const chunks: {inventoryItemId: string, sku: string}[][] = [];
+    
+    // Create chunks of inventory items
+    for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+      chunks.push(items.slice(i, i + CHUNK_SIZE));
+    }
+    
+    log(`Processing ${items.length} inventory items in ${chunks.length} chunks`, 'shopify-api');
+    
+    // Process each chunk
+    for (const chunk of chunks) {
+      const baseUrl = this.buildApiUrl(credentials.storeUrl);
+      
+      // Create comma-separated list of IDs for query parameter
+      const inventoryItemIds = chunk.map(item => item.inventoryItemId).join(',');
+      const url = `${baseUrl}/inventory_items.json?ids=${inventoryItemIds}`;
+      
+      log(`Fetching bulk inventory items, chunk size: ${chunk.length}`, 'shopify-api');
+      
+      try {
+        const response = await this.rateLimit<{ inventory_items: any[] }>(url, {
+          headers: this.buildHeaders(credentials.apiSecret)
+        });
+        
+        if (response && response.inventory_items && response.inventory_items.length > 0) {
+          // Create a map of inventory item IDs to SKUs for quick lookup
+          const skuMap = new Map<string, string>();
+          chunk.forEach(item => skuMap.set(item.inventoryItemId, item.sku));
+          
+          // Process all inventory items in the response
+          for (const item of response.inventory_items) {
+            if (item.id && item.cost) {
+              const inventoryItemId = item.id.toString();
+              const costPrice = parseFloat(item.cost);
+              const sku = skuMap.get(inventoryItemId) || ''; 
+              
+              costPrices.set(inventoryItemId, {
+                costPrice,
+                sku
+              });
+              
+              // Get current sync ID to tag the logs properly
+              try {
+                const syncProgress = await storage.getShopifySyncProgress();
+                const currentSyncId = syncProgress?.id || 0;
+                
+                // Log with SyncID tag for consistent formatting
+                const logMessage = `Got cost price for ${sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+                log(logMessage, 'shopify-api');
+                
+                // Log for UI display with the same format
+                await logCostPrice(sku, costPrice, logMessage, undefined, undefined);
+              } catch (error) {
+                log(`Error logging cost price: ${error}`, 'shopify-api');
+              }
+            }
+          }
+        }
+      } catch (error) {
+        log(`Error getting bulk inventory cost prices: ${error}`, 'shopify-api');
+        // Continue with the next chunk even if this one fails
+      }
+      
+      // Add a small delay between chunks to respect rate limits
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    log(`Successfully retrieved ${costPrices.size} cost prices out of ${items.length} requested`, 'shopify-api');
+    return costPrices;
+  }
 }
 
 export const shopifyClient = new ShopifyClient();

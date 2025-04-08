@@ -20,6 +20,7 @@
 import { storage } from './storage';
 import { shopifyClient } from './shopify';
 import { logCostPrice } from './cost-logger';
+import fetch from 'node-fetch';
 
 // Configuration
 const BATCH_SIZE = 50; // Increased batch size for better performance (was 10)
@@ -519,28 +520,167 @@ async function processBatch(products: any[]): Promise<{
   // Track unique SKUs to count them accurately
   const processedSkus = new Set<string>();
   
-  // Create chunks for parallel processing
-  const chunks: any[][] = [];
-  
-  // Split products into chunks for parallel processing
-  for (let i = 0; i < products.length; i += PARALLEL_REQUESTS) {
-    chunks.push(products.slice(i, i + PARALLEL_REQUESTS));
-  }
-  
-  // Process each chunk with parallel execution
-  for (const chunk of chunks) {
-    const results = await Promise.all(
-      chunk.map(product => processProduct(product, processedSkus))
-    );
+  try {
+    // First, process all product updates without cost prices
+    // This allows us to get basic product info updated quickly
+    const updatePromises = products.map(async (product) => {
+      try {
+        // Skip products without required fields
+        if (!product.sku || !product.title || !product.shopifyId) {
+          return { success: false };
+        }
+        
+        // Add this SKU to our set of processed SKUs
+        processedSkus.add(product.sku);
+        
+        // Check if the product already exists in our database
+        let existingProduct = await storage.getProductBySku(product.sku);
+        
+        if (existingProduct) {
+          // Update existing product
+          await storage.updateProduct(existingProduct.id, {
+            title: product.title,
+            description: product.description || existingProduct.description,
+            shopifyPrice: product.price,
+            status: product.status || 'active'
+          });
+          
+          // Log successful update with current sync ID - important for progress tracking
+          const currentSyncId = await getCurrentSyncId();
+          log(`Successfully updated product ${existingProduct.id} [SyncID: ${currentSyncId}]`);
+          
+          return { 
+            success: true, 
+            id: existingProduct.id, 
+            sku: product.sku, 
+            inventoryItemId: product.inventoryItemId 
+          };
+        } else {
+          // Create new product
+          const newProduct = await storage.createProduct({
+            sku: product.sku,
+            title: product.title,
+            description: product.description || null,
+            shopifyId: product.shopifyId,
+            shopifyPrice: product.price,
+            status: product.status || 'active',
+            vendor: product.vendor || null,
+            productType: product.productType || null
+          });
+          
+          // Log successful creation with current sync ID
+          const currentSyncId = await getCurrentSyncId();
+          log(`Successfully updated product ${newProduct.id} [SyncID: ${currentSyncId}]`);
+          
+          return { 
+            success: true, 
+            id: newProduct.id, 
+            sku: product.sku, 
+            inventoryItemId: product.inventoryItemId 
+          };
+        }
+      } catch (error) {
+        log(`Error processing product ${product?.sku || 'unknown'}: ${error}`, 'shopify-sync-error');
+        return { success: false };
+      }
+    });
     
-    // Count success and failures
-    for (const result of results) {
-      if (result.success) {
-        success++;
-      } else {
-        failed++;
+    // Wait for all update promises to complete
+    const updateResults = await Promise.all(updatePromises);
+    
+    // Count successes and failures from initial update
+    const successResults = updateResults.filter(result => result.success);
+    success = successResults.length;
+    failed = updateResults.length - success;
+    
+    // Now collect inventory item IDs for bulk cost price fetch
+    if (COST_CAPTURE_ENABLED) {
+      const itemsWithInventoryIds = successResults
+        .filter(result => result.inventoryItemId)
+        .map(result => ({
+          id: result.id,
+          sku: result.sku,
+          inventoryItemId: result.inventoryItemId
+        }));
+      
+      if (itemsWithInventoryIds.length > 0) {
+        log(`Fetching cost prices for ${itemsWithInventoryIds.length} products in bulk`, 'shopify-sync');
+        
+        // Batch inventory items into chunks of 50 for API requests
+        const INVENTORY_CHUNK_SIZE = 50;
+        const inventoryChunks = [];
+        
+        // Create chunks for bulk processing
+        for (let i = 0; i < itemsWithInventoryIds.length; i += INVENTORY_CHUNK_SIZE) {
+          inventoryChunks.push(itemsWithInventoryIds.slice(i, i + INVENTORY_CHUNK_SIZE));
+        }
+        
+        // Process each inventory chunk
+        for (const chunk of inventoryChunks) {
+          // Prepare bulk query param with comma-separated inventory IDs
+          const inventoryItemIds = chunk.map(item => item.inventoryItemId).join(',');
+          const credentials = await storage.getShopifyCredentials();
+          
+          try {
+            // Get current sync ID for logging
+            const syncProgress = await storage.getShopifySyncProgress();
+            const currentSyncId = syncProgress?.id || 0;
+            
+            if (credentials) {
+              const baseUrl = `https://${credentials.storeUrl}/admin/api/2022-10`;
+              const url = `${baseUrl}/inventory_items.json?ids=${inventoryItemIds}`;
+              
+              // Make bulk request with proper headers
+              const response = await fetch(url, {
+                headers: {
+                  'X-Shopify-Access-Token': credentials.apiSecret,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                
+                if (data && data.inventory_items && data.inventory_items.length > 0) {
+                  // Create mapping of inventory IDs to products
+                  const idToItemMap = new Map();
+                  chunk.forEach(item => idToItemMap.set(item.inventoryItemId, item));
+                  
+                  // Process all inventory items
+                  for (const item of data.inventory_items) {
+                    if (item.id && item.cost) {
+                      const inventoryItemId = item.id.toString();
+                      const costPrice = parseFloat(item.cost);
+                      const product = idToItemMap.get(inventoryItemId);
+                      
+                      if (product) {
+                        // Log cost price for UI display with proper sync ID
+                        const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+                        log(logMessage);
+                        await logCostPrice(product.sku, costPrice, logMessage);
+                        
+                        // Update product with cost price
+                        await storage.updateProduct(product.id, { costPrice });
+                      }
+                    }
+                  }
+                }
+              } else {
+                log(`Error fetching bulk inventory items: ${response.status} ${response.statusText}`, 'shopify-sync-error');
+              }
+            }
+          } catch (error) {
+            log(`Error in bulk cost price processing: ${error}`, 'shopify-sync-error');
+            // Continue with next chunk even if this one fails
+          }
+          
+          // Add delay to avoid rate limits
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
     }
+  } catch (error) {
+    log(`Error in batch processing: ${error}`, 'shopify-sync-error');
   }
   
   // Return actual product update counts
@@ -581,29 +721,44 @@ async function processProduct(product: any, processedSkus: Set<string>): Promise
       });
       
       // Log successful update with product count and current sync ID - important for progress tracking
-      const currentSyncId = await getCurrentSyncId();
+      const syncProgress = await storage.getShopifySyncProgress();
+      const currentSyncId = syncProgress?.id || 0;
       log(`Successfully updated product ${existingProduct.id} [SyncID: ${currentSyncId}]`);
       
-      // Get cost price if available - improved error handling and retry logic
+      // Get cost price if available - direct API call approach
       if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
         try {
-          const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
-          
-          if (costPrice !== null && costPrice > 0) {
-            // Get current sync ID for consistent tag format
-            const currentSyncId = await getCurrentSyncId();
+          // Get credentials to make direct API call
+          const settings = await storage.getUser(1); // Simplified: using first user
+          if (settings?.shopifyApiSecret && settings?.shopifyStoreUrl) {
+            const baseUrl = `https://${settings.shopifyStoreUrl}/admin/api/2022-10`;
+            const url = `${baseUrl}/inventory_items/${product.inventoryItemId}.json`;
             
-            // Use consistent format for log message with SyncID tag at the end
-            const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
-            log(logMessage);
-            
-            // Log cost price for UI display - use the exact same format for consistency
-            await logCostPrice(product.sku, costPrice, logMessage);
-            
-            // Update cost price in database
-            await storage.updateProduct(existingProduct.id, {
-              costPrice
+            // Make direct API call
+            const response = await fetch(url, {
+              headers: {
+                'X-Shopify-Access-Token': settings.shopifyApiSecret,
+                'Content-Type': 'application/json'
+              }
             });
+            
+            if (response.ok) {
+              const data = await response.json();
+              
+              if (data && data.inventory_item && data.inventory_item.cost) {
+                const costPrice = parseFloat(data.inventory_item.cost);
+                
+                // Format consistent log message with SyncID
+                const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+                log(logMessage);
+                
+                // Log for UI display with same format
+                await logCostPrice(product.sku, costPrice, logMessage);
+                
+                // Update database
+                await storage.updateProduct(existingProduct.id, { costPrice });
+              }
+            }
           }
         } catch (err) {
           log(`Error getting cost price for ${product.sku}: ${err}`, 'shopify-sync-error');
@@ -625,30 +780,45 @@ async function processProduct(product: any, processedSkus: Set<string>): Promise
         productType: product.productType || null
       });
       
-      // Log successful creation with product count and current sync ID - important for progress tracking
-      const currentSyncId = await getCurrentSyncId();
+      // Log successful creation with current sync ID - important for progress tracking
+      const syncProgress = await storage.getShopifySyncProgress();
+      const currentSyncId = syncProgress?.id || 0;
       log(`Successfully updated product ${newProduct.id} [SyncID: ${currentSyncId}]`);
       
-      // Get cost price if available
+      // Get cost price if available - direct API call approach
       if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
         try {
-          const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
-          
-          if (costPrice !== null && costPrice > 0) {
-            // Get current sync ID for consistent tag format
-            const currentSyncId = await getCurrentSyncId();
+          // Get credentials to make direct API call
+          const settings = await storage.getUser(1); // Simplified: using first user
+          if (settings?.shopifyApiSecret && settings?.shopifyStoreUrl) {
+            const baseUrl = `https://${settings.shopifyStoreUrl}/admin/api/2022-10`;
+            const url = `${baseUrl}/inventory_items/${product.inventoryItemId}.json`;
             
-            // Use consistent format for log message with SyncID tag at the end
-            const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
-            log(logMessage);
-            
-            // Log cost price for UI display - use the exact same format for consistency
-            await logCostPrice(product.sku, costPrice, logMessage);
-            
-            // Update cost price in database
-            await storage.updateProduct(newProduct.id, {
-              costPrice
+            // Make direct API call
+            const response = await fetch(url, {
+              headers: {
+                'X-Shopify-Access-Token': settings.shopifyApiSecret,
+                'Content-Type': 'application/json'
+              }
             });
+            
+            if (response.ok) {
+              const data = await response.json();
+              
+              if (data && data.inventory_item && data.inventory_item.cost) {
+                const costPrice = parseFloat(data.inventory_item.cost);
+                
+                // Format consistent log message with SyncID
+                const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+                log(logMessage);
+                
+                // Log for UI display with same format
+                await logCostPrice(product.sku, costPrice, logMessage);
+                
+                // Update database
+                await storage.updateProduct(newProduct.id, { costPrice });
+              }
+            }
           }
         } catch (err) {
           log(`Error getting cost price for ${product.sku}: ${err}`, 'shopify-sync-error');
@@ -662,7 +832,6 @@ async function processProduct(product: any, processedSkus: Set<string>): Promise
     log(`Error processing product ${product?.sku || 'unknown'}: ${error}`, 'shopify-sync-error');
     return { success: false };
   }
-}
 }
 
 /**
