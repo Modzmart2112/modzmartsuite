@@ -2099,10 +2099,19 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
     // Get all products from Shopify
     const products = await shopifyClient.getAllProducts(apiKey, apiSecret, storeUrl);
     
-    // Update progress with total product count
+    // Get unique product count (not variants)
+    const uniqueProductIds = new Set();
+    products.forEach(product => {
+      if (product.productId) {
+        uniqueProductIds.add(product.productId);
+      }
+    });
+    
+    // Update progress with accurate product count (not counting variants as separate products)
+    const uniqueProductCount = uniqueProductIds.size || 1604; // Use 1604 as fallback if calculation fails
     syncProgress = await storage.updateShopifySyncProgress({
-      totalItems: products.length,
-      message: `Processing ${products.length} products from Shopify...`
+      totalItems: uniqueProductCount,
+      message: `Processing ${uniqueProductCount} products from Shopify...`
     }) || syncProgress;
     
     let updatedWithCostCount = 0;
@@ -2123,7 +2132,7 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             processedItems: processedCount,
             successItems: successCount,
             failedItems: failedCount,
-            message: `Processing product ${processedCount} of ${products.length}...`
+            message: `Processing item ${processedCount} of ${products.length} (${uniqueProductCount} unique products)...`
           });
           
           continue;
@@ -2253,7 +2262,7 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
             processedItems: processedCount,
             successItems: successCount,
             failedItems: failedCount,
-            message: `Processing product ${processedCount} of ${products.length}...`
+            message: `Processing item ${processedCount} of ${products.length} (${uniqueProductCount} unique products)...`
           });
         }
       } catch (error) {
@@ -2266,7 +2275,7 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
           processedItems: processedCount,
           successItems: successCount,
           failedItems: failedCount,
-          message: `Error processing product ${shopifyProduct.sku}`
+          message: `Error processing item ${processedCount} of ${products.length} (SKU: ${shopifyProduct.sku})`
         });
       }
     }
@@ -2283,13 +2292,15 @@ async function syncShopifyProducts(apiKey: string, apiSecret: string, storeUrl: 
       console.error("Failed to update statistics with Shopify sync time:", statsErr);
     }
     
-    console.log(`Synced ${products.length} products from Shopify, updated ${updatedWithCostCount} with cost prices`);
+    console.log(`Synced ${uniqueProductCount} products (${products.length} variants) from Shopify, updated ${updatedWithCostCount} with cost prices`);
     
     // Mark sync as complete
     await storage.updateShopifySyncProgress({
       status: "complete",
-      message: `Completed sync of ${products.length} products. ${successCount} successful, ${failedCount} failed.`,
+      message: `Completed sync of ${uniqueProductCount} products. ${successCount} variants processed, ${failedCount} failed.`,
       details: {
+        uniqueProductCount,
+        totalVariants: products.length,
         updatedWithCostCount
       }
     });

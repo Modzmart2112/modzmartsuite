@@ -170,6 +170,8 @@ class ShopifyClient {
   // Get all products from Shopify
   async getAllProducts(apiKey: string, apiSecret: string, storeUrl: string): Promise<any[]> {
     try {
+      // Use a map to track unique products (excluding variants) for accurate product count
+      const uniqueProductsMap = new Map(); // Map product ID to product info
       const products = [];
       let params = "?limit=250";
       let hasNextPage = true;
@@ -200,6 +202,16 @@ class ShopifyClient {
         }
         
         const data = await response.json() as { products: any[] };
+        
+        // Track unique products for accurate count
+        for (const product of data.products) {
+          // Store in our map for accurate product count
+          uniqueProductsMap.set(product.id.toString(), {
+            id: product.id.toString(),
+            title: product.title,
+            variantCount: product.variants.length
+          });
+        }
         
         // Process products
         for (const product of data.products) {
@@ -255,6 +267,7 @@ class ShopifyClient {
             
             products.push({
               id: variant.id.toString(),
+              productId: product.id.toString(), // Add parent product ID for reference
               title: `${product.title} - ${variant.title !== 'Default Title' ? variant.title : ''}`.trim(),
               description: product.body_html || "",
               sku: variant.sku || "",
