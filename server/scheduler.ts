@@ -279,20 +279,41 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
       message: "Connecting to Shopify and fetching products"
     });
     
-    // Get all products from Shopify
-    const shopifyProducts = await shopifyClient.getAllProducts(
-      user.shopifyApiKey,
-      user.shopifyApiSecret,
-      storeUrl
-    );
-    
-    log(`Retrieved ${shopifyProducts.length} products from Shopify`, "shopify-sync");
-    
-    // Update progress with total items
-    await storage.updateShopifySyncProgress({
-      totalItems: shopifyProducts.length,
-      message: `Retrieved ${shopifyProducts.length} products from Shopify`
-    });
+    let shopifyProducts = [];
+    try {
+      // Get all products from Shopify
+      shopifyProducts = await shopifyClient.getAllProducts(
+        user.shopifyApiKey,
+        user.shopifyApiSecret,
+        storeUrl
+      );
+      
+      log(`Retrieved ${shopifyProducts.length} products from Shopify`, "shopify-sync");
+      
+      // Update progress with total items
+      await storage.updateShopifySyncProgress({
+        totalItems: shopifyProducts.length,
+        message: `Retrieved ${shopifyProducts.length} products from Shopify`
+      });
+    } catch (error) {
+      // If we hit a rate limit or other error, try to continue with any products we did retrieve
+      log(`Error fetching all products from Shopify: ${error}`, "shopify-sync");
+      
+      // Update progress but don't mark as error yet - we'll try to process any products we did get
+      await storage.updateShopifySyncProgress({
+        totalItems: shopifyProducts.length,
+        message: `Partial data retrieved (${shopifyProducts.length} products) due to rate limiting. Continuing with available data.`
+      });
+      
+      // If we got no products at all, mark as error and exit
+      if (shopifyProducts.length === 0) {
+        await storage.updateShopifySyncProgress({
+          status: "error",
+          message: `Failed to retrieve any products from Shopify: ${error instanceof Error ? error.message : String(error)}`
+        });
+        return;
+      }
+    }
     
     // Initialize counters for reporting
     let updatedCount = 0;

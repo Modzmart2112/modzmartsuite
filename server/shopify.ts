@@ -1,24 +1,82 @@
 import fetch from "node-fetch";
+import { log } from './vite';
 
 // Simple Shopify client for interacting with the Shopify Admin API
 class ShopifyClient {
+  // Rate limit settings
+  private readonly RATE_LIMIT_DELAY_MS = 1000; // 1 second between requests
+  private readonly RATE_LIMIT_RETRY_DELAY_MS = 2000; // 2 seconds after a 429 error
+  private readonly MAX_RETRIES = 3; // Maximum retries for rate-limited requests
+  private lastRequestTime = 0;
+
+  /**
+   * Make a rate-limited API request
+   * @param url The URL to request
+   * @param options Fetch options
+   * @returns Response from the API
+   */
+  private async rateLimit<T>(url: string, options: any): Promise<T> {
+    // Calculate time since last request
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    
+    // If we made a request recently, delay this one to respect rate limits
+    if (timeSinceLastRequest < this.RATE_LIMIT_DELAY_MS) {
+      const delay = this.RATE_LIMIT_DELAY_MS - timeSinceLastRequest;
+      log(`Rate limiting: Waiting ${delay}ms before next request`, 'shopify-api');
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    let retries = 0;
+    
+    while (true) {
+      this.lastRequestTime = Date.now();
+      
+      try {
+        const response = await fetch(url, options);
+        
+        // If we hit rate limits (429), back off and retry
+        if (response.status === 429) {
+          if (retries >= this.MAX_RETRIES) {
+            log(`Rate limit exceeded and max retries (${this.MAX_RETRIES}) reached`, 'shopify-api');
+            throw new Error(`Shopify API returned 429`);
+          }
+          
+          retries++;
+          log(`Rate limit hit (429). Retry ${retries}/${this.MAX_RETRIES} after ${this.RATE_LIMIT_RETRY_DELAY_MS}ms delay`, 'shopify-api');
+          await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_RETRY_DELAY_MS));
+          continue;
+        }
+        
+        // For other errors, throw
+        if (!response.ok) {
+          throw new Error(`Shopify API returned ${response.status}`);
+        }
+        
+        return await response.json() as T;
+      } catch (error) {
+        // If there was a network error (not a 429 response), throw it
+        if (!(error instanceof Error) || !error.message.includes('429')) {
+          throw error;
+        }
+        
+        // Otherwise, we're handling the 429 in the loop
+      }
+    }
+  }
+
   // Test Shopify connection
   async testConnection(apiKey: string, apiSecret: string, storeUrl: string): Promise<boolean> {
     try {
       const baseUrl = this.buildApiUrl(storeUrl);
-      const response = await fetch(`${baseUrl}/shop.json`, {
+      
+      const data = await this.rateLimit<{ shop: any }>(`${baseUrl}/shop.json`, {
         headers: this.buildHeaders(apiSecret) // Use API Secret (Access Token)
       });
       
-      if (!response.ok) {
-        console.error(`Shopify API returned status ${response.status}`);
-        throw new Error(`Shopify API returned ${response.status}`);
-      }
-      
-      const data = await response.json() as { shop: any };
       return !!data.shop;
     } catch (error) {
-      console.error("Shopify connection test failed:", error);
+      log("Shopify connection test failed: " + error, 'shopify-api');
       throw new Error("Failed to connect to Shopify");
     }
   }
@@ -33,13 +91,26 @@ class ShopifyClient {
       const baseUrl = this.buildApiUrl(storeUrl);
       
       while (hasNextPage) {
-        console.log(`Fetching products from Shopify: ${baseUrl}/products.json${params}`);
-        const response = await fetch(`${baseUrl}/products.json${params}`, {
-          headers: this.buildHeaders(apiSecret)
-        });
+        log(`Fetching products from Shopify: ${baseUrl}/products.json${params}`, 'shopify-api');
         
-        if (!response.ok) {
-          throw new Error(`Shopify API returned ${response.status}`);
+        // Use our rate-limited fetch for the main product request
+        let response: Response;
+        try {
+          response = await fetch(`${baseUrl}/products.json${params}`, {
+            headers: this.buildHeaders(apiSecret)
+          });
+          
+          if (response.status === 429) {
+            log(`Rate limit hit (429). Waiting ${this.RATE_LIMIT_RETRY_DELAY_MS}ms before retrying`, 'shopify-api');
+            await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_RETRY_DELAY_MS));
+            continue; // Retry this iteration
+          }
+          
+          if (!response.ok) {
+            throw new Error(`Shopify API returned ${response.status}`);
+          }
+        } catch (error) {
+          throw error;
         }
         
         const data = await response.json() as { products: any[] };
@@ -54,31 +125,45 @@ class ShopifyClient {
             
             if (inventoryItemId) {
               try {
-                // Fetch the inventory item to get cost
-                console.log(`Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`);
+                // Fetch the inventory item to get cost - with rate limiting
+                log(`Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`, 'shopify-api');
                 const inventoryUrl = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
-                console.log(`Request URL: ${inventoryUrl}`);
+                log(`Request URL: ${inventoryUrl}`, 'shopify-api');
                 
-                const inventoryResponse = await fetch(inventoryUrl, {
-                  headers: this.buildHeaders(apiSecret)
-                });
+                // Add delay between inventory requests to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
+                
+                let inventoryResponse: Response;
+                try {
+                  inventoryResponse = await fetch(inventoryUrl, {
+                    headers: this.buildHeaders(apiSecret)
+                  });
+                  
+                  if (inventoryResponse.status === 429) {
+                    log(`Rate limit hit (429) for inventory. Skipping cost price for ${variant.sku}`, 'shopify-api');
+                    continue; // Skip cost price for this item
+                  }
+                } catch (error) {
+                  log(`Network error fetching inventory: ${error}`, 'shopify-api');
+                  continue; // Skip cost price for this item
+                }
                 
                 if (inventoryResponse.ok) {
                   const inventoryData = await inventoryResponse.json();
-                  console.log(`Inventory data for ${variant.sku}:`, JSON.stringify(inventoryData).substring(0, 300));
+                  log(`Inventory data for ${variant.sku}: ${JSON.stringify(inventoryData).substring(0, 300)}`, 'shopify-api');
                   
                   // Correctly extract cost from inventory_item
                   if (inventoryData && inventoryData.inventory_item) {
                     costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                    console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                    log(`Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
                   } else {
-                    console.warn(`No inventory_item data found for SKU ${variant.sku}`);
+                    log(`No inventory_item data found for SKU ${variant.sku}`, 'shopify-api');
                   }
                 } else {
-                  console.error(`Failed to fetch inventory: ${inventoryResponse.status} ${inventoryResponse.statusText}`);
+                  log(`Failed to fetch inventory: ${inventoryResponse.status} ${inventoryResponse.statusText}`, 'shopify-api');
                 }
               } catch (error) {
-                console.error(`Failed to fetch cost for inventory item ${inventoryItemId}:`, error);
+                log(`Failed to fetch cost for inventory item ${inventoryItemId}: ${error}`, 'shopify-api');
               }
             }
             
@@ -104,6 +189,9 @@ class ShopifyClient {
           if (match && match[1]) {
             const url = new URL(match[1]);
             params = url.search;
+            
+            // Add a delay before fetching the next page
+            await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
           } else {
             hasNextPage = false;
           }
@@ -114,7 +202,7 @@ class ShopifyClient {
       
       return products;
     } catch (error) {
-      console.error("Error fetching Shopify products:", error);
+      log("Error fetching Shopify products: " + error, 'shopify-api');
       throw error;
     }
   }
@@ -123,12 +211,26 @@ class ShopifyClient {
   async getProductBySku(apiKey: string, apiSecret: string, storeUrl: string, sku: string): Promise<any | null> {
     try {
       const baseUrl = this.buildApiUrl(storeUrl);
-      const response = await fetch(`${baseUrl}/products.json?limit=250`, {
-        headers: this.buildHeaders(apiSecret)
-      });
       
-      if (!response.ok) {
-        throw new Error(`Shopify API returned ${response.status}`);
+      // Use rate-limited fetch for the products request
+      let response: Response;
+      try {
+        log(`Fetching products to find SKU ${sku}`, 'shopify-api');
+        response = await fetch(`${baseUrl}/products.json?limit=250`, {
+          headers: this.buildHeaders(apiSecret)
+        });
+        
+        if (response.status === 429) {
+          log(`Rate limit hit (429). Waiting before retrying`, 'shopify-api');
+          await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_RETRY_DELAY_MS));
+          return null; // Return null instead of retrying to prevent UI hangs
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Shopify API returned ${response.status}`);
+        }
+      } catch (error) {
+        throw error;
       }
       
       const data = await response.json() as { products: any[] };
@@ -142,31 +244,36 @@ class ShopifyClient {
             
             if (inventoryItemId) {
               try {
-                // Fetch the inventory item to get cost
-                console.log(`Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`);
+                // Fetch the inventory item to get cost - with rate limiting
+                log(`Fetching inventory item ${inventoryItemId} for SKU ${variant.sku}`, 'shopify-api');
                 const inventoryUrl = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
-                console.log(`Request URL: ${inventoryUrl}`);
+                log(`Request URL: ${inventoryUrl}`, 'shopify-api');
+                
+                // Add delay between inventory requests to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
                 
                 const inventoryResponse = await fetch(inventoryUrl, {
                   headers: this.buildHeaders(apiSecret)
                 });
                 
-                if (inventoryResponse.ok) {
+                if (inventoryResponse.status === 429) {
+                  log(`Rate limit hit (429) for inventory. Skipping cost price for ${variant.sku}`, 'shopify-api');
+                } else if (inventoryResponse.ok) {
                   const inventoryData = await inventoryResponse.json();
-                  console.log(`Inventory data for ${variant.sku}:`, JSON.stringify(inventoryData).substring(0, 300));
+                  log(`Inventory data for ${variant.sku}: ${JSON.stringify(inventoryData).substring(0, 300)}`, 'shopify-api');
                   
                   // Correctly extract cost from inventory_item
                   if (inventoryData && inventoryData.inventory_item) {
                     costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                    console.log(`Got cost price for ${variant.sku}: $${costPrice}`);
+                    log(`Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
                   } else {
-                    console.warn(`No inventory_item data found for SKU ${variant.sku}`);
+                    log(`No inventory_item data found for SKU ${variant.sku}`, 'shopify-api');
                   }
                 } else {
-                  console.error(`Failed to fetch inventory: ${inventoryResponse.status} ${inventoryResponse.statusText}`);
+                  log(`Failed to fetch inventory: ${inventoryResponse.status} ${inventoryResponse.statusText}`, 'shopify-api');
                 }
               } catch (error) {
-                console.error(`Failed to fetch cost for inventory item ${inventoryItemId}:`, error);
+                log(`Failed to fetch cost for inventory item ${inventoryItemId}: ${error}`, 'shopify-api');
               }
             }
             
@@ -187,7 +294,7 @@ class ShopifyClient {
       
       return null;
     } catch (error) {
-      console.error(`Error fetching Shopify product by SKU ${sku}:`, error);
+      log(`Error fetching Shopify product by SKU ${sku}: ${error}`, 'shopify-api');
       throw error;
     }
   }
@@ -196,7 +303,7 @@ class ShopifyClient {
   async updateProductPrice(variantId: string, price: number): Promise<void> {
     // This is a simplified implementation
     // In a real app, this would call the Shopify API to update the product price
-    console.log(`Updating Shopify variant ${variantId} price to ${price}`);
+    log(`Updating Shopify variant ${variantId} price to ${price}`, 'shopify-api');
   }
   
   // Helper methods
@@ -220,7 +327,7 @@ class ShopifyClient {
     // Strip protocol for final URL construction
     normalizedUrl = normalizedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
     
-    console.log(`Normalized Shopify URL: ${normalizedUrl}`);
+    log(`Normalized Shopify URL: ${normalizedUrl}`, 'shopify-api');
     return `https://${normalizedUrl}/admin/api/2022-10`;
   }
   
