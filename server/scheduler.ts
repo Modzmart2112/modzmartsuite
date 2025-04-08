@@ -230,6 +230,8 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     // Update progress status to in-progress
     syncProgress = await storage.updateShopifySyncProgress({
       status: "in-progress",
+      totalItems: 0, // Reset totalItems
+      processedItems: 0, // Reset processedItems
       message: "Starting Shopify product synchronization"
     });
     
@@ -239,9 +241,10 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     if (!user || !user.shopifyApiKey || !user.shopifyApiSecret || !user.shopifyStoreUrl) {
       log("Shopify credentials not configured, skipping sync", "shopify-sync");
       
-      // Update progress to error
+      // Update progress to error with completedAt date
       await storage.updateShopifySyncProgress({
         status: "error",
+        completedAt: new Date(),
         message: "Shopify credentials not configured"
       });
       
@@ -263,9 +266,10 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     } catch (error) {
       log(`Invalid Shopify store URL: ${storeUrl}`, "shopify-sync");
       
-      // Update progress to error
+      // Update progress to error with completedAt date
       await storage.updateShopifySyncProgress({
         status: "error",
+        completedAt: new Date(),
         message: "Invalid Shopify store URL"
       });
       
@@ -309,6 +313,7 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
       if (shopifyProducts.length === 0) {
         await storage.updateShopifySyncProgress({
           status: "error",
+          completedAt: new Date(),
           message: `Failed to retrieve any products from Shopify: ${error instanceof Error ? error.message : String(error)}`
         });
         return;
@@ -395,9 +400,10 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     
     log(`Shopify sync complete: ${updatedCount} updated, ${createdCount} created, ${errorCount} errors`, "shopify-sync");
     
-    // Update sync progress to complete
+    // Update sync progress to complete with explicit completedAt date
     await storage.updateShopifySyncProgress({
       status: "complete",
+      completedAt: new Date(),
       processedItems: processedCount,
       successItems: updatedCount + createdCount,
       failedItems: errorCount,
@@ -418,7 +424,8 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
     try {
       await storage.updateShopifySyncProgress({
         status: "error",
-        message: `Sync failed with error: ${error.message || "Unknown error"}`
+        completedAt: new Date(),
+        message: `Sync failed with error: ${error instanceof Error ? error.message : "Unknown error"}`
       });
     } catch (updateError) {
       log(`Error updating sync progress: ${updateError}`, "shopify-sync");
