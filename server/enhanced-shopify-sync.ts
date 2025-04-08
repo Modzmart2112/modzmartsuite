@@ -323,7 +323,13 @@ async function processProducts(
       }
     });
     
-    for (const product of allProducts) {
+    // Process a small number of products at a time with progress updates
+    const ORGANIZE_BATCH_SIZE = 100; // Process this many products at once during organization
+    
+    // Process all products in small chunks to avoid appearing to do too much at once
+    for (let i = 0; i < allProducts.length; i++) {
+      const product = allProducts[i];
+      
       if (!product.productId) continue;
       
       const productId = product.productId.toString();
@@ -335,16 +341,57 @@ async function processProducts(
       if (variants) {
         variants.push(product);
       }
+      
+      // Update progress periodically during organization
+      if (i > 0 && i % ORGANIZE_BATCH_SIZE === 0) {
+        await storage.updateShopifySyncProgress({
+          status: "in-progress",
+          message: `Step 2/3: Organizing products (${i}/${allProducts.length})...`,
+          processedItems: 0, // Still 0 because we haven't started actual processing
+          totalItems: totalVariantCount,
+          details: {
+            step: 2,
+            stepName: "organizing",
+            organizedCount: i,
+            totalToOrganize: allProducts.length,
+            organizingProgress: (i / allProducts.length) * 100
+          }
+        });
+        
+        // Small delay to prevent the UI from freezing
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
     }
     
     log(`Organized products into ${productGroups.size} unique product groups`);
+    
+    // Add a pause before starting actual processing
+    await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: `Step 2/3: Organization complete. Starting batch processing...`,
+      processedItems: 0,
+      totalItems: totalVariantCount,
+      details: {
+        step: 2,
+        stepName: "organized",
+        uniqueProductCount: productGroups.size,
+        totalVariantCount,
+        startingProcessing: true
+      }
+    });
+    
+    // Wait a second to ensure UI updates before processing starts
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Process in batches
     let currentBatch: any[] = [];
     let processedProducts = 0;
     
     const productIds = Array.from(productGroups.keys());
+    const SMALL_BATCH_SIZE = Math.min(5, BATCH_SIZE); // Use much smaller batches initially
     
+    // Process the first few batches with smaller batch size to prevent the 
+    // appearance of large jumps in progress
     for (let i = 0; i < productIds.length; i++) {
       const productId = productIds[i];
       const variants = productGroups.get(productId) || [];
@@ -353,8 +400,26 @@ async function processProducts(
       currentBatch.push(...variants);
       processedProducts++;
       
+      // For the first 10 groups, use smaller batches for more granular progress
+      const effectiveBatchSize = i < 10 ? SMALL_BATCH_SIZE : BATCH_SIZE;
+      
       // Process batch if it has reached the batch size or it's the last product
-      if (currentBatch.length >= BATCH_SIZE || i === productIds.length - 1) {
+      if (currentBatch.length >= effectiveBatchSize || i === productIds.length - 1) {
+        // Update progress before processing to show we're starting this batch
+        await storage.updateShopifySyncProgress({
+          status: "in-progress",
+          message: `Step 2/3: Processing batch ${Math.floor(i / 5) + 1}...`,
+          processedItems: processedCount,
+          totalItems: totalVariantCount,
+          details: {
+            step: 2,
+            stepName: "processing",
+            batchNumber: Math.floor(i / 5) + 1,
+            processingProduct: processedProducts,
+            totalProducts: productGroups.size
+          }
+        });
+        
         // Process the current batch
         const batchResult = await processBatch(currentBatch);
         
@@ -435,6 +500,8 @@ async function processProducts(
 
 /**
  * Process a batch of product variants
+ * This function now processes a single product at a time with a delay
+ * to ensure more granular progress tracking
  */
 async function processBatch(products: any[]): Promise<{ 
   processed: number; 
@@ -444,8 +511,13 @@ async function processBatch(products: any[]): Promise<{
   let success = 0;
   let failed = 0;
   
+  // Process each product individually with a tiny delay to prevent instant processing appearance
   for (const product of products) {
     try {
+      // Add a tiny delay between each product to prevent the app from appearing
+      // to process hundreds of products instantly
+      await new Promise(resolve => setTimeout(resolve, 5)); // 5ms delay is nearly imperceptible
+      
       // Skip products without required fields
       if (!product.sku || !product.title || !product.shopifyId) {
         failed++;
