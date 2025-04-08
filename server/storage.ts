@@ -840,21 +840,44 @@ export class DatabaseStorage implements IStorage {
       // No parameters needed since values are directly in the query
       const result = await db.execute(query);
       
+      // Convert snake_case column names to camelCase for consistency
+      const mappedProducts = result.rows.map(product => {
+        return {
+          ...product,
+          // Manually map the snake_case fields to camelCase
+          costPrice: product.cost_price,
+          shopifyId: product.shopify_id,
+          shopifyPrice: product.shopify_price,
+          supplierUrl: product.supplier_url,
+          supplierPrice: product.supplier_price,
+          lastScraped: product.last_scraped,
+          lastChecked: product.last_checked,
+          hasPriceDiscrepancy: product.has_price_discrepancy,
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          productType: product.product_type,
+          onSale: product.on_sale,
+          originalPrice: product.original_price,
+          saleEndDate: product.sale_end_date,
+          saleId: product.sale_id
+        };
+      });
+      
       // Check if we got results
-      if (result.rows.length === 0) {
+      if (mappedProducts.length === 0) {
         console.log('No products found');
       } else {
         // Log a sample product to debug
-        const sampleProduct = result.rows[0];
+        const sampleProduct = mappedProducts[0];
         console.log('Product sample cost price check: ');
         console.log(`\tFirst product SKU: ${sampleProduct.sku}`);
-        console.log(`\tCost price: ${sampleProduct.cost_price}`);
-        console.log(`\tCost price type: ${typeof sampleProduct.cost_price}`);
+        console.log(`\tCost price: ${sampleProduct.costPrice}`);
+        console.log(`\tCost price type: ${typeof sampleProduct.costPrice}`);
         console.log(`\tAll properties: ${Object.keys(sampleProduct).join(', ')}`);
       }
       
-      console.log(`Found ${result.rows.length} products, total: ${result.rowCount || 'unknown'}`);
-      return result.rows as Product[];
+      console.log(`Found ${mappedProducts.length} products, total: ${result.rowCount || 'unknown'}`);
+      return mappedProducts as Product[];
     } catch (error) {
       console.error('Error fetching products:', error);
       return [];
@@ -1040,7 +1063,31 @@ export class DatabaseStorage implements IStorage {
       
       // Execute raw query without parameters
       const result = await db.execute(queryStr);
-      return result.rows as Product[];
+      
+      // Convert snake_case column names to camelCase for consistency
+      const mappedProducts = result.rows.map(product => {
+        return {
+          ...product,
+          // Manually map the snake_case fields to camelCase
+          costPrice: product.cost_price,
+          shopifyId: product.shopify_id,
+          shopifyPrice: product.shopify_price,
+          supplierUrl: product.supplier_url,
+          supplierPrice: product.supplier_price,
+          lastScraped: product.last_scraped,
+          lastChecked: product.last_checked,
+          hasPriceDiscrepancy: product.has_price_discrepancy,
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          productType: product.product_type,
+          onSale: product.on_sale,
+          originalPrice: product.original_price,
+          saleEndDate: product.sale_end_date,
+          saleId: product.sale_id
+        };
+      });
+      
+      return mappedProducts as Product[];
     } catch (error) {
       console.error(`Error fetching products for vendor ${vendor}:`, error);
       return [];
@@ -1061,7 +1108,31 @@ export class DatabaseStorage implements IStorage {
       
       // Execute raw query without parameters
       const result = await db.execute(queryStr);
-      return result.rows as Product[];
+      
+      // Convert snake_case column names to camelCase for consistency
+      const mappedProducts = result.rows.map(product => {
+        return {
+          ...product,
+          // Manually map the snake_case fields to camelCase
+          costPrice: product.cost_price,
+          shopifyId: product.shopify_id,
+          shopifyPrice: product.shopify_price,
+          supplierUrl: product.supplier_url,
+          supplierPrice: product.supplier_price,
+          lastScraped: product.last_scraped,
+          lastChecked: product.last_checked,
+          hasPriceDiscrepancy: product.has_price_discrepancy,
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          productType: product.product_type,
+          onSale: product.on_sale,
+          originalPrice: product.original_price,
+          saleEndDate: product.sale_end_date,
+          saleId: product.sale_id
+        };
+      });
+      
+      return mappedProducts as Product[];
     } catch (error) {
       console.error(`Error fetching products for product type ${productType}:`, error);
       return [];
@@ -1221,7 +1292,31 @@ export class DatabaseStorage implements IStorage {
       `;
       
       const result = await db.execute(sqlQuery);
-      return result.rows as Product[];
+      
+      // Convert snake_case column names to camelCase for consistency
+      const mappedProducts = result.rows.map(product => {
+        return {
+          ...product,
+          // Manually map the snake_case fields to camelCase
+          costPrice: product.cost_price,
+          shopifyId: product.shopify_id,
+          shopifyPrice: product.shopify_price,
+          supplierUrl: product.supplier_url,
+          supplierPrice: product.supplier_price,
+          lastScraped: product.last_scraped,
+          lastChecked: product.last_checked,
+          hasPriceDiscrepancy: product.has_price_discrepancy,
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          productType: product.product_type,
+          onSale: product.on_sale,
+          originalPrice: product.original_price,
+          saleEndDate: product.sale_end_date,
+          saleId: product.sale_id
+        };
+      });
+      
+      return mappedProducts as Product[];
     } catch (error) {
       console.error('Error searching products:', error);
       return [];

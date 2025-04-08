@@ -275,8 +275,8 @@ export function ProductList({
               ) : products.length > 0 ? (
                 products.map((product: any) => {
                   // Calculate margin percentage if both retail and cost price are available
-                  const margin = product.cost_price ? 
-                    ((product.shopify_price - product.cost_price) / product.shopify_price * 100).toFixed(1) : 
+                  const margin = product.costPrice ? 
+                    ((product.shopifyPrice - product.costPrice) / product.shopifyPrice * 100).toFixed(1) : 
                     null;
                   
                   return (
@@ -296,16 +296,16 @@ export function ProductList({
                       )}
                       <TableCell className="font-medium">{product.sku}</TableCell>
                       <TableCell>{product.title}</TableCell>
-                      <TableCell>${formatPrice(product.shopify_price)}</TableCell>
+                      <TableCell>${formatPrice(product.shopifyPrice)}</TableCell>
                       <TableCell>
-                        {product.cost_price 
-                          ? <span className="font-medium">${formatPrice(product.cost_price)}</span>
+                        {product.costPrice 
+                          ? <span className="font-medium">${formatPrice(product.costPrice)}</span>
                           : <span className="text-gray-400">Not set</span>
                         }
                       </TableCell>
                       <TableCell>
-                        {product.supplier_price 
-                          ? `$${formatPrice(product.supplier_price)}`
+                        {product.supplierPrice 
+                          ? `$${formatPrice(product.supplierPrice)}`
                           : <span className="text-gray-400">Not available</span>
                         }
                       </TableCell>
@@ -322,7 +322,7 @@ export function ProductList({
                               </TooltipTrigger>
                               <TooltipContent>
                                 <div className="text-sm">
-                                  <p>Profit: ${formatPrice(product.shopify_price - (product.cost_price || 0))}</p>
+                                  <p>Profit: ${formatPrice(product.shopifyPrice - (product.costPrice || 0))}</p>
                                   <p className="mt-1 text-xs text-muted-foreground">
                                     Based on retail vs. cost price
                                   </p>
@@ -335,7 +335,7 @@ export function ProductList({
                         )}
                       </TableCell>
                       <TableCell>
-                        {product.has_price_discrepancy ? (
+                        {product.hasPriceDiscrepancy ? (
                           <Badge variant="destructive">Price Discrepancy</Badge>
                         ) : (
                           <Badge variant="outline" className="bg-green-100 text-green-800">
@@ -344,8 +344,8 @@ export function ProductList({
                         )}
                       </TableCell>
                       <TableCell>
-                        {product.updated_at 
-                          ? new Date(product.updated_at).toLocaleString()
+                        {product.updatedAt 
+                          ? new Date(product.updatedAt).toLocaleString()
                           : '-'
                         }
                       </TableCell>
