@@ -1723,7 +1723,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post('/api/sales/campaigns', asyncHandler(async (req, res) => {
     try {
-      const campaignData = insertSaleCampaignSchema.parse(req.body);
+      const rawData = req.body;
+      
+      // Convert date strings to Date objects if they exist
+      if (rawData.startDate && typeof rawData.startDate === 'string') {
+        rawData.startDate = new Date(rawData.startDate);
+      }
+      if (rawData.endDate && typeof rawData.endDate === 'string') {
+        rawData.endDate = new Date(rawData.endDate);
+      }
+      
+      const campaignData = insertSaleCampaignSchema.parse(rawData);
       const campaign = await storage.createSaleCampaign(campaignData);
       res.status(201).json({ campaign });
     } catch (error) {
@@ -1743,7 +1753,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid campaign ID" });
       }
       
-      const updatedCampaign = await storage.updateSaleCampaign(campaignId, req.body);
+      const rawData = req.body;
+      
+      // Convert date strings to Date objects if they exist
+      if (rawData.startDate && typeof rawData.startDate === 'string') {
+        rawData.startDate = new Date(rawData.startDate);
+      }
+      if (rawData.endDate && typeof rawData.endDate === 'string') {
+        rawData.endDate = new Date(rawData.endDate);
+      }
+      
+      const updatedCampaign = await storage.updateSaleCampaign(campaignId, rawData);
       
       if (!updatedCampaign) {
         return res.status(404).json({ error: "Sale campaign not found" });
