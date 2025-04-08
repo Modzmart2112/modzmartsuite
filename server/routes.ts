@@ -886,12 +886,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Filter by current sync session if requested
         if (filterBySync && currentSyncId > 0) {
-          // Either look for [SyncID: X] in "Successfully updated product" logs
-          // or logs that were created after sync started (if sync start time is available)
-          const isCurrentSync = (log.message && log.message.includes(`[SyncID: ${currentSyncId}]`)) ||
-            (syncProgress?.startedAt && new Date(log.createdAt) > new Date(syncProgress.startedAt));
-            
-          return isCostPriceLog && isCurrentSync;
+          // Check if this log contains the exact matching SyncID tag
+          const hasSyncIdTag = log.message && log.message.includes(`[SyncID: ${currentSyncId}]`);
+          
+          // Also check metadata for the syncId field
+          const hasSyncIdMetadata = log.metadata && log.metadata.syncId === currentSyncId;
+          
+          // Only include logs with matching SyncID
+          return isCostPriceLog && (hasSyncIdTag || hasSyncIdMetadata);
         }
         
         // Otherwise just return all cost price logs
