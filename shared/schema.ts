@@ -200,3 +200,19 @@ export const insertSyncProgressSchema = createInsertSchema(syncProgress).omit({ 
 // Types for sync progress
 export type SyncProgress = typeof syncProgress.$inferSelect;
 export type InsertSyncProgress = z.infer<typeof insertSyncProgressSchema>;
+
+// Table for Shopify API logs
+export const shopifyLogs = pgTable("shopify_logs", {
+  id: serial("id").primaryKey(),
+  message: text("message").notNull(),
+  level: text("level").default("info"), // info, warning, error
+  createdAt: timestamp("created_at").defaultNow(),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+});
+
+// Insert schema for Shopify logs
+export const insertShopifyLogSchema = createInsertSchema(shopifyLogs).omit({ id: true });
+
+// Types for Shopify logs
+export type ShopifyLog = typeof shopifyLogs.$inferSelect;
+export type InsertShopifyLog = z.infer<typeof insertShopifyLogSchema>;

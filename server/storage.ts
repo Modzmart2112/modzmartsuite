@@ -77,6 +77,7 @@ export interface IStorage {
   initializeShopifySyncProgress(): Promise<SyncProgress>;
   updateShopifySyncProgress(progress: Partial<SyncProgress>): Promise<SyncProgress | undefined>;
   getShopifySyncProgress(): Promise<SyncProgress | null>;
+  getRecentShopifyLogs(limit?: number): Promise<ShopifyLog[]>;
 }
 
 // In-memory storage implementation
@@ -90,6 +91,7 @@ export class MemStorage implements IStorage {
   private saleCampaigns: Map<number, SaleCampaign>;
   private saleCampaignTargets: Map<number, SaleCampaignTarget>;
   private syncProgresses: Map<number, SyncProgress>;
+  private shopifyLogs: Map<number, ShopifyLog>;
   
   private userIdCounter: number;
   private productIdCounter: number;
@@ -99,6 +101,7 @@ export class MemStorage implements IStorage {
   private saleCampaignIdCounter: number;
   private saleCampaignTargetIdCounter: number;
   private syncProgressIdCounter: number;
+  private shopifyLogIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -109,6 +112,7 @@ export class MemStorage implements IStorage {
     this.saleCampaigns = new Map();
     this.saleCampaignTargets = new Map();
     this.syncProgresses = new Map();
+    this.shopifyLogs = new Map();
     
     this.userIdCounter = 1;
     this.productIdCounter = 1;
@@ -118,6 +122,7 @@ export class MemStorage implements IStorage {
     this.saleCampaignIdCounter = 1;
     this.saleCampaignTargetIdCounter = 1;
     this.syncProgressIdCounter = 1;
+    this.shopifyLogIdCounter = 1;
     
     // Initialize with default stats
     this.stats = {
@@ -760,6 +765,21 @@ export class MemStorage implements IStorage {
     
     return sortedProgresses.length > 0 ? sortedProgresses[0] : null;
   }
+  
+  /**
+   * Get recent Shopify API logs for analyzing sync progress
+   * @param limit The maximum number of logs to retrieve
+   */
+  async getRecentShopifyLogs(limit: number = 20): Promise<ShopifyLog[]> {
+    // Get recent shopify logs, ordered by creation time descending (newest first)
+    return Array.from(this.shopifyLogs.values())
+      .sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeB - timeA;
+      })
+      .slice(0, limit);
+  }
 }
 
 // Database storage implementation
@@ -829,6 +849,14 @@ export class DatabaseStorage implements IStorage {
   async getProductCount(): Promise<number> {
     const result = await db.select({ count: sql`count(*)` }).from(products);
     return Number(result[0].count);
+  }
+  
+  /**
+   * Get the total count of products regardless of status
+   * Simple wrapper around getProductCount for cleaner API calls
+   */
+  async getTotalProductCount(): Promise<number> {
+    return this.getProductCount();
   }
 
   async getActiveProductCount(): Promise<number> {
@@ -1729,6 +1757,25 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return progress || null;
+  }
+  
+  /**
+   * Get recent Shopify API logs for analyzing sync progress
+   * @param limit The maximum number of logs to retrieve
+   */
+  async getRecentShopifyLogs(limit: number = 20): Promise<ShopifyLog[]> {
+    try {
+      // Get recent shopify logs, ordered by creation time descending (newest first)
+      const results = await db.select()
+        .from(shopifyLogs)
+        .orderBy(desc(shopifyLogs.createdAt))
+        .limit(limit);
+        
+      return results;
+    } catch (error) {
+      console.error('Error getting recent Shopify logs:', error);
+      return [];
+    }
   }
 }
 

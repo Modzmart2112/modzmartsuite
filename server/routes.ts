@@ -1271,6 +1271,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/scheduler/shopify-sync-progress", asyncHandler(async (req, res) => {
     // Return current sync progress from storage
     const syncProgress = await storage.getShopifySyncProgress();
+    
+    // If we're in the middle of a sync but totalItems isn't set yet, get an estimate based on inventory items
+    if (syncProgress && syncProgress.status === 'in-progress') {
+      // If we need to set the total items
+      if (!syncProgress.totalItems || syncProgress.totalItems === 0) {
+        // Get total product count from database for a rough estimate
+        const productCount = await storage.getTotalProductCount();
+        
+        // Set a minimum count to avoid division by zero, max 10% higher than actual count to be conservative
+        const totalEstimate = Math.max(productCount * 1.1, 50);
+        
+        // Update the sync progress with an estimate
+        await storage.updateShopifySyncProgress({
+          totalItems: Math.round(totalEstimate),
+          details: {
+            ...syncProgress.details,
+            isEstimate: true
+          }
+        });
+        
+        // Return updated progress
+        const updatedProgress = await storage.getShopifySyncProgress();
+        res.json(updatedProgress);
+        return;
+      }
+      
+      // If no processed items are set but we're in the middle of a sync
+      // This is used to show progress while the sync is determining the total
+      if (syncProgress.processedItems === 0 || syncProgress.processedItems === null) {
+        // Get the shopify logs to analyze actual progress
+        const logs = await storage.getRecentShopifyLogs(20);
+        
+        // Extract SKUs from the logs to determine how many items we've processed
+        const processedSKUs = new Set();
+        
+        for (const log of logs) {
+          // Extract SKU from log message like "Got cost price for AB-123456: $100.00"
+          const match = /Got cost price for ([A-Za-z0-9-]+): \$[\d.]+/.exec(log.message);
+          if (match && match[1]) {
+            processedSKUs.add(match[1]);
+          }
+        }
+        
+        // If we have processed SKUs from the logs
+        if (processedSKUs.size > 0) {
+          const processedCount = processedSKUs.size;
+          const totalItems = syncProgress.totalItems || 100; // Fallback to 100 if no estimate
+          const percentage = Math.min(Math.round((processedCount / totalItems) * 100), 99); // Cap at 99% until actually complete
+          
+          // Update progress based on log analysis
+          await storage.updateShopifySyncProgress({
+            processedItems: processedCount,
+            successItems: processedCount,
+            details: {
+              ...syncProgress.details,
+              percentage,
+              calculatedFromLogs: true
+            }
+          });
+          
+          // Return updated progress
+          const updatedProgress = await storage.getShopifySyncProgress();
+          res.json(updatedProgress);
+          return;
+        }
+      }
+    }
+    
+    // Return the progress as-is if no adjustments were needed
     res.json(syncProgress);
   }));
   
