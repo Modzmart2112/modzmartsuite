@@ -7,12 +7,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { format, formatDistanceToNow } from "date-fns";
-import { Loader2, Clock, RefreshCw, CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { Loader2, Clock, RefreshCw, CheckCircle, AlertCircle, XCircle, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
+import { useEffect, useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function ShopifySyncStatus() {
+  // State for cost price log entries
+  const [costPriceLogs, setCostPriceLogs] = useState<Array<{ sku: string, price: string, timestamp: Date }>>([]);
+  
   // Fetch scheduler status from API with aggressive refresh
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["/api/scheduler/status"],
@@ -32,10 +37,81 @@ export function ShopifySyncStatus() {
   // Fetch sync progress with aggressive refresh - using the scheduler endpoint
   const syncProgressQuery = useQuery({
     queryKey: ["/api/scheduler/shopify-sync-progress"],
-    refetchInterval: 2000, // Poll more frequently for sync progress
+    refetchInterval: 1000, // Poll more frequently for sync progress
     staleTime: 0,
     refetchOnWindowFocus: true,
   });
+
+  // Function to format price
+  const formatPrice = (price: string) => {
+    return price;
+  };
+  
+  // Effect to parse console logs for cost prices
+  useEffect(() => {
+    // Check if we have a sync in progress
+    const syncProgress = syncProgressQuery.data;
+    const isSyncing = syncProgress && (syncProgress.status === 'pending' || syncProgress.status === 'in-progress');
+    
+    if (isSyncing) {
+      // Function to fetch the server logs via the API
+      const fetchLogs = async () => {
+        try {
+          const response = await fetch('/api/logs/shopify');
+          if (response.ok) {
+            const logsData = await response.json();
+            
+            // Parse logs for cost price information
+            const newLogs: Array<{ sku: string, price: string, timestamp: Date }> = [];
+            
+            logsData.forEach((log: any) => {
+              // Extract SKU and price from log message like "Got cost price for AB-123456: $100.00"
+              const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)/.exec(log.message);
+              if (match && match[1] && match[2]) {
+                newLogs.push({
+                  sku: match[1],
+                  price: match[2],
+                  timestamp: new Date(log.createdAt)
+                });
+              }
+            });
+            
+            // Update state with most recent logs first, limit to 30 items
+            if (newLogs.length > 0) {
+              setCostPriceLogs(prevLogs => {
+                // Combine new logs with existing ones
+                const combined = [...newLogs, ...prevLogs];
+                
+                // Remove duplicates by SKU (keep most recent)
+                const uniqueLogs = combined.reduce((acc, current) => {
+                  const x = acc.find(item => item.sku === current.sku);
+                  if (!x) {
+                    return acc.concat([current]);
+                  } else {
+                    return acc;
+                  }
+                }, [] as Array<{ sku: string, price: string, timestamp: Date }>);
+                
+                // Sort by most recent first and limit to 30
+                return uniqueLogs
+                  .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+                  .slice(0, 30);
+              });
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching Shopify logs:", error);
+        }
+      };
+      
+      // Call once immediately
+      fetchLogs();
+      
+      // Set up interval to fetch logs
+      const intervalId = setInterval(fetchLogs, 2000);
+      return () => clearInterval(intervalId);
+    }
+  }, [syncProgressQuery.data]);
 
   // Formatted last sync time
   const lastSyncTime = data?.lastShopifySync 
@@ -76,6 +152,9 @@ export function ShopifySyncStatus() {
   // Handle manual sync
   const handleManualSync = async () => {
     try {
+      // Clear previous logs when starting a new sync
+      setCostPriceLogs([]);
+      
       // Use the correct endpoint path
       const response = await fetch("/api/scheduler/run-shopify-sync", {
         method: "POST",
@@ -123,6 +202,9 @@ export function ShopifySyncStatus() {
           title: "Sync reset",
           description: "Shopify sync status has been reset.",
         });
+        
+        // Clear cost price logs
+        setCostPriceLogs([]);
         
         // Refetch all data immediately
         refetch();
@@ -207,7 +289,33 @@ export function ShopifySyncStatus() {
                   {progressPercentage > 0 && ` (${progressPercentage}%)`}
                 </span>
               </div>
-              <Progress value={progressPercentage} className="h-2" />
+              
+              {/* Cost Price Live Feed */}
+              <div className="mt-2 border rounded-md">
+                <div className="bg-muted py-1.5 px-3 text-sm font-medium flex items-center border-b">
+                  <DollarSign className="h-4 w-4 mr-1.5 text-green-500" />
+                  Cost Price Feed
+                </div>
+                
+                <ScrollArea className="h-[150px] w-full">
+                  <div className="p-2">
+                    {costPriceLogs.length > 0 ? (
+                      costPriceLogs.map((log, i) => (
+                        <div key={`${log.sku}-${i}`} className="py-1 px-1 text-xs flex justify-between border-b last:border-b-0">
+                          <span className="font-medium">{log.sku}</span>
+                          <span className="text-green-600 font-semibold">${log.price}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-2 px-1 text-xs text-muted-foreground flex items-center justify-center">
+                        <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                        Waiting for cost price data...
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+              
               <p className="text-xs text-muted-foreground mt-1">{progressMessage}</p>
             </div>
           )}

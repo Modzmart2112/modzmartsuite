@@ -962,6 +962,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }));
   
+  // Get recent Shopify logs for displaying cost prices during sync
+  app.get("/api/logs/shopify", asyncHandler(async (req, res) => {
+    try {
+      // Get the recent Shopify logs (default limit 50)
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const shopifyLogs = await storage.getRecentShopifyLogs(limit);
+      
+      // Filter logs for those containing cost price information
+      const costPriceLogs = shopifyLogs.filter(log => 
+        log.message && log.message.includes("Got cost price for")
+      );
+      
+      res.json(costPriceLogs);
+    } catch (error) {
+      console.error("Error getting Shopify logs:", error);
+      res.status(500).json({ message: "Failed to retrieve Shopify logs" });
+    }
+  }));
+  
   // Debug endpoint to fetch sample products directly from Shopify with cost prices
   app.get("/api/shopify/sample-products", asyncHandler(async (req, res) => {
     try {
