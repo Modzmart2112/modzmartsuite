@@ -898,7 +898,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Filter by current sync session if requested
         if (filterBySync && currentSyncId > 0) {
           // Check if this log contains the exact matching SyncID tag
-          const hasSyncIdTag = log.message && log.message.includes(`[SyncID: ${currentSyncId}]`);
+          // Use a more precise regex pattern to ensure we match the exact SyncID
+          const syncIdPattern = new RegExp(`\\[SyncID: ${currentSyncId}\\]$`);
+          const hasSyncIdTag = log.message && syncIdPattern.test(log.message);
+          
+          console.log(`Log "${log.message.substring(0, 30)}..." has syncId ${currentSyncId}? ${hasSyncIdTag}`);
           
           // Only include logs with matching SyncID
           return isCostPriceLog && hasSyncIdTag;
@@ -1292,11 +1296,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         // Fall back to time-based filtering if no logs with SyncID found
+        // This is more selective - we only include logs from the last 10 minutes
+        // and make sure they include "cost price" to avoid including unrelated logs
         const timeBased = currentSyncLogs.length === 0 && syncProgress.startedAt
           ? shopifyLogs.filter(log => {
               const logDate = new Date(log.createdAt);
               const syncStartDate = new Date(syncProgress.startedAt);
-              return logDate > syncStartDate;
+              const tenMinutesBeforeNow = new Date(Date.now() - 10 * 60 * 1000);
+              
+              // Make sure log is after sync started AND within the last 10 minutes
+              // AND contains cost price information to avoid unrelated logs
+              return logDate > syncStartDate && 
+                     logDate > tenMinutesBeforeNow && 
+                     log.message && log.message.includes("Got cost price for");
             })
           : [];
             
@@ -1383,9 +1395,20 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
         console.log(`[shopify-sync] Clearing ${shopifyLogs.length} Shopify logs for clean reset`);
         
         try {
-          // Delete cost price logs to ensure clean state
-          await db.execute(sql`DELETE FROM shopify_logs WHERE created_at > NOW() - INTERVAL '1 hour'`);
-          console.log("[shopify-sync] Successfully cleared recent Shopify logs");
+          // Delete cost price logs to ensure clean state - specifically target logs with the existing sync ID
+          if (existingSync.id) {
+            // First, attempt to clean logs by sync ID tag
+            await db.execute(sql`DELETE FROM shopify_logs WHERE message LIKE '%[SyncID: ${existingSync.id}]%'`);
+            console.log(`[shopify-sync] Successfully cleared logs for sync ID ${existingSync.id}`);
+            
+            // Also clear very recent logs just to be safe (from last 5 minutes)
+            await db.execute(sql`DELETE FROM shopify_logs WHERE created_at > NOW() - INTERVAL '5 minutes'`);
+            console.log("[shopify-sync] Also cleared very recent logs for safety");
+          } else {
+            // Fallback to time-based clearing if no sync ID
+            await db.execute(sql`DELETE FROM shopify_logs WHERE created_at > NOW() - INTERVAL '30 minutes'`);
+            console.log("[shopify-sync] No sync ID found, cleared logs from last 30 minutes");
+          }
         } catch (dbError) {
           console.error("[shopify-sync] Error clearing Shopify logs:", dbError);
         }

@@ -556,10 +556,15 @@ async function processBatch(products: any[]): Promise<{
             const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
             
             if (costPrice !== null && costPrice > 0) {
-              log(`Got cost price for ${product.sku}: $${costPrice}`);
+              // Get current sync ID for consistent tag format
+              const currentSyncId = await getCurrentSyncId();
               
-              // Log cost price for UI display
-              await logCostPrice(product.sku, costPrice, `Cost price from Shopify inventory`);
+              // Use consistent format for log message with SyncID tag at the end
+              const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+              log(logMessage);
+              
+              // Log cost price for UI display - use the exact same format for consistency
+              await logCostPrice(product.sku, costPrice, logMessage);
               
               // Update cost price in database
               await storage.updateProduct(existingProduct.id, {
@@ -596,10 +601,15 @@ async function processBatch(products: any[]): Promise<{
             const costPrice = await shopifyClient.getInventoryCostPrice(product.inventoryItemId);
             
             if (costPrice !== null && costPrice > 0) {
-              log(`Got cost price for ${product.sku}: $${costPrice}`);
+              // Get current sync ID for consistent tag format
+              const currentSyncId = await getCurrentSyncId();
               
-              // Log cost price for UI display
-              await logCostPrice(product.sku, costPrice, `Cost price from Shopify inventory`);
+              // Use consistent format for log message with SyncID tag at the end
+              const logMessage = `Got cost price for ${product.sku}: $${costPrice} [SyncID: ${currentSyncId}]`;
+              log(logMessage);
+              
+              // Log cost price for UI display - use the exact same format for consistency
+              await logCostPrice(product.sku, costPrice, logMessage);
               
               // Update cost price in database
               await storage.updateProduct(newProduct.id, {

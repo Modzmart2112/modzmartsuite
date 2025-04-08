@@ -88,17 +88,25 @@ export function ShopifySyncStatus() {
                   timestamp: new Date(log.createdAt)
                 });
               } else {
-                // Fall back to regex extraction - updated to handle SyncID tags in log messages
-                const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)(?:\s+\[SyncID: \d+\])?/.exec(log.message);
+                // Fall back to regex extraction - using a more specific pattern to match SyncID tags exactly
+                // The pattern matches "Got cost price for SKU: $123.45 [SyncID: 123]" format
+                const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)(?:\s+\[SyncID: (\d+)\])?/.exec(log.message);
                 if (match && match[1] && match[2]) {
-                  // Only include products with a valid cost price
-                  const price = parseFloat(match[2]);
-                  if (!isNaN(price) && price > 0) {
-                    newLogs.push({
-                      sku: match[1],
-                      price: match[2],
-                      timestamp: new Date(log.createdAt)
-                    });
+                  // Check if the SyncID in the log matches the current syncProgress.id
+                  const logSyncId = match[3] ? parseInt(match[3]) : null;
+                  
+                  // Only use this log if it either has no SyncID tag or it has the correct SyncID
+                  // This ensures we don't show logs from other sync sessions
+                  if (!syncProgress.id || !logSyncId || logSyncId === syncProgress.id) {
+                    // Only include products with a valid cost price
+                    const price = parseFloat(match[2]);
+                    if (!isNaN(price) && price > 0) {
+                      newLogs.push({
+                        sku: match[1],
+                        price: match[2],
+                        timestamp: new Date(log.createdAt)
+                      });
+                    }
                   }
                 }
               }
