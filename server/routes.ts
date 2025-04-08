@@ -868,16 +868,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get recent Shopify logs for displaying cost prices during sync
   app.get("/api/logs/shopify", asyncHandler(async (req, res) => {
     try {
-      // Get the current sync ID
-      const syncProgress = await storage.getShopifySyncProgress();
-      const currentSyncId = syncProgress?.id || 0;
-      
       // Check if we want to filter by the current sync session
       const filterBySync = req.query.filterBySync === "true";
       
+      // Use the sync ID from the query parameter if provided, otherwise get current sync ID
+      let currentSyncId = 0;
+      if (req.query.syncId) {
+        currentSyncId = parseInt(req.query.syncId as string, 10);
+        console.log(`Using specific syncId from request: ${currentSyncId}`);
+      } else {
+        const syncProgress = await storage.getShopifySyncProgress();
+        currentSyncId = syncProgress?.id || 0;
+        console.log(`Using current sync ID: ${currentSyncId}`);
+      }
+      
       // Get the recent Shopify logs (default limit 50)
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const shopifyLogs = await storage.getRecentShopifyLogs(limit);
+      // Get more logs when filtering to ensure we don't miss any
+      const actualLimit = filterBySync ? Math.max(limit, 200) : limit;
+      const shopifyLogs = await storage.getRecentShopifyLogs(actualLimit);
+      
+      console.log(`Filtering ${shopifyLogs.length} logs, filterBySync: ${filterBySync}, syncId: ${currentSyncId}`);
       
       // Filter logs by cost price info and optionally by current sync ID
       const costPriceLogs = shopifyLogs.filter(log => {
@@ -889,11 +900,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Check if this log contains the exact matching SyncID tag
           const hasSyncIdTag = log.message && log.message.includes(`[SyncID: ${currentSyncId}]`);
           
-          // Also check metadata for the syncId field
-          const hasSyncIdMetadata = log.metadata && log.metadata.syncId === currentSyncId;
-          
           // Only include logs with matching SyncID
-          return isCostPriceLog && (hasSyncIdTag || hasSyncIdMetadata);
+          return isCostPriceLog && hasSyncIdTag;
         }
         
         // Otherwise just return all cost price logs

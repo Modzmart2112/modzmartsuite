@@ -47,17 +47,32 @@ export function ShopifySyncStatus() {
   });
 
   // Effect to fetch cost prices
+  // Track the current sync ID to detect when a new sync starts
+  const [currentSyncId, setCurrentSyncId] = useState<number | null>(null);
+  
   useEffect(() => {
     // Check if we have a sync in progress
     const syncProgress = syncProgressQuery.data;
     const isSyncing = syncProgress && (syncProgress.status === 'pending' || syncProgress.status === 'in-progress');
     
+    // Check if this is a new sync session (ID changed)
+    const syncId = syncProgress?.id || null;
+    const isNewSync = syncId !== currentSyncId;
+    
+    // Update the current sync ID when it changes
+    if (isNewSync && syncId) {
+      setCurrentSyncId(syncId);
+      // Clear previous logs when a new sync starts
+      setCostPriceLogs([]);
+      console.log(`New sync session detected! ID: ${syncId}`);
+    }
+    
     if (isSyncing) {
       // Function to fetch the server logs via the API
       const fetchLogs = async () => {
         try {
-          // Filter logs by current sync session to only show cost prices updated in this run
-          const response = await fetch('/api/logs/shopify?filterBySync=true');
+          // Add the specific sync ID to the filter query to ensure we only get logs from this sync session
+          const response = await fetch(`/api/logs/shopify?filterBySync=true&syncId=${syncProgress.id}`);
           if (response.ok) {
             const logsData = await response.json();
             
@@ -89,11 +104,11 @@ export function ShopifySyncStatus() {
               }
             });
             
-            // Update state with most recent logs first, limit to 20 items for better performance
+            // Using a replacement approach instead of merging to ensure we only show current sync logs
             if (newLogs.length > 0) {
               setCostPriceLogs(prevLogs => {
-                // Combine new logs with existing ones
-                const combined = [...newLogs, ...prevLogs];
+                // Start with just the new logs
+                const combined = [...newLogs];
                 
                 // Remove duplicates by SKU (keep most recent)
                 const uniqueLogs = combined.reduce((acc, current) => {
@@ -121,7 +136,7 @@ export function ShopifySyncStatus() {
       const intervalId = setInterval(fetchLogs, 2000);
       return () => clearInterval(intervalId);
     }
-  }, [syncProgressQuery.data]);
+  }, [syncProgressQuery.data, currentSyncId]);
 
   // Formatted last sync time
   const lastSyncTime = data?.lastShopifySync 
