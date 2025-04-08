@@ -842,24 +842,33 @@ export class DatabaseStorage implements IStorage {
       
       // Convert snake_case column names to camelCase for consistency
       const mappedProducts = result.rows.map(product => {
+        // Extract all the snake_case fields we want to rename
+        const { 
+          id, sku, title, description, status, images, vendor, 
+          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
+          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
+          product_type, on_sale, original_price, sale_end_date, sale_id
+        } = product;
+        
+        // Return a new object with only the fields we need
         return {
-          ...product,
-          // Manually map the snake_case fields to camelCase
-          costPrice: product.cost_price,
-          shopifyId: product.shopify_id,
-          shopifyPrice: product.shopify_price,
-          supplierUrl: product.supplier_url,
-          supplierPrice: product.supplier_price,
-          lastScraped: product.last_scraped,
-          lastChecked: product.last_checked,
-          hasPriceDiscrepancy: product.has_price_discrepancy,
-          createdAt: product.created_at,
-          updatedAt: product.updated_at,
-          productType: product.product_type,
-          onSale: product.on_sale,
-          originalPrice: product.original_price,
-          saleEndDate: product.sale_end_date,
-          saleId: product.sale_id
+          id, sku, title, description, status, images, vendor,
+          // Manually map the snake_case fields to camelCase only (no duplicates)
+          costPrice: cost_price,
+          shopifyId: shopify_id,
+          shopifyPrice: shopify_price, 
+          supplierUrl: supplier_url,
+          supplierPrice: supplier_price,
+          lastScraped: last_scraped,
+          lastChecked: last_checked,
+          hasPriceDiscrepancy: has_price_discrepancy,
+          createdAt: created_at,
+          updatedAt: updated_at,
+          productType: product_type,
+          onSale: on_sale,
+          originalPrice: original_price,
+          saleEndDate: sale_end_date,
+          saleId: sale_id
         };
       });
       
@@ -1066,24 +1075,33 @@ export class DatabaseStorage implements IStorage {
       
       // Convert snake_case column names to camelCase for consistency
       const mappedProducts = result.rows.map(product => {
+        // Extract all the snake_case fields we want to rename
+        const { 
+          id, sku, title, description, status, images, vendor: vendorName, 
+          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
+          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
+          product_type, on_sale, original_price, sale_end_date, sale_id
+        } = product;
+        
+        // Return a new object with only the fields we need
         return {
-          ...product,
-          // Manually map the snake_case fields to camelCase
-          costPrice: product.cost_price,
-          shopifyId: product.shopify_id,
-          shopifyPrice: product.shopify_price,
-          supplierUrl: product.supplier_url,
-          supplierPrice: product.supplier_price,
-          lastScraped: product.last_scraped,
-          lastChecked: product.last_checked,
-          hasPriceDiscrepancy: product.has_price_discrepancy,
-          createdAt: product.created_at,
-          updatedAt: product.updated_at,
-          productType: product.product_type,
-          onSale: product.on_sale,
-          originalPrice: product.original_price,
-          saleEndDate: product.sale_end_date,
-          saleId: product.sale_id
+          id, sku, title, description, status, images, vendor: vendorName,
+          // Manually map the snake_case fields to camelCase only (no duplicates)
+          costPrice: cost_price,
+          shopifyId: shopify_id,
+          shopifyPrice: shopify_price, 
+          supplierUrl: supplier_url,
+          supplierPrice: supplier_price,
+          lastScraped: last_scraped,
+          lastChecked: last_checked,
+          hasPriceDiscrepancy: has_price_discrepancy,
+          createdAt: created_at,
+          updatedAt: updated_at,
+          productType: product_type,
+          onSale: on_sale,
+          originalPrice: original_price,
+          saleEndDate: sale_end_date,
+          saleId: sale_id
         };
       });
       
@@ -1111,24 +1129,33 @@ export class DatabaseStorage implements IStorage {
       
       // Convert snake_case column names to camelCase for consistency
       const mappedProducts = result.rows.map(product => {
+        // Extract all the snake_case fields we want to rename
+        const { 
+          id, sku, title, description, status, images, vendor, 
+          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
+          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
+          product_type, on_sale, original_price, sale_end_date, sale_id
+        } = product;
+        
+        // Return a new object with only the fields we need
         return {
-          ...product,
-          // Manually map the snake_case fields to camelCase
-          costPrice: product.cost_price,
-          shopifyId: product.shopify_id,
-          shopifyPrice: product.shopify_price,
-          supplierUrl: product.supplier_url,
-          supplierPrice: product.supplier_price,
-          lastScraped: product.last_scraped,
-          lastChecked: product.last_checked,
-          hasPriceDiscrepancy: product.has_price_discrepancy,
-          createdAt: product.created_at,
-          updatedAt: product.updated_at,
-          productType: product.product_type,
-          onSale: product.on_sale,
-          originalPrice: product.original_price,
-          saleEndDate: product.sale_end_date,
-          saleId: product.sale_id
+          id, sku, title, description, status, images, vendor,
+          // Manually map the snake_case fields to camelCase only (no duplicates)
+          costPrice: cost_price,
+          shopifyId: shopify_id,
+          shopifyPrice: shopify_price, 
+          supplierUrl: supplier_url,
+          supplierPrice: supplier_price,
+          lastScraped: last_scraped,
+          lastChecked: last_checked,
+          hasPriceDiscrepancy: has_price_discrepancy,
+          createdAt: created_at,
+          updatedAt: updated_at,
+          productType: product_type,
+          onSale: on_sale,
+          originalPrice: original_price,
+          saleEndDate: sale_end_date,
+          saleId: sale_id
         };
       });
       
@@ -1295,24 +1322,33 @@ export class DatabaseStorage implements IStorage {
       
       // Convert snake_case column names to camelCase for consistency
       const mappedProducts = result.rows.map(product => {
+        // Extract all the snake_case fields we want to rename
+        const { 
+          id, sku, title, description, status, images, vendor, 
+          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
+          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
+          product_type, on_sale, original_price, sale_end_date, sale_id
+        } = product;
+        
+        // Return a new object with only the fields we need
         return {
-          ...product,
-          // Manually map the snake_case fields to camelCase
-          costPrice: product.cost_price,
-          shopifyId: product.shopify_id,
-          shopifyPrice: product.shopify_price,
-          supplierUrl: product.supplier_url,
-          supplierPrice: product.supplier_price,
-          lastScraped: product.last_scraped,
-          lastChecked: product.last_checked,
-          hasPriceDiscrepancy: product.has_price_discrepancy,
-          createdAt: product.created_at,
-          updatedAt: product.updated_at,
-          productType: product.product_type,
-          onSale: product.on_sale,
-          originalPrice: product.original_price,
-          saleEndDate: product.sale_end_date,
-          saleId: product.sale_id
+          id, sku, title, description, status, images, vendor,
+          // Manually map the snake_case fields to camelCase only (no duplicates)
+          costPrice: cost_price,
+          shopifyId: shopify_id,
+          shopifyPrice: shopify_price, 
+          supplierUrl: supplier_url,
+          supplierPrice: supplier_price,
+          lastScraped: last_scraped,
+          lastChecked: last_checked,
+          hasPriceDiscrepancy: has_price_discrepancy,
+          createdAt: created_at,
+          updatedAt: updated_at,
+          productType: product_type,
+          onSale: on_sale,
+          originalPrice: original_price,
+          saleEndDate: sale_end_date,
+          saleId: sale_id
         };
       });
       
