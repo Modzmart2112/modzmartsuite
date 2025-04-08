@@ -112,19 +112,20 @@ export async function improvedSyncShopifyProducts(): Promise<void> {
         uniqueVariantCount++;
       }
       
-      // Calculate an estimated completion time
-      const estimatedTotalTimeMs = uniqueVariantCount * AVERAGE_PROCESSING_TIME_MS;
+      // Calculate an estimated completion time - only count unique products for ETA
+      // This is a more accurate representation of what users see in Shopify admin
+      const estimatedTotalTimeMs = uniqueProductIds.size * AVERAGE_PROCESSING_TIME_MS;
       const estimatedCompletionDate = new Date(Date.now() + estimatedTotalTimeMs);
       
       log(`Found ${uniqueProductIds.size} unique products (${uniqueVariantCount} total variants) in Shopify`, "shopify-sync");
       
-      // Update progress with accurate counts and ETA
+      // Update progress with accurate counts and ETA - show unique product count as the total
       await storage.updateShopifySyncProgress({
-        totalItems: uniqueVariantCount,
+        totalItems: uniqueProductIds.size, // Use unique product count instead of variant count
         processedItems: 0,
         successItems: 0,
         failedItems: 0,
-        message: `Starting to process ${uniqueProductIds.size} products (${uniqueVariantCount} variants)`,
+        message: `Starting to process ${uniqueProductIds.size} products`,
         details: {
           uniqueProductCount: uniqueProductIds.size,
           estimatedCompletionTime: estimatedCompletionDate.toISOString(),
@@ -225,11 +226,13 @@ export async function improvedSyncShopifyProducts(): Promise<void> {
           if (processedCount % 10 === 0 || 
               percentage % 5 === 0 || 
               processedCount === uniqueVariantCount) {
+            // Show progress as processed count out of unique products (not variants)
+            // This matches what most users understand as their "product count" in Shopify
             await storage.updateShopifySyncProgress({
               processedItems: processedCount,
               successItems: successCount,
               failedItems: failedCount,
-              message: `Processing products: ${processedCount} of ${uniqueVariantCount} items processed so far`,
+              message: `Processing products: ${processedCount} items processed so far`,
               details: {
                 uniqueProductCount: uniqueProductIds.size,
                 estimatedCompletionTime: estimatedCompletionDate.toISOString(),
@@ -240,7 +243,7 @@ export async function improvedSyncShopifyProducts(): Promise<void> {
               }
             });
             
-            log(`Progress: ${processedCount}/${uniqueVariantCount} items (${percentage}%)`, "shopify-sync");
+            log(`Progress: ${processedCount}/${uniqueProductIds.size} products (${Math.min(Math.round((processedCount / uniqueProductIds.size) * 100), 100)}%)`, "shopify-sync");
           }
         }
       }

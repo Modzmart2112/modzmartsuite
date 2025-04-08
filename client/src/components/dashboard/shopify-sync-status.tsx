@@ -298,8 +298,13 @@ export function ShopifySyncStatus() {
               <div className="flex justify-between items-center text-sm">
                 <span className="font-medium text-blue-500">Sync in progress</span>
                 <span>
-                  {/* Simplified counter that just shows processed items */}
-                  {processedItems} / {totalItems} items
+                  {/* Show processed items without focusing on total, since the total might include variants */}
+                  {processedItems} items processed
+                  {syncProgress?.details?.uniqueProductCount && (
+                    <span className="text-xs text-muted-foreground ml-1">
+                      (of {syncProgress.details.uniqueProductCount} unique products)
+                    </span>
+                  )}
                 </span>
               </div>
               
