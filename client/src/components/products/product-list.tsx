@@ -24,15 +24,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProductFilter } from "@/components/product-filters";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Function to format price with commas - handles null/undefined values
+// Function to format price with commas - handles null/undefined values or issues with NaN
 const formatPrice = (price: number | null | undefined): string => {
-  if (price === null || price === undefined) {
+  if (price === null || price === undefined || isNaN(Number(price))) {
     return '0.00';
   }
-  return price.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+  
+  // Ensure the price is treated as a number
+  const numericPrice = typeof price === 'string' ? parseFloat(price) : price;
+  
+  try {
+    return numericPrice.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  } catch (error) {
+    console.error('Error formatting price:', numericPrice, error);
+    return '0.00';
+  }
 };
 
 export function ProductList({ 
@@ -302,6 +311,10 @@ export function ProductList({
                           ? <span className="font-medium">${formatPrice(product.costPrice)}</span>
                           : <span className="text-gray-400">Not set</span>
                         }
+                        {/* Debug display to check raw value */}
+                        {(process.env.NODE_ENV === 'development' && product.costPrice) && (
+                          <span className="block text-xs text-gray-400">Raw: {product.costPrice}</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {product.supplierPrice 

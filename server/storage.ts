@@ -850,15 +850,20 @@ export class DatabaseStorage implements IStorage {
           product_type, on_sale, original_price, sale_end_date, sale_id
         } = product;
         
+        // Parse cost_price to a number if it exists
+        const costPrice = cost_price !== null && cost_price !== undefined 
+          ? Number(cost_price) 
+          : null;
+        
         // Return a new object with only the fields we need
         return {
           id, sku, title, description, status, images, vendor,
           // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice: cost_price,
+          costPrice, // Use the parsed number value
           shopifyId: shopify_id,
-          shopifyPrice: shopify_price, 
+          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
           supplierUrl: supplier_url,
-          supplierPrice: supplier_price,
+          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
           lastScraped: last_scraped,
           lastChecked: last_checked,
           hasPriceDiscrepancy: has_price_discrepancy,
@@ -866,7 +871,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: updated_at,
           productType: product_type,
           onSale: on_sale,
-          originalPrice: original_price,
+          originalPrice: original_price !== null ? Number(original_price) : null,
           saleEndDate: sale_end_date,
           saleId: sale_id
         };
@@ -1083,15 +1088,20 @@ export class DatabaseStorage implements IStorage {
           product_type, on_sale, original_price, sale_end_date, sale_id
         } = product;
         
+        // Parse numeric fields to proper number types
+        const costPrice = cost_price !== null && cost_price !== undefined 
+          ? Number(cost_price) 
+          : null;
+        
         // Return a new object with only the fields we need
         return {
           id, sku, title, description, status, images, vendor: vendorName,
           // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice: cost_price,
+          costPrice,
           shopifyId: shopify_id,
-          shopifyPrice: shopify_price, 
+          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
           supplierUrl: supplier_url,
-          supplierPrice: supplier_price,
+          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
           lastScraped: last_scraped,
           lastChecked: last_checked,
           hasPriceDiscrepancy: has_price_discrepancy,
@@ -1099,7 +1109,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: updated_at,
           productType: product_type,
           onSale: on_sale,
-          originalPrice: original_price,
+          originalPrice: original_price !== null ? Number(original_price) : null,
           saleEndDate: sale_end_date,
           saleId: sale_id
         };
@@ -1137,15 +1147,20 @@ export class DatabaseStorage implements IStorage {
           product_type, on_sale, original_price, sale_end_date, sale_id
         } = product;
         
+        // Parse numeric fields to proper number types
+        const costPrice = cost_price !== null && cost_price !== undefined 
+          ? Number(cost_price) 
+          : null;
+        
         // Return a new object with only the fields we need
         return {
           id, sku, title, description, status, images, vendor,
           // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice: cost_price,
+          costPrice,
           shopifyId: shopify_id,
-          shopifyPrice: shopify_price, 
+          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
           supplierUrl: supplier_url,
-          supplierPrice: supplier_price,
+          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
           lastScraped: last_scraped,
           lastChecked: last_checked,
           hasPriceDiscrepancy: has_price_discrepancy,
@@ -1153,7 +1168,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: updated_at,
           productType: product_type,
           onSale: on_sale,
-          originalPrice: original_price,
+          originalPrice: original_price !== null ? Number(original_price) : null,
           saleEndDate: sale_end_date,
           saleId: sale_id
         };
@@ -1330,15 +1345,20 @@ export class DatabaseStorage implements IStorage {
           product_type, on_sale, original_price, sale_end_date, sale_id
         } = product;
         
+        // Parse numeric fields to proper number types
+        const costPrice = cost_price !== null && cost_price !== undefined 
+          ? Number(cost_price) 
+          : null;
+        
         // Return a new object with only the fields we need
         return {
           id, sku, title, description, status, images, vendor,
           // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice: cost_price,
+          costPrice,
           shopifyId: shopify_id,
-          shopifyPrice: shopify_price, 
+          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
           supplierUrl: supplier_url,
-          supplierPrice: supplier_price,
+          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
           lastScraped: last_scraped,
           lastChecked: last_checked,
           hasPriceDiscrepancy: has_price_discrepancy,
@@ -1346,7 +1366,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: updated_at,
           productType: product_type,
           onSale: on_sale,
-          originalPrice: original_price,
+          originalPrice: original_price !== null ? Number(original_price) : null,
           saleEndDate: sale_end_date,
           saleId: sale_id
         };

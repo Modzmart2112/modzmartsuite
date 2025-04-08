@@ -76,11 +76,15 @@ export function ShopifySyncStatus() {
                 // Fall back to regex extraction for backwards compatibility
                 const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)/.exec(log.message);
                 if (match && match[1] && match[2]) {
-                  newLogs.push({
-                    sku: match[1],
-                    price: match[2],
-                    timestamp: new Date(log.createdAt)
-                  });
+                  // Only include products with a valid cost price (not null, undefined, or <= 0)
+                  const price = parseFloat(match[2]);
+                  if (!isNaN(price) && price > 0) {
+                    newLogs.push({
+                      sku: match[1],
+                      price: match[2],
+                      timestamp: new Date(log.createdAt)
+                    });
+                  }
                 }
               }
             });
