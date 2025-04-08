@@ -268,6 +268,25 @@ const SaleManagementPage: React.FC = () => {
   const handleAddTarget = () => {
     if (!selectedCampaign) return;
     
+    // Ensure we have valid data before proceeding
+    if (newTarget.targetType === 'product' && (newTarget.targetId === null || isNaN(Number(newTarget.targetId)))) {
+      toast({
+        title: "Invalid Product ID",
+        description: "Please enter a valid product ID number",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if ((newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type') && !newTarget.targetValue) {
+      toast({
+        title: "Missing Value",
+        description: `Please select a ${newTarget.targetType === 'vendor' ? 'vendor' : 'product type'}`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const targetData = {
       targetType: newTarget.targetType,
       targetId: newTarget.targetType === 'product' ? Number(newTarget.targetId) : null,
@@ -1175,11 +1194,16 @@ const SaleManagementPage: React.FC = () => {
                   id="targetId"
                   className="col-span-3"
                   type="number"
-                  value={newTarget.targetId || ''}
-                  onChange={(e) => setNewTarget({ 
-                    ...newTarget, 
-                    targetId: e.target.value ? parseInt(e.target.value) : null 
-                  })}
+                  value={newTarget.targetId === null ? '' : newTarget.targetId}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    // Only set valid numbers or null
+                    const parsedValue = value ? Number(value) : null;
+                    setNewTarget({ 
+                      ...newTarget, 
+                      targetId: !isNaN(parsedValue) ? parsedValue : null 
+                    });
+                  }}
                   placeholder="Enter product ID"
                 />
               </div>
@@ -1192,7 +1216,9 @@ const SaleManagementPage: React.FC = () => {
             </Button>
             <Button 
               onClick={handleAddTarget} 
-              disabled={(newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type') ? !newTarget.targetValue : !newTarget.targetId}
+              disabled={(newTarget.targetType === 'vendor' || newTarget.targetType === 'product_type') 
+                ? !newTarget.targetValue 
+                : (newTarget.targetId === null || isNaN(Number(newTarget.targetId)))}
             >
               Add Target
             </Button>
