@@ -228,18 +228,35 @@ export async function checkAllPrices(): Promise<void> {
  * 2. Process products with clear ETA
  * 3. Complete sync with clean termination
  */
+/**
+ * Automated job to sync products from Shopify
+ * This job will run every hour to check for new or updated products in Shopify
+ * 
+ * NOTE: This function now uses the completely enhanced implementation 
+ * with the correct 3-step process:
+ * 1. Count products (accurate count of unique products)
+ * 2. Process products with clear ETA
+ * 3. Complete sync with clean termination
+ */
 export async function scheduledSyncShopifyProducts(): Promise<void> {
   try {
-    // Use the completely rebuilt implementation
-    return await import('./rebuilt-shopify-sync').then(module => module.rebuildSyncShopifyProducts());
+    // Use the new enhanced implementation with modernized UI support
+    return await import('./enhanced-shopify-sync').then(module => module.enhancedSyncShopifyProducts());
   } catch (error) {
-    log(`Error in scheduled Shopify sync: ${error}`, "shopify-sync");
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Error in scheduled Shopify sync: ${errorMessage}`, "shopify-sync-error");
     
-    // Update progress to failed state with completion time
+    // Update progress to failed state with completion time and detailed error info
     await storage.updateShopifySyncProgress({
       status: "failed",
       completedAt: new Date(),
-      message: `Sync failed with error: ${error instanceof Error ? error.message : String(error)}`
+      message: `Sync failed with error: ${errorMessage}`,
+      details: {
+        error: errorMessage,
+        errorStack: error instanceof Error ? error.stack : undefined,
+        step: "unknown",
+        timeOfFailure: new Date().toISOString()
+      }
     });
   }
 }

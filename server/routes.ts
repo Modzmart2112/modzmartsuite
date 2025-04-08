@@ -1071,13 +1071,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid Shopify store URL. Please update your connection info." });
       }
       
-      console.log(`Starting Shopify sync with URL: ${storeUrl}`);
+      console.log(`[shopify-sync] Starting enhanced Shopify sync with store: ${storeUrl}`);
       
-      // Start syncing products in the background
-      // Use the improved implementation for better progress tracking and performance
-      improvedSyncShopifyProducts().catch(console.error);
+      // Import and use the new enhanced implementation with 3-step process and modern UI support
+      import('./enhanced-shopify-sync').then(module => {
+        module.enhancedSyncShopifyProducts().catch(error => {
+          console.error("[shopify-sync] Error in enhanced sync process:", error);
+        });
+      });
       
-      res.json({ success: true, message: "Product sync initiated" });
+      res.json({ 
+        success: true, 
+        message: "Shopify product synchronization initiated",
+        details: {
+          process: "3-step synchronization",
+          steps: [
+            "Counting unique products", 
+            "Processing with real-time updates", 
+            "Completing with summary"
+          ]
+        }
+      });
     } catch (error) {
       console.error("Error syncing products:", error);
       res.status(500).json({ message: "Failed to sync products" });
@@ -1303,21 +1317,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Initialize the sync progress
       await storage.initializeShopifySyncProgress();
       
-      // Run the improved Shopify sync job
-      improvedSyncShopifyProducts().catch(err => {
-        console.error('Error in manual Shopify sync:', err);
-        // Update progress to indicate error
-        storage.updateShopifySyncProgress({
-          status: "error",
-          message: "Sync failed with error: " + err.message
-        }).catch(updateErr => {
-          console.error('Error updating sync progress:', updateErr);
+      // Use the new enhanced Shopify sync implementation
+      import('./enhanced-shopify-sync').then(module => {
+        module.enhancedSyncShopifyProducts().catch(err => {
+          console.error('[shopify-sync] Error in manual Shopify sync:', err);
+          // Update progress to indicate error with enhanced details
+          storage.updateShopifySyncProgress({
+            status: "failed",
+            message: "Sync failed with error: " + (err instanceof Error ? err.message : String(err)),
+            details: {
+              error: err instanceof Error ? err.message : String(err),
+              errorStack: err instanceof Error ? err.stack : undefined,
+              step: "unknown",
+              timeOfFailure: new Date().toISOString()
+            }
+          }).catch(updateErr => {
+            console.error('[shopify-sync] Error updating sync progress:', updateErr);
+          });
         });
       });
       
       res.json({
         success: true,
-        message: 'Shopify sync job started with improved implementation'
+        message: 'Shopify sync job started with enhanced implementation',
+        details: {
+          process: "3-step synchronization",
+          steps: [
+            "Counting unique products", 
+            "Processing with real-time updates", 
+            "Completing with summary"
+          ]
+        }
       });
     } catch (error) {
       console.error('Failed to start Shopify sync job:', error);
