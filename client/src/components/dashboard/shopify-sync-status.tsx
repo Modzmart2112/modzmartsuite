@@ -29,7 +29,7 @@ export function ShopifySyncStatus() {
     refetchOnWindowFocus: true,
   });
   
-  // Fetch sync progress with aggressive refresh
+  // Fetch sync progress with aggressive refresh - ensure correct endpoint
   const syncProgressQuery = useQuery({
     queryKey: ["/api/shopify/sync-progress"],
     refetchInterval: 2000, // Poll more frequently for sync progress
@@ -52,14 +52,26 @@ export function ShopifySyncStatus() {
   // Sync progress data
   const syncProgress = syncProgressQuery.data;
   const isSyncing = syncProgress && (syncProgress.status === 'pending' || syncProgress.status === 'in-progress');
-  const progressPercentage = syncProgress?.details?.percentage || 0;
+  
+  // Handle percentage calculation more robustly
+  let progressPercentage = 0;
+  if (syncProgress?.details?.percentage) {
+    progressPercentage = syncProgress.details.percentage;
+  } else if (syncProgress?.totalItems && syncProgress?.processedItems) {
+    progressPercentage = Math.round((syncProgress.processedItems / syncProgress.totalItems) * 100);
+  }
+  
   const progressMessage = syncProgress?.message || 'Initializing...';
   const processedItems = syncProgress?.processedItems || 0;
   const totalItems = syncProgress?.totalItems || 0;
+  
+  // Debug the sync progress to console
+  console.log("Sync progress:", syncProgress);
 
   // Handle manual sync
   const handleManualSync = async () => {
     try {
+      // Use the correct endpoint path
       const response = await fetch("/api/scheduler/run-shopify-sync", {
         method: "POST",
       });
@@ -76,13 +88,15 @@ export function ShopifySyncStatus() {
           syncProgressQuery.refetch();
         }, 1000);
       } else {
+        const errorData = await response.json();
         toast({
           title: "Sync failed",
-          description: "Failed to start Shopify sync.",
+          description: errorData?.message || "Failed to start Shopify sync.",
           variant: "destructive",
         });
       }
     } catch (error) {
+      console.error("Error starting sync:", error);
       toast({
         title: "Error",
         description: "An error occurred while trying to sync with Shopify.",
