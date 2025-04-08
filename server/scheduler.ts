@@ -292,12 +292,24 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
         storeUrl
       );
       
-      log(`Retrieved ${shopifyProducts.length} products from Shopify`, "shopify-sync");
+      // Count total variants for more accurate progress tracking
+      let totalVariants = 0;
+      for (const product of shopifyProducts) {
+        totalVariants += (product.variants?.length || 1);
+      }
+      
+      log(`Retrieved ${shopifyProducts.length} products (${totalVariants} variants) from Shopify`, "shopify-sync");
       
       // Update progress with total items
       await storage.updateShopifySyncProgress({
-        totalItems: shopifyProducts.length,
-        message: `Retrieved ${shopifyProducts.length} products from Shopify`
+        totalItems: totalVariants,
+        processedItems: 0,
+        successItems: 0,
+        failedItems: 0,
+        message: `Processing ${totalVariants} product variants from Shopify`,
+        details: {
+          percentage: 0
+        }
       });
     } catch (error) {
       // If we hit a rate limit or other error, try to continue with any products we did retrieve
@@ -375,12 +387,18 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
         processedCount++;
         
         // Update sync progress every 10 items to avoid too many DB operations
-        if (processedCount % 10 === 0 || processedCount === shopifyProducts.length) {
+        if (processedCount % 5 === 0 || processedCount === shopifyProducts.length) {
+          const totalItems = await storage.getShopifySyncProgress().then(p => p?.totalItems || 0);
+          const percentage = totalItems > 0 ? Math.round((processedCount / totalItems) * 100) : 0;
+          
           await storage.updateShopifySyncProgress({
             processedItems: processedCount,
             successItems: updatedCount + createdCount,
             failedItems: errorCount,
-            message: `Processing products (${processedCount}/${shopifyProducts.length})`
+            message: `Processing products (${processedCount} of ${totalItems} variants)`,
+            details: {
+              percentage
+            }
           });
         }
       } catch (error) {
@@ -389,11 +407,17 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
         log(`Error processing Shopify product ${shopifyProduct.sku}: ${error}`, "shopify-sync");
         
         // Update sync progress on errors immediately
+        const totalItems = await storage.getShopifySyncProgress().then(p => p?.totalItems || 0);
+        const percentage = totalItems > 0 ? Math.round((processedCount / totalItems) * 100) : 0;
+          
         await storage.updateShopifySyncProgress({
           processedItems: processedCount,
           successItems: updatedCount + createdCount,
           failedItems: errorCount,
-          message: `Processing products (${processedCount}/${shopifyProducts.length})`
+          message: `Processing products (${processedCount} of ${totalItems} variants, ${errorCount} errors)`,
+          details: {
+            percentage
+          }
         });
       }
     }
@@ -407,7 +431,10 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
       processedItems: processedCount,
       successItems: updatedCount + createdCount,
       failedItems: errorCount,
-      message: `Sync complete: ${updatedCount} updated, ${createdCount} created, ${errorCount} errors`
+      message: `Sync complete: ${updatedCount} updated, ${createdCount} created, ${errorCount} errors`,
+      details: {
+        percentage: 100
+      }
     });
     
     // Update last sync time in stats
@@ -425,7 +452,10 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
       await storage.updateShopifySyncProgress({
         status: "error",
         completedAt: new Date(),
-        message: `Sync failed with error: ${error instanceof Error ? error.message : "Unknown error"}`
+        message: `Sync failed with error: ${error instanceof Error ? error.message : "Unknown error"}`,
+        details: {
+          percentage: 0
+        }
       });
     } catch (updateError) {
       log(`Error updating sync progress: ${updateError}`, "shopify-sync");

@@ -55,11 +55,16 @@ export function ShopifySyncStatus() {
   
   // Handle percentage calculation more robustly
   let progressPercentage = 0;
-  if (syncProgress?.details?.percentage) {
+  if (syncProgress?.details?.percentage !== undefined) {
+    // Get percentage directly from details if available
     progressPercentage = syncProgress.details.percentage;
-  } else if (syncProgress?.totalItems && syncProgress?.processedItems) {
+  } else if (syncProgress?.totalItems && syncProgress?.totalItems > 0 && syncProgress?.processedItems) {
+    // Calculate percentage from processed/total if details not available
     progressPercentage = Math.round((syncProgress.processedItems / syncProgress.totalItems) * 100);
   }
+  
+  // Ensure progress percentage is bounded between 0-100
+  progressPercentage = Math.max(0, Math.min(100, progressPercentage));
   
   const progressMessage = syncProgress?.message || 'Initializing...';
   const processedItems = syncProgress?.processedItems || 0;
@@ -197,7 +202,10 @@ export function ShopifySyncStatus() {
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-medium text-blue-500">Sync in progress</span>
-                <span>{processedItems} / {totalItems} products</span>
+                <span>
+                  {processedItems} / {totalItems} products
+                  {progressPercentage > 0 && ` (${progressPercentage}%)`}
+                </span>
               </div>
               <Progress value={progressPercentage} className="h-2" />
               <p className="text-xs text-muted-foreground mt-1">{progressMessage}</p>
