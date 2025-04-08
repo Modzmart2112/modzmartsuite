@@ -41,13 +41,24 @@ function log(message: string, category = 'shopify-sync'): void {
  * and enhanced status reporting for the new UI
  */
 export async function enhancedSyncShopifyProducts(): Promise<void> {
-  // *** COMPLETE RESET - Force a complete fresh start ***
-  // First, manually mark any existing sync as complete to prevent resuming
+  // *** COMPLETE RESET - Force a completely fresh start ***
+  // Find the sync record we should be using (should be the one created by the routes.ts endpoint)
   const existingSync = await storage.getShopifySyncProgress();
-  if (existingSync && (existingSync.status === 'in-progress' || existingSync.status === 'pending')) {
-    log(`Found existing sync in ${existingSync.status} state - marking as complete to prevent resuming`);
+  
+  // Create a sync record if we don't have one (shouldn't happen since routes.ts creates one)
+  if (!existingSync) {
+    log('No sync record found. Creating a fresh one...');
+    await storage.initializeShopifySyncProgress();
+    // Get the newly created record
+    const newSync = await storage.getShopifySyncProgress();
+    
+    if (!newSync) {
+      throw new Error('Failed to create or retrieve a sync progress record');
+    }
+    
+    // Make sure all counters are reset to 0
     await storage.updateShopifySyncProgress({
-      id: existingSync.id,
+      id: newSync.id,
       status: "complete",
       completedAt: new Date(),
       message: "Previous sync marked as complete before starting new sync"

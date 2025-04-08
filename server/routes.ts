@@ -1291,7 +1291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced reset for any stuck Shopify sync - completely fresh start
   app.post("/api/scheduler/reset-shopify-sync", asyncHandler(async (req, res) => {
     try {
-      // STEP 1: Force-mark any existing sync as complete
+      // STEP 1: Force-mark any existing sync as complete and clear all progress data
       const existingSync = await storage.getShopifySyncProgress();
       if (existingSync) {
         console.log(`[shopify-sync] Resetting sync ID ${existingSync.id} from ${existingSync.status} state`);
@@ -1299,18 +1299,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: existingSync.id,
           status: "reset", // Mark as reset instead of complete
           completedAt: new Date(),
-          message: "Sync was manually reset by user"
+          message: "Sync was manually reset by user",
+          // CRITICAL: Reset all counters to remove "progress" information
+          processedItems: 0,
+          totalItems: 0,
+          successItems: 0,
+          failedItems: 0,
+          details: {
+            reset: true,
+            resetTime: new Date().toISOString(),
+            previousStatus: existingSync.status
+          }
         });
       }
       
-      // STEP 2: Create a completely fresh sync record with pending status but ready state
+      // DIRECT SQL CLEANUP: This ensures we don't have any stuck sync records
+      try {
+        await db.execute(sql`
+          UPDATE sync_progress 
+          SET status = 'reset', 
+              message = 'Automatically reset during cleanup', 
+              processed_items = 0,
+              total_items = 0,
+              success_items = 0,
+              failed_items = 0,
+              details = '{}'
+          WHERE type = 'shopify-sync' 
+          AND status IN ('pending', 'in-progress')
+        `);
+        console.log('[shopify-sync] Cleaned up any stuck sync records');
+      } catch (sqlError) {
+        console.error('[shopify-sync] Error cleaning up sync records:', sqlError);
+        // Continue with the reset process even if this fails
+      }
+      
+      // STEP 2: Create a completely fresh sync record with ready state
       const newSync = await storage.initializeShopifySyncProgress();
       
       // Update the new sync to indicate it's ready for a new start
       await storage.updateShopifySyncProgress({
         id: newSync.id,
         status: "ready", // Use ready status to clearly indicate it's ready for a new sync
-        message: "Ready for new sync - click Sync Now to begin"
+        message: "Ready for new sync - click Sync Now to begin",
+        // Explicitly set these to 0 to ensure we have no lingering progress
+        processedItems: 0,
+        totalItems: 0,
+        successItems: 0,
+        failedItems: 0
       });
       
       console.log(`[shopify-sync] Created fresh sync record with ID ${newSync.id} in 'ready' state`);
