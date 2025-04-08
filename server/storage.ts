@@ -79,6 +79,7 @@ export interface IStorage {
   updateShopifySyncProgress(progress: Partial<SyncProgress>): Promise<SyncProgress | undefined>;
   getShopifySyncProgress(): Promise<SyncProgress | null>;
   getRecentShopifyLogs(limit?: number): Promise<ShopifyLog[]>;
+  createShopifyLog(message: string, level?: string, metadata?: Record<string, any>): Promise<ShopifyLog>;
 }
 
 // In-memory storage implementation
@@ -780,6 +781,19 @@ export class MemStorage implements IStorage {
         return timeB - timeA;
       })
       .slice(0, limit);
+  }
+  
+  async createShopifyLog(message: string, level: string = 'info', metadata: Record<string, any> = {}): Promise<ShopifyLog> {
+    const id = this.shopifyLogIdCounter++;
+    const log: ShopifyLog = {
+      id,
+      message,
+      level,
+      createdAt: new Date(),
+      metadata
+    };
+    this.shopifyLogs.set(id, log);
+    return log;
   }
 }
 
@@ -1776,6 +1790,34 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error getting recent Shopify logs:', error);
       return [];
+    }
+  }
+  
+  async createShopifyLog(message: string, level: string = 'info', metadata: Record<string, any> = {}): Promise<ShopifyLog> {
+    try {
+      const logData = {
+        message,
+        level,
+        metadata,
+        createdAt: new Date()
+      };
+      
+      const [createdLog] = await db.insert(shopifyLogs)
+        .values(logData)
+        .returning();
+        
+      console.log(`Created Shopify log: ${message}`);
+      return createdLog;
+    } catch (error) {
+      console.error('Error creating Shopify log:', error);
+      // Return a minimal log object so the calling code doesn't break
+      return {
+        id: -1,
+        message,
+        level,
+        createdAt: new Date(),
+        metadata
+      };
     }
   }
 }

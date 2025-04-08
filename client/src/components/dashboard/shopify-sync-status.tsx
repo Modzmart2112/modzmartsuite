@@ -65,14 +65,23 @@ export function ShopifySyncStatus() {
             const newLogs: Array<{ sku: string, price: string, timestamp: Date }> = [];
             
             logsData.forEach((log: any) => {
-              // Extract SKU and price from log message like "Got cost price for AB-123456: $100.00"
-              const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)/.exec(log.message);
-              if (match && match[1] && match[2]) {
+              // First check if log has metadata from our new cost-logger module
+              if (log.metadata && log.metadata.type === 'cost_price' && log.metadata.sku && log.metadata.price) {
                 newLogs.push({
-                  sku: match[1],
-                  price: match[2],
+                  sku: log.metadata.sku,
+                  price: log.metadata.price.toFixed(2),
                   timestamp: new Date(log.createdAt)
                 });
+              } else {
+                // Fall back to regex extraction for backwards compatibility
+                const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)/.exec(log.message);
+                if (match && match[1] && match[2]) {
+                  newLogs.push({
+                    sku: match[1],
+                    price: match[2],
+                    timestamp: new Date(log.createdAt)
+                  });
+                }
               }
             });
             

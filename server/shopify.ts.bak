@@ -240,7 +240,7 @@ class ShopifyClient {
                   // Correctly extract cost from inventory_item
                   if (inventoryData && inventoryData.inventory_item) {
                     costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                    await logCostPrice(variant.sku, costPrice);
+                    log(`Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
                   } else {
                     log(`No inventory_item data found for SKU ${variant.sku}`, 'shopify-api');
                   }
@@ -350,7 +350,7 @@ class ShopifyClient {
                   // Correctly extract cost from inventory_item
                   if (inventoryData && inventoryData.inventory_item) {
                     costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                    await logCostPrice(variant.sku, costPrice);
+                    log(`Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
                   } else {
                     log(`No inventory_item data found for SKU ${variant.sku}`, 'shopify-api');
                   }

@@ -1,5 +1,7 @@
 import fetch from "node-fetch";
 import { log } from './vite';
+import { storage } from './storage';
+import { logCostPrice } from './cost-logger';
 
 // Simple Shopify client for interacting with the Shopify Admin API
 class ShopifyClient {
@@ -131,7 +133,8 @@ class ShopifyClient {
                 // Extract cost from inventory_item
                 if (inventoryData && inventoryData.inventory_item) {
                   costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                  log(`Debug: Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
+                  // Use the standardized cost logger with no custom message
+                  await logCostPrice(variant.sku, costPrice);
                 }
               }
             } catch (error) {
@@ -238,7 +241,7 @@ class ShopifyClient {
                   // Correctly extract cost from inventory_item
                   if (inventoryData && inventoryData.inventory_item) {
                     costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                    log(`Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
+                    await logCostPrice(variant.sku, costPrice);
                   } else {
                     log(`No inventory_item data found for SKU ${variant.sku}`, 'shopify-api');
                   }
@@ -348,7 +351,7 @@ class ShopifyClient {
                   // Correctly extract cost from inventory_item
                   if (inventoryData && inventoryData.inventory_item) {
                     costPrice = parseFloat(inventoryData.inventory_item.cost || '0');
-                    log(`Got cost price for ${variant.sku}: $${costPrice}`, 'shopify-api');
+                    await logCostPrice(variant.sku, costPrice);
                   } else {
                     log(`No inventory_item data found for SKU ${variant.sku}`, 'shopify-api');
                   }
