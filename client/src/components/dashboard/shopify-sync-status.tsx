@@ -56,7 +56,8 @@ export function ShopifySyncStatus() {
       // Function to fetch the server logs via the API
       const fetchLogs = async () => {
         try {
-          const response = await fetch('/api/logs/shopify');
+          // Filter logs by current sync session to only show cost prices updated in this run
+          const response = await fetch('/api/logs/shopify?filterBySync=true');
           if (response.ok) {
             const logsData = await response.json();
             

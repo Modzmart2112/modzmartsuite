@@ -546,8 +546,9 @@ async function processBatch(products: any[]): Promise<{
           status: product.status || 'active'
         });
         
-        // Log successful update with product count - important for progress tracking
-        log(`Successfully updated product ${existingProduct.id}`);
+        // Log successful update with product count and current sync ID - important for progress tracking
+        const currentSyncId = await getCurrentSyncId();
+        log(`Successfully updated product ${existingProduct.id} [SyncID: ${currentSyncId}]`);
         
         // Get cost price if available - improved error handling and retry logic
         if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
@@ -585,8 +586,9 @@ async function processBatch(products: any[]): Promise<{
           productType: product.productType || null
         });
         
-        // Log successful creation with product count - important for progress tracking
-        log(`Successfully updated product ${newProduct.id}`);
+        // Log successful creation with product count and current sync ID - important for progress tracking
+        const currentSyncId = await getCurrentSyncId();
+        log(`Successfully updated product ${newProduct.id} [SyncID: ${currentSyncId}]`);
         
         // Get cost price if available
         if (product.inventoryItemId && COST_CAPTURE_ENABLED) {
@@ -643,5 +645,19 @@ function formatDuration(ms: number): string {
     return `${minutes}m ${seconds % 60}s`;
   } else {
     return `${seconds}s`;
+  }
+}
+
+/**
+ * Get the current sync ID for adding to log messages
+ * This allows us to filter by sync session in the UI
+ */
+async function getCurrentSyncId(): Promise<number> {
+  try {
+    const syncProgress = await storage.getShopifySyncProgress();
+    return syncProgress?.id || 0;
+  } catch (error) {
+    console.error("Error getting current sync ID:", error);
+    return 0;
   }
 }

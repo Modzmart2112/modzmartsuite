@@ -16,8 +16,12 @@ import { storage } from './storage';
  */
 export async function logCostPrice(sku: string, price: number, message?: string): Promise<void> {
   try {
+    // Get the current sync ID to tag the logs
+    const syncProgress = await storage.getShopifySyncProgress();
+    const currentSyncId = syncProgress?.id || 0;
+    
     // Get the default message if not provided
-    const defaultMessage = `Got cost price for ${sku}: $${price.toFixed(2)}`;
+    const defaultMessage = `Got cost price for ${sku}: $${price.toFixed(2)}${currentSyncId ? ` [SyncID: ${currentSyncId}]` : ''}`;
     const logMessage = message || defaultMessage;
     
     // Log to console
@@ -31,6 +35,7 @@ export async function logCostPrice(sku: string, price: number, message?: string)
         type: 'cost_price',
         sku,
         price,
+        syncId: currentSyncId,
         timestamp: new Date().toISOString()
       }
     );

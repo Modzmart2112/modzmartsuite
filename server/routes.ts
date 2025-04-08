@@ -868,14 +868,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get recent Shopify logs for displaying cost prices during sync
   app.get("/api/logs/shopify", asyncHandler(async (req, res) => {
     try {
+      // Get the current sync ID
+      const syncProgress = await storage.getShopifySyncProgress();
+      const currentSyncId = syncProgress?.id || 0;
+      
+      // Check if we want to filter by the current sync session
+      const filterBySync = req.query.filterBySync === "true";
+      
       // Get the recent Shopify logs (default limit 50)
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const shopifyLogs = await storage.getRecentShopifyLogs(limit);
       
-      // Filter logs for those containing cost price information
-      const costPriceLogs = shopifyLogs.filter(log => 
-        log.message && log.message.includes("Got cost price for")
-      );
+      // Filter logs by cost price info and optionally by current sync ID
+      const costPriceLogs = shopifyLogs.filter(log => {
+        // Basic filter for cost price logs
+        const isCostPriceLog = log.message && log.message.includes("Got cost price for");
+        
+        // Filter by current sync session if requested
+        if (filterBySync && currentSyncId > 0) {
+          // Either look for [SyncID: X] in "Successfully updated product" logs
+          // or logs that were created after sync started (if sync start time is available)
+          const isCurrentSync = (log.message && log.message.includes(`[SyncID: ${currentSyncId}]`)) ||
+            (syncProgress?.startedAt && new Date(log.createdAt) > new Date(syncProgress.startedAt));
+            
+          return isCostPriceLog && isCurrentSync;
+        }
+        
+        // Otherwise just return all cost price logs
+        return isCostPriceLog;
+      });
       
       res.json(costPriceLogs);
     } catch (error) {
@@ -1245,21 +1266,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Find "Successfully updated product X" messages
         const updateRegex = /Successfully updated product (\d+)/;
+        const syncIdRegex = /\[SyncID: (\d+)\]/;
         
-        // Only count logs created after the current sync was started
-        // This filters out logs from previous sync sessions
-        const currentSyncLogs = syncProgress.startedAt 
+        // First try to use logs with explicit SyncID
+        const currentSyncLogs = shopifyLogs.filter(log => {
+          if (log.message && syncIdRegex.test(log.message)) {
+            // Extract the sync ID from the log message
+            const match = log.message.match(syncIdRegex);
+            if (match && match[1]) {
+              const logSyncId = parseInt(match[1]);
+              return logSyncId === syncProgress.id;
+            }
+          }
+          return false;
+        });
+        
+        // Fall back to time-based filtering if no logs with SyncID found
+        const timeBased = currentSyncLogs.length === 0 && syncProgress.startedAt
           ? shopifyLogs.filter(log => {
               const logDate = new Date(log.createdAt);
               const syncStartDate = new Date(syncProgress.startedAt);
               return logDate > syncStartDate;
             })
-          : shopifyLogs;
+          : [];
+            
+        // Combine both methods, prioritizing SyncID matches
+        const allCurrentLogs = currentSyncLogs.length > 0 
+          ? currentSyncLogs 
+          : timeBased;
           
-        console.log(`Found ${currentSyncLogs.length} logs from current sync session`);
+        console.log(`Found ${allCurrentLogs.length} logs from current sync session (${currentSyncLogs.length} by SyncID, ${timeBased.length} by timestamp)`);
         
         // Filter for successful updates only in this current sync
-        const successLogEntries = currentSyncLogs.filter(log => 
+        const successLogEntries = allCurrentLogs.filter(log => 
           updateRegex.test(log.message)
         );
 
