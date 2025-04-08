@@ -73,8 +73,8 @@ export function ShopifySyncStatus() {
                   timestamp: new Date(log.createdAt)
                 });
               } else {
-                // Fall back to regex extraction
-                const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)/.exec(log.message);
+                // Fall back to regex extraction - updated to handle SyncID tags in log messages
+                const match = /Got cost price for ([A-Za-z0-9-]+): \$([\d.]+)(?:\s+\[SyncID: \d+\])?/.exec(log.message);
                 if (match && match[1] && match[2]) {
                   // Only include products with a valid cost price
                   const price = parseFloat(match[2]);
