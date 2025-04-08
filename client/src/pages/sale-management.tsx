@@ -1154,7 +1154,7 @@ const SaleManagementPage: React.FC = () => {
                       vendorsData.vendors.map((vendor: string) => (
                         <SelectItem key={vendor} value={vendor}>{vendor}</SelectItem>
                       )) : 
-                      <SelectItem value="" disabled>Loading vendors...</SelectItem>
+                      <SelectItem value="loading" disabled>Loading vendors...</SelectItem>
                     }
                   </SelectContent>
                 </Select>
@@ -1178,7 +1178,7 @@ const SaleManagementPage: React.FC = () => {
                       productTypesData.productTypes.map((type: string) => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
                       )) : 
-                      <SelectItem value="" disabled>Loading product types...</SelectItem>
+                      <SelectItem value="loading" disabled>Loading product types...</SelectItem>
                     }
                   </SelectContent>
                 </Select>
