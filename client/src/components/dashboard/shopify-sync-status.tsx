@@ -421,6 +421,11 @@ export function ShopifySyncStatus() {
                 </h3>
                 <span className="text-sm font-medium">
                   {processedItems} items processed
+                  {costPriceLogs.length > 0 && (
+                    <span className="ml-1 text-xs text-blue-500">
+                      (Current: {costPriceLogs[0]?.sku})
+                    </span>
+                  )}
                 </span>
               </div>
               
@@ -526,14 +531,24 @@ export function ShopifySyncStatus() {
                           </p>
                           
                           {shouldShowProgress && totalItems > 0 && (
-                            <div className="flex justify-between mt-1 text-xs">
-                              <span className="text-blue-600 dark:text-blue-400 font-medium">
-                                {/* Use the exact percentage when available */}
-                                {displayPercentage}% Complete
-                              </span>
-                              <span className="text-muted-foreground">
-                                {processedItems} of {totalItems} items
-                              </span>
+                            <div className="flex flex-col mt-1 gap-1 text-xs">
+                              <div className="flex justify-between">
+                                <span className="text-blue-600 dark:text-blue-400 font-medium">
+                                  {/* Use the exact percentage when available */}
+                                  {displayPercentage}% Complete
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {processedItems} of {totalItems} items
+                                </span>
+                              </div>
+                              
+                              {costPriceLogs.length > 0 && (
+                                <div className="px-1 py-0.5 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-900/30">
+                                  <span className="text-blue-700 dark:text-blue-400 font-medium">
+                                    Currently processing: <span className="font-mono">{costPriceLogs[0]?.sku}</span>
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                           
