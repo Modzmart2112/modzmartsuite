@@ -66,13 +66,21 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
     const { shopifyApiKey, shopifyApiSecret, shopifyStoreUrl } = settings;
     
     // Step 1: Count products - Update progress to show we're counting
+    // Explicitly set percentage to 0 and clear previous progress
     await storage.updateShopifySyncProgress({
       status: "in-progress",
-      message: "Counting products in Shopify store...",
+      message: "Step 1/3: Counting products in Shopify store...",
+      totalItems: 0,
+      processedItems: 0,
+      successItems: 0,
+      failedItems: 0,
       details: {
         step: 1,
         stepName: "counting",
-        startTime: new Date().toISOString()
+        startTime: new Date().toISOString(),
+        percentage: 0, // Explicitly set percentage to 0
+        estimatedCompletionTime: null,
+        estimatedRemainingMs: null
       }
     });
     
@@ -110,15 +118,20 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
     
     log(`Counting complete: ${productCount} unique products, ${variantCount} variants`);
     
-    // Step 2: Process products
+    // Step 2: Process products with clearer labeling
     await storage.updateShopifySyncProgress({
       status: "in-progress",
-      message: `Processing ${variantCount} variants from ${productCount} products...`,
+      message: `Step 2/3: Processing ${variantCount} variants from ${productCount} products...`,
+      processedItems: 0, // Reset processed items counter
+      totalItems: variantCount, // Ensure total items is set correctly
       details: {
         step: 2,
         stepName: "processing",
         startTime: new Date().toISOString(),
-        uniqueProductCount: productCount
+        uniqueProductCount: productCount,
+        percentage: 0, // Explicitly set percentage to 0 at start
+        estimatedCompletionTime: null,
+        estimatedRemainingMs: null
       }
     });
     
@@ -140,8 +153,9 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
     // Update progress with completion information
     await storage.updateShopifySyncProgress({
       status: "complete",
-      message: `Sync completed: ${successCount} items synced successfully, ${failedCount} failed`,
+      message: `Step 3/3: Sync completed: ${successCount} items synced successfully, ${failedCount} failed`,
       processedItems: processedCount,
+      totalItems: variantCount, // Ensure total items remains set
       successItems: successCount,
       failedItems: failedCount,
       completedAt: completionTime,
@@ -151,6 +165,7 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
         uniqueProductCount: productCount,
         totalDuration: totalTimeMs,
         formattedDuration: formatDuration(totalTimeMs),
+        percentage: 100, // Set percentage to 100% on completion
         processingRate: totalTimeMs > 0 ? Math.round((processedCount / totalTimeMs) * 60000) : 0 // items per minute
       }
     });
@@ -307,11 +322,12 @@ async function processProducts(
             ? Math.min(100, Math.round((processedCount / totalVariantCount) * 100)) 
             : 0;
           
-          // Update progress in database
+          // Update progress in database with clearer step labeling
           await storage.updateShopifySyncProgress({
             status: "in-progress",
-            message: `Processing products: ${processedCount} of ${totalVariantCount} items (${percentComplete}%)`,
+            message: `Step 2/3: Processing ${processedCount} of ${totalVariantCount} items (${percentComplete}%)`,
             processedItems: processedCount,
+            totalItems: totalVariantCount, // Always ensure total items is set
             successItems: successCount,
             failedItems: failedCount,
             details: {
@@ -328,7 +344,7 @@ async function processProducts(
             }
           });
           
-          log(`Processed ${processedCount}/${totalVariantCount} items (${percentComplete}%) - ETA: ${formatDuration(estimatedRemainingMs)}`);
+          log(`Step 2/3: Processed ${processedCount}/${totalVariantCount} items (${percentComplete}%) - ETA: ${formatDuration(estimatedRemainingMs)}`);
         }
         
         // Add a small delay between batches to prevent rate limiting
