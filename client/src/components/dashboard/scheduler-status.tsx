@@ -366,36 +366,7 @@ export function SchedulerStatus() {
             </div>
           </div>
           
-          {/* Data visualization section */}
-          <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <LineChart className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Performance Overview</span>
-              </div>
-              <Badge variant="outline" className="text-xs">Last 7 days</Badge>
-            </div>
-            
-            <div className="h-14 flex items-end gap-1 justify-between px-2">
-              {[15, 22, 8, 30, 18, 25, 20].map((value, index) => (
-                <div 
-                  key={index} 
-                  className="bg-indigo-500/80 dark:bg-indigo-600/80 rounded-t w-full"
-                  style={{ height: `${value * 2}px` }}
-                  title={`Day ${index+1}: ${value} checks`}
-                ></div>
-              ))}
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 mt-2 px-1">
-              <div>Mon</div>
-              <div>Tue</div>
-              <div>Wed</div>
-              <div>Thu</div>
-              <div>Fri</div>
-              <div>Sat</div>
-              <div>Sun</div>
-            </div>
-          </div>
+          {/* Data visualization section removed as requested */}
         </div>
       </CardContent>
       <CardFooter className="pt-2 pb-6 px-6">
