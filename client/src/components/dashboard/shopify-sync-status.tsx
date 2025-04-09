@@ -310,66 +310,69 @@ export function ShopifySyncStatus() {
       
       console.log("Starting cost price sync - making API request...");
       
-      // Show immediate feedback
+      // Show immediate feedback to user
       toast({
         title: "Starting Cost Price Sync",
-        description: "Making API request...",
+        description: "Initializing synchronization process...",
       });
       
-      // Use the API client utility instead of raw fetch
-      const response = await fetch("/api/scheduler/run-cost-price-sync", {
-        method: "POST",
-        headers: {
-          'Content-Type': 'application/json'
-        },
-      });
-      
-      // Log the full response for debugging
-      console.log("Cost price sync API response status:", response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Cost price sync started successfully:", data);
-        
-        toast({
-          title: "Cost Price Sync Started",
-          description: "Syncing only products without cost prices",
+      try {
+        // Use the API client utility instead of raw fetch
+        const response = await fetch("/api/scheduler/run-cost-price-sync", {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
         });
         
-        // Refresh data right away to pick up the new sync session
-        refetch();
-        syncProgressQuery.refetch();
+        // Log the full response for debugging
+        console.log("Cost price sync API response status:", response.status);
         
-        // Keep refreshing to show live updates
-        const refreshInterval = setInterval(() => {
+        // Always parse the response first
+        const data = await response.json();
+        console.log("Cost price sync response data:", data);
+        
+        if (response.ok) {
+          toast({
+            title: "Cost Price Sync Started",
+            description: "Syncing only products without cost prices",
+          });
+          
+          // Refresh data right away to pick up the new sync session
+          refetch();
           syncProgressQuery.refetch();
-        }, 1000);
-        
-        // Clear the interval after 5 seconds
-        setTimeout(() => {
-          clearInterval(refreshInterval);
-        }, 5000);
-      } else {
-        let errorMessage = "Could not start cost price sync";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData?.message || errorMessage;
-          console.error("Error response from API:", errorData);
-        } catch (jsonError) {
-          console.error("Could not parse error response:", jsonError);
+          
+          // Keep refreshing to show live updates
+          const refreshInterval = setInterval(() => {
+            syncProgressQuery.refetch();
+          }, 1000);
+          
+          // Clear the interval after 5 seconds
+          setTimeout(() => {
+            clearInterval(refreshInterval);
+          }, 5000);
+        } else {
+          // Handle server error with response
+          toast({
+            title: "Cost Price Sync Failed",
+            description: data?.message || "Error from server: " + response.statusText,
+            variant: "destructive",
+          });
         }
-        
+      } catch (fetchError) {
+        console.error("Fetch error during cost price sync:", fetchError);
         toast({
-          title: "Cost Price Sync Failed",
-          description: errorMessage,
+          title: "Network Error",
+          description: "Failed to communicate with the server. Please try again.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("Error starting cost price sync:", error);
+      // This catches any other errors in the outer function
+      console.error("Unexpected error during cost price sync:", error);
       toast({
         title: "Error",
-        description: "An error occurred while syncing cost prices: " + (error instanceof Error ? error.message : String(error)),
+        description: "An unexpected error occurred. Please check console logs.",
         variant: "destructive",
       });
     }
