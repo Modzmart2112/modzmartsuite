@@ -1899,7 +1899,13 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSaleCampaign(id: number): Promise<boolean> {
     try {
-      // First delete all targets associated with this campaign
+      console.log(`Deleting sale campaign with ID ${id}`);
+      
+      // First, revert any active prices back to their original values
+      console.log(`Reverting all prices for campaign ID ${id} before deletion`);
+      await this.revertSaleCampaign(id);
+      
+      // Delete all targets associated with this campaign
       await db.delete(saleCampaignTargets)
         .where(eq(saleCampaignTargets.campaignId, id));
       
@@ -1908,6 +1914,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(saleCampaigns.id, id))
         .returning();
       
+      console.log(`Campaign ${id} deleted successfully`);
       return result.length > 0;
     } catch (error) {
       console.error(`Error deleting sale campaign ${id}:`, error);
