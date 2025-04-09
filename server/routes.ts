@@ -1535,6 +1535,69 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
     }
   }));
   
+  // Trigger cost-price-only sync - optimized sync that only updates products without cost prices
+  app.post("/api/scheduler/run-cost-price-sync", asyncHandler(async (req, res) => {
+    try {
+      // Check if there's an existing record in 'ready' or 'pending' state we can use
+      const existingSync = await storage.getShopifySyncProgress();
+      let syncId = 0;
+      
+      if (existingSync && ['pending', 'ready'].includes(existingSync.status)) {
+        syncId = existingSync.id;
+        // Update it to be ready for the cost price sync
+        await storage.updateShopifySyncProgress({
+          status: "pending",
+          message: "Preparing to start cost price sync...",
+          details: {
+            syncType: "cost-price-only"
+          }
+        });
+      } else {
+        // Initialize a new sync progress record
+        const newSync = await storage.initializeShopifySyncProgress();
+        syncId = newSync.id;
+      }
+      
+      // Use the new specialized cost price sync implementation
+      import('./enhanced-shopify-sync').then(module => {
+        module.syncProductsWithoutCostPrice().catch(err => {
+          console.error('[cost-price-sync] Error in cost price sync:', err);
+          // Update progress to indicate error with enhanced details
+          storage.updateShopifySyncProgress({
+            status: "failed",
+            message: "Cost price sync failed: " + (err instanceof Error ? err.message : String(err)),
+            details: {
+              syncType: "cost-price-only",
+              error: err instanceof Error ? err.stack : String(err)
+            }
+          });
+        });
+      });
+      
+      // Return success to the caller
+      res.json({
+        message: 'Cost price sync job started',
+        details: {
+          syncId,
+          process: "Specialized cost price sync",
+          description: "This will only update products without cost prices, not all products"
+        }
+      });
+      
+      // Update stats with the latest sync time - this is a critical fix
+      // Without this, the UI won't update the last sync time and users get confused
+      await storage.updateStats({
+        lastShopifySync: new Date()
+      });
+    } catch (error) {
+      console.error("Error starting cost price sync:", error);
+      res.status(500).json({
+        message: "Failed to start cost price sync",
+        error: (error as Error).message
+      });
+    }
+  }));
+
   // Trigger a manual Shopify sync
   app.post("/api/scheduler/run-shopify-sync", asyncHandler(async (req, res) => {
     try {

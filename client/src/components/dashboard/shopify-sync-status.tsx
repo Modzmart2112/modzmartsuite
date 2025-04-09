@@ -292,6 +292,55 @@ export function ShopifySyncStatus() {
     }
   };
   
+  // Handle specialized cost price sync - only updates products without cost prices
+  const handleCostPriceSync = async () => {
+    try {
+      // Clear the cost price logs to start with a fresh view
+      setCostPriceLogs([]);
+      
+      // First validate that we can actually start a sync
+      if (!isReady) {
+        toast({
+          title: "Cannot Start Cost Price Sync",
+          description: "Please reset the current sync before starting a new one.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const response = await fetch("/api/scheduler/run-cost-price-sync", {
+        method: "POST",
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Cost Price Sync Started",
+          description: "Syncing only products without cost prices",
+        });
+        
+        // Refresh data after a short delay to ensure the backend has updated
+        setTimeout(() => {
+          refetch();
+          syncProgressQuery.refetch();
+        }, 1000);
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "Cost Price Sync Failed",
+          description: errorData?.message || "Could not start cost price sync",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error starting cost price sync:", error);
+      toast({
+        title: "Error",
+        description: "An error occurred while syncing cost prices",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Handle complete reset for stuck sync - forces a fresh start
   const handleResetSync = async () => {
     try {
@@ -404,14 +453,25 @@ export function ShopifySyncStatus() {
                   </div>
                 </div>
               </div>
-              <Button 
-                onClick={handleManualSync}
-                disabled={!isConnected}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Sync Now
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={handleCostPriceSync}
+                  disabled={!isConnected}
+                  variant="outline"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-900 dark:text-blue-400 dark:hover:bg-blue-950"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Cost Prices Only
+                </Button>
+                <Button 
+                  onClick={handleManualSync}
+                  disabled={!isConnected}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Sync All
+                </Button>
+              </div>
             </div>
             
             {/* Info about what sync does */}
@@ -426,7 +486,7 @@ export function ShopifySyncStatus() {
               </div>
               <div className="flex items-start gap-2">
                 <Zap className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                <p>Click "Sync Now" to begin a 3-step synchronization process</p>
+                <p>"Sync All" for all products or "Cost Prices Only" for products missing cost prices</p>
               </div>
             </div>
           </div>

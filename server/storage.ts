@@ -28,6 +28,7 @@ export interface IStorage {
   getActiveProductCount(): Promise<number>;
   getProductsBySku(skus: string[]): Promise<Product[]>;
   getProductById(id: number): Promise<Product | undefined>;
+  getProductsWithoutCostPrice(): Promise<Product[]>;
   getProductBySku(sku: string): Promise<Product | undefined>;
   getProductsWithSupplierUrls(): Promise<Product[]>;
   getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]>;
@@ -220,6 +221,12 @@ export class MemStorage implements IStorage {
   async getProductsBySku(skus: string[]): Promise<Product[]> {
     return Array.from(this.products.values()).filter(product => 
       skus.includes(product.sku)
+    );
+  }
+  
+  async getProductsWithoutCostPrice(): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(product => 
+      product.costPrice === null || product.costPrice === 0
     );
   }
 
@@ -1196,6 +1203,45 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(products.id));
+  }
+  
+  async getProductsWithoutCostPrice(): Promise<Product[]> {
+    try {
+      console.log('Fetching products without cost price');
+      
+      return await db.select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      })
+        .from(products)
+        .where(
+          sql`(${products.costPrice} IS NULL OR ${products.costPrice} = 0)`
+        )
+        .orderBy(asc(products.id));
+    } catch (error) {
+      console.error('Error fetching products without cost price:', error);
+      return [];
+    }
   }
   
   async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {

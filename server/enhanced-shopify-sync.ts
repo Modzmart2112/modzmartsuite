@@ -15,6 +15,7 @@
  * - Clear status messages at each stage with time estimates
  * - Enhanced error handling and reporting
  * - Support for pausable processing (user can reset mid-sync)
+ * - Targeted cost-price-only sync for products missing cost price
  */
 
 import { storage } from './storage';
@@ -206,6 +207,12 @@ export async function enhancedSyncShopifyProducts(): Promise<void> {
     
     log(`Sync completed successfully in ${formatDuration(totalTimeMs)}`);
     log(`Results: ${successCount} items synced successfully, ${failedCount} failed`);
+    
+    // Update global stats with last sync time
+    await storage.updateStats({
+      lastShopifySync: new Date()
+    });
+    log('Updated lastShopifySync timestamp in stats');
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -831,6 +838,244 @@ async function processProduct(product: any, processedSkus: Set<string>): Promise
   } catch (error) {
     log(`Error processing product ${product?.sku || 'unknown'}: ${error}`, 'shopify-sync-error');
     return { success: false };
+  }
+}
+
+/**
+ * Specialized function that only syncs products without cost prices
+ * This is more efficient than a full sync when you just need to update cost prices
+ */
+export async function syncProductsWithoutCostPrice(): Promise<void> {
+  // Create a new sync record for this specialized operation
+  let syncProgress = await storage.initializeShopifySyncProgress();
+  log(`Starting cost-price-only sync with ID ${syncProgress.id}`);
+  const startTime = Date.now();
+  
+  try {
+    // Get API credentials
+    const settings = await storage.getUser(1);
+    if (!settings?.shopifyApiKey || !settings?.shopifyApiSecret || !settings?.shopifyStoreUrl) {
+      await storage.updateShopifySyncProgress({
+        status: "failed",
+        message: "Shopify API credentials are missing or incomplete",
+        completedAt: new Date(),
+        details: {
+          error: "API credentials missing",
+          syncType: "cost-price-only"
+        }
+      });
+      log("Cost price sync failed: Shopify API credentials are missing or incomplete");
+      return;
+    }
+    
+    // Extract credentials
+    const { shopifyApiKey, shopifyApiSecret, shopifyStoreUrl } = settings;
+    
+    // Get all products without cost prices from our database
+    await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: "Identifying products without cost prices...",
+      details: {
+        syncType: "cost-price-only",
+        step: "identifying"
+      }
+    });
+    
+    // Get products without cost prices
+    const productsWithoutCostPrice = await storage.getProductsWithoutCostPrice();
+    const productCount = productsWithoutCostPrice.length;
+    
+    log(`Found ${productCount} products without cost prices`);
+    
+    if (productCount === 0) {
+      await storage.updateShopifySyncProgress({
+        status: "complete",
+        message: "No products without cost prices found",
+        completedAt: new Date(),
+        details: {
+          syncType: "cost-price-only",
+          productsChecked: 0
+        }
+      });
+      
+      // Update global stats
+      await storage.updateStats({
+        lastShopifySync: new Date()
+      });
+      
+      return;
+    }
+    
+    // Group products by batch size for API requests
+    const BATCH_SIZE = 50;
+    const batches = [];
+    
+    for (let i = 0; i < productCount; i += BATCH_SIZE) {
+      batches.push(productsWithoutCostPrice.slice(i, i + BATCH_SIZE));
+    }
+    
+    // Update progress to show we're starting to process
+    await storage.updateShopifySyncProgress({
+      status: "in-progress",
+      message: `Processing ${productCount} products without cost prices...`,
+      totalItems: productCount,
+      processedItems: 0,
+      details: {
+        syncType: "cost-price-only",
+        batchCount: batches.length,
+        step: "processing"
+      }
+    });
+    
+    // Process each batch
+    let processedCount = 0;
+    let updatedCount = 0;
+    let failedCount = 0;
+    
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchNumber = i + 1;
+      
+      // Update progress for this batch
+      await storage.updateShopifySyncProgress({
+        status: "in-progress",
+        message: `Processing batch ${batchNumber}/${batches.length}...`,
+        processedItems: processedCount,
+        totalItems: productCount,
+        details: {
+          syncType: "cost-price-only",
+          currentBatch: batchNumber,
+          totalBatches: batches.length,
+          progress: (processedCount / productCount) * 100
+        }
+      });
+      
+      // Process this batch - collect inventory item IDs
+      const inventoryItemIds = [];
+      const productMap = new Map(); // Map inventory item IDs to our product records
+      
+      for (const product of batch) {
+        if (product.shopifyId) {
+          try {
+            // Get the inventory item ID for this product
+            const shopifyProduct = await shopifyClient.getProductByID(
+              shopifyApiKey, 
+              shopifyApiSecret, 
+              shopifyStoreUrl,
+              product.shopifyId
+            );
+            
+            if (shopifyProduct && shopifyProduct.inventoryItemId) {
+              inventoryItemIds.push(shopifyProduct.inventoryItemId);
+              productMap.set(shopifyProduct.inventoryItemId, product);
+            }
+          } catch (error) {
+            log(`Error getting inventory item ID for product ${product.sku}: ${error}`, "cost-price-sync");
+            failedCount++;
+          }
+        }
+        
+        processedCount++;
+      }
+      
+      // Get cost prices in bulk if we have inventory item IDs
+      if (inventoryItemIds.length > 0) {
+        try {
+          // Fetch cost prices for these inventory items
+          const inventoryItemIdsParam = inventoryItemIds.join(',');
+          
+          // Get bulk inventory item data
+          const inventory = await shopifyClient.getInventoryItemsByIds(
+            shopifyApiKey,
+            shopifyApiSecret,
+            shopifyStoreUrl,
+            inventoryItemIdsParam
+          );
+          
+          // Process inventory items
+          if (inventory && inventory.inventory_items) {
+            for (const item of inventory.inventory_items) {
+              if (item.id && item.cost && productMap.has(item.id)) {
+                const product = productMap.get(item.id);
+                const costPrice = parseFloat(item.cost);
+                
+                // Update the product with cost price
+                await storage.updateProduct(product.id, {
+                  costPrice
+                });
+                
+                // Log the cost price for real-time UI display
+                await logCostPrice(product.sku, costPrice);
+                
+                updatedCount++;
+                log(`Updated cost price for ${product.sku}: ${costPrice}`);
+              }
+            }
+          }
+        } catch (error) {
+          log(`Error processing inventory items: ${error}`, "cost-price-sync");
+          failedCount += inventoryItemIds.length;
+        }
+      }
+      
+      // Update progress after this batch
+      await storage.updateShopifySyncProgress({
+        processedItems: processedCount,
+        successItems: updatedCount,
+        failedItems: failedCount,
+        details: {
+          syncType: "cost-price-only",
+          progress: (processedCount / productCount) * 100,
+          timeElapsed: formatDuration(Date.now() - startTime)
+        }
+      });
+      
+      // Add a small delay between batches
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    // Complete the sync
+    const totalTimeMs = Date.now() - startTime;
+    
+    await storage.updateShopifySyncProgress({
+      status: "complete",
+      message: `Cost price sync completed: ${updatedCount} products updated, ${failedCount} failed`,
+      processedItems: processedCount,
+      totalItems: productCount,
+      successItems: updatedCount,
+      failedItems: failedCount,
+      completedAt: new Date(),
+      details: {
+        syncType: "cost-price-only",
+        totalDuration: totalTimeMs,
+        formattedDuration: formatDuration(totalTimeMs)
+      }
+    });
+    
+    // Update global stats
+    await storage.updateStats({
+      lastShopifySync: new Date()
+    });
+    
+    log(`Cost price sync completed in ${formatDuration(totalTimeMs)}`);
+    log(`Results: ${updatedCount} cost prices updated, ${failedCount} failed`);
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Unexpected error in cost price sync: ${errorMessage}`, 'cost-price-sync-error');
+    
+    // Update progress with error information
+    await storage.updateShopifySyncProgress({
+      status: "failed",
+      message: `Cost price sync failed: ${errorMessage}`,
+      completedAt: new Date(),
+      details: {
+        error: errorMessage,
+        errorStack: error instanceof Error ? error.stack : undefined,
+        duration: Date.now() - startTime,
+        syncType: "cost-price-only"
+      }
+    });
   }
 }
 
