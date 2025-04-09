@@ -12,6 +12,7 @@ import {
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
 import { eq, desc, and, asc, isNotNull, sql, inArray, or, type SQL } from "drizzle-orm";
+import { shopifyClient } from "./shopify";
 
 // Define the storage interface
 export interface IStorage {
@@ -2155,7 +2156,7 @@ export class DatabaseStorage implements IStorage {
           // Ensure price doesn't go below zero
           newPrice = Math.max(newPrice, 0);
           
-          // Update the product with the new price
+          // Update the product with the new price in our database
           await this.updateProduct(product.id, {
             shopifyPrice: newPrice,
             onSale: true,
@@ -2163,6 +2164,30 @@ export class DatabaseStorage implements IStorage {
             saleEndDate: campaign.endDate,
             saleId: campaign.id
           });
+          
+          // NEW CODE: Update the price in Shopify directly
+          try {
+            // Extract variant ID from shopifyId - this could be the full ID or just the variant ID
+            const variantId = product.shopifyId;
+            if (variantId && !variantId.startsWith('local-')) {
+              console.log(`Pushing sale price to Shopify for variant ${variantId}: ${newPrice} (original: ${product.shopifyPrice})`);
+              
+              // Call the Shopify API to update the price
+              // Also set the compare_at_price to the original price to show a sale
+              await shopifyClient.updateProductPrice(
+                variantId, 
+                newPrice, 
+                product.shopifyPrice // Set the original price as the compare-at price
+              );
+              
+              console.log(`Successfully updated Shopify price for product ${product.sku} (ID: ${product.id})`);
+            } else {
+              console.log(`Skipping Shopify update for product ${product.sku} - no valid Shopify ID`);
+            }
+          } catch (error) {
+            console.error(`Error pushing price to Shopify for product ${product.id}:`, error);
+            // Continue processing other products even if this one fails
+          }
           
           affectedProductCount++;
         }
@@ -2197,6 +2222,8 @@ export class DatabaseStorage implements IStorage {
       let revertedCount = 0;
       const now = new Date();
       
+      console.log(`Reverting sale campaign ${campaignId} - found ${productsOnSale.length} products to revert`);
+      
       for (const product of productsOnSale) {
         // Only revert if there's an original price
         if (product.originalPrice) {
@@ -2208,7 +2235,7 @@ export class DatabaseStorage implements IStorage {
             notes: `Sale campaign #${campaignId} reverted`
           });
           
-          // Restore the original price
+          // Restore the original price in database
           await this.updateProduct(product.id, {
             shopifyPrice: product.originalPrice,
             onSale: false,
@@ -2216,6 +2243,30 @@ export class DatabaseStorage implements IStorage {
             saleEndDate: null,
             saleId: null
           });
+          
+          // NEW CODE: Push the original price back to Shopify
+          try {
+            // Extract variant ID from shopifyId - this could be the full ID or just the variant ID
+            const variantId = product.shopifyId;
+            if (variantId && !variantId.startsWith('local-')) {
+              console.log(`Reverting Shopify price for variant ${variantId} to original price: ${product.originalPrice}`);
+              
+              // Call the Shopify API to update the price
+              // We also remove the compare-at price by setting it to null
+              await shopifyClient.updateProductPrice(
+                variantId, 
+                product.originalPrice, 
+                null // Remove compare-at price to hide the sale indicator
+              );
+              
+              console.log(`Successfully reverted Shopify price for product ${product.sku} (ID: ${product.id})`);
+            } else {
+              console.log(`Skipping Shopify update for product ${product.sku} - no valid Shopify ID`);
+            }
+          } catch (error) {
+            console.error(`Error pushing reverted price to Shopify for product ${product.id}:`, error);
+            // Continue processing other products even if this one fails
+          }
           
           revertedCount++;
         }
@@ -2227,6 +2278,7 @@ export class DatabaseStorage implements IStorage {
         completedAt: now 
       });
       
+      console.log(`Successfully reverted ${revertedCount} products for campaign ${campaignId}`);
       return revertedCount;
     } catch (error) {
       console.error(`Error reverting sale campaign ${campaignId}:`, error);

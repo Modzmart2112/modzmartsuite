@@ -444,10 +444,54 @@ class ShopifyClient {
   }
   
   // Update product price in Shopify
-  async updateProductPrice(variantId: string, price: number): Promise<void> {
-    // This is a simplified implementation
-    // In a real app, this would call the Shopify API to update the product price
-    log(`Updating Shopify variant ${variantId} price to ${price}`, 'shopify-api');
+  async updateProductPrice(variantId: string, price: number, compareAtPrice?: number | null): Promise<void> {
+    try {
+      // Get credentials from the database
+      const credentials = await storage.getShopifyCredentials();
+      if (!credentials) {
+        log('No Shopify credentials found', 'shopify-api');
+        throw new Error('Shopify credentials not configured');
+      }
+      
+      const baseUrl = this.buildApiUrl(credentials.storeUrl);
+      const url = `${baseUrl}/variants/${variantId}.json`;
+      
+      log(`Updating Shopify variant ${variantId} price to ${price}${compareAtPrice ? ` (compareAtPrice: ${compareAtPrice})` : ''}`, 'shopify-api');
+      
+      // Build the update payload
+      const updateData: any = {
+        variant: {
+          id: variantId,
+          price: price.toString()
+        }
+      };
+      
+      // If compareAtPrice is provided, include it (null will clear it)
+      if (compareAtPrice !== undefined) {
+        updateData.variant.compare_at_price = compareAtPrice === null ? null : compareAtPrice.toString();
+      }
+      
+      // Make the API call to update the variant
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: this.buildHeaders(credentials.apiSecret),
+        body: JSON.stringify(updateData)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log(`Failed to update Shopify variant ${variantId}: ${response.status} ${response.statusText} - ${errorText}`, 'shopify-api-error');
+        throw new Error(`Shopify API returned ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      log(`Successfully updated Shopify variant ${variantId} price to ${price}`, 'shopify-api');
+      
+      return data;
+    } catch (error) {
+      log(`Error updating Shopify variant ${variantId} price: ${error}`, 'shopify-api-error');
+      throw error;
+    }
   }
   
   // Helper methods
