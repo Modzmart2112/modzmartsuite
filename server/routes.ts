@@ -108,6 +108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "User not found" });
     }
     
+    console.log("User data from database:", JSON.stringify(user));
+    
     res.json({
       id: user.id,
       username: user.username,
@@ -124,6 +126,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const userId = 1;
     const { firstName, lastName, email } = req.body as AccountSettings;
     
+    console.log("Updating user profile with data:", JSON.stringify({ firstName, lastName, email }));
+    
     // For password change, we'd need additional validation and hashing
     
     const updatedUser = await storage.updateUser(userId, {
@@ -131,6 +135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lastName,
       email
     });
+    
+    console.log("Updated user data:", JSON.stringify(updatedUser));
     
     if (!updatedUser) {
       return res.status(404).json({ message: "User not found" });
