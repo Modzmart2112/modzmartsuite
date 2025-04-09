@@ -600,6 +600,80 @@ class ShopifyClient {
     log(`Successfully retrieved ${costPrices.size} cost prices out of ${items.length} requested`, 'shopify-api');
     return costPrices;
   }
+
+  /**
+   * Get a product by its Shopify product ID
+   * This retrieves the product and extracts the inventory item ID
+   * 
+   * @param apiKey API key
+   * @param apiSecret API secret (access token)
+   * @param storeUrl Store URL
+   * @param productId Shopify product ID
+   * @returns Product details with inventory item ID
+   */
+  async getProductByID(
+    apiKey: string, 
+    apiSecret: string, 
+    storeUrl: string,
+    productId: string
+  ): Promise<{ inventoryItemId: string | null }> {
+    try {
+      const baseUrl = this.buildApiUrl(storeUrl);
+      const url = `${baseUrl}/products/${productId}.json`;
+      
+      log(`Fetching product by ID: ${url}`, 'shopify-api');
+      
+      const response = await this.rateLimit<{ product: any }>(url, {
+        headers: this.buildHeaders(apiSecret)
+      });
+      
+      // Extract the inventory item ID from the first variant
+      if (response.product?.variants?.length > 0) {
+        const variant = response.product.variants[0];
+        return { 
+          inventoryItemId: variant.inventory_item_id?.toString() || null
+        };
+      }
+      
+      return { inventoryItemId: null };
+    } catch (error) {
+      log(`Error getting product by ID: ${error}`, 'shopify-api');
+      return { inventoryItemId: null };
+    }
+  }
+  
+  /**
+   * Get inventory items by their IDs in bulk
+   * This uses the bulk endpoint to efficiently fetch multiple inventory items
+   * 
+   * @param apiKey API key
+   * @param apiSecret API secret (access token)
+   * @param storeUrl Store URL
+   * @param inventoryItemIds Comma-separated list of inventory item IDs
+   * @returns Inventory items data
+   */
+  async getInventoryItemsByIds(
+    apiKey: string,
+    apiSecret: string,
+    storeUrl: string,
+    inventoryItemIds: string
+  ): Promise<{ inventory_items: any[] }> {
+    try {
+      const baseUrl = this.buildApiUrl(storeUrl);
+      const url = `${baseUrl}/inventory_items.json?ids=${inventoryItemIds}`;
+      
+      log(`Fetching inventory items by IDs: ${url}`, 'shopify-api');
+      
+      const response = await this.rateLimit<{ inventory_items: any[] }>(url, {
+        headers: this.buildHeaders(apiSecret)
+      });
+      
+      return response;
+    } catch (error) {
+      log(`Error getting inventory items by IDs: ${error}`, 'shopify-api');
+      return { inventory_items: [] };
+    }
+  }
 }
 
 export const shopifyClient = new ShopifyClient();
