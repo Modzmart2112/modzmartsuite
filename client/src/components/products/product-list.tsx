@@ -112,6 +112,8 @@ export function ProductList({
     refetchInterval: 2000, // Check every 2 seconds
   });
   
+  // Track previous sync status to detect when a sync completes
+  const [prevSyncStatus, setPrevSyncStatus] = useState<string | null>(null);
   const isShopifySyncInProgress = syncStatus?.status === 'in-progress';
 
   // Fetch products from API - includes search functionality and filters
@@ -154,6 +156,15 @@ export function ProductList({
     refetchInterval: isShopifySyncInProgress ? 2000 : false,
   });
   
+  // When sync status changes from 'in-progress' to 'complete', trigger a refetch
+  useEffect(() => {
+    if (prevSyncStatus === 'in-progress' && syncStatus?.status === 'complete') {
+      console.log('Shopify sync completed - refreshing product data');
+      refetch();
+    }
+    setPrevSyncStatus(syncStatus?.status || null);
+  }, [syncStatus?.status, refetch]);
+
   // Handle search changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
