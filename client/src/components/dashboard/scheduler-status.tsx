@@ -185,7 +185,8 @@ export function SchedulerStatus() {
   };
   
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-md hover:shadow-lg transition-shadow duration-300">
+      {/* Keep the card header untouched as requested */}
       <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -203,58 +204,80 @@ export function SchedulerStatus() {
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-4">
+      <CardContent className="pt-6">
         <div className="space-y-6">
-          <div className="p-4 rounded-lg bg-muted/50 border border-border">
+          {/* Status banner with enhanced styling */}
+          <div className={`p-5 rounded-lg ${isSchedulerActive 
+            ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800/50' 
+            : 'bg-gradient-to-br from-red-50/80 to-orange-50/80 dark:from-red-900/20 dark:to-orange-900/20 border border-red-100 dark:border-red-800/50'}`}>
             {isSchedulerActive ? (
-              <div className="flex items-center gap-3 text-foreground">
-                <Calendar className="h-10 w-10 text-primary" />
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-100 dark:bg-blue-800/30 rounded-full p-2.5">
+                  <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
                 <div>
-                  <div className="font-medium">Next Price Check:</div>
-                  <div className="text-sm">{formatTime(status?.nextScheduledRun || calculateNextRun().toISOString())}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Checks run daily at 12:00 AM AEST (UTC+10)</div>
+                  <div className="font-medium text-blue-800 dark:text-blue-300">Next Price Check:</div>
+                  <div className="text-lg font-semibold">{formatTime(status?.nextScheduledRun || calculateNextRun().toISOString())}</div>
+                  <div className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1.5 flex items-center">
+                    <Clock className="h-3 w-3 mr-1 inline" />
+                    Checks run daily at 12:00 AM AEST (UTC+10)
+                  </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-10 w-10 text-destructive" />
+              <div className="flex items-center gap-4">
+                <div className="bg-red-100 dark:bg-red-800/30 rounded-full p-2.5">
+                  <AlertCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+                </div>
                 <div>
-                  <div className="font-medium">Schedule Inactive</div>
-                  <div className="text-sm text-muted-foreground">Price checks are not currently scheduled</div>
-                  <div className="text-xs text-muted-foreground mt-1">Click "Start Scheduler" to begin daily checks</div>
+                  <div className="font-medium text-red-800 dark:text-red-300">Schedule Inactive</div>
+                  <div className="text-base font-semibold">Price checks are not currently scheduled</div>
+                  <div className="text-xs text-red-600/80 dark:text-red-400/80 mt-1.5 flex items-center">
+                    <PlayCircle className="h-3 w-3 mr-1 inline" />
+                    Click "Start Scheduler" to begin daily checks
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          <Separator />
+          <Separator className="bg-gray-200 dark:bg-gray-700" />
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Last Check</span>
+          {/* Stats section with enhanced styling */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Last Price Check</span>
               </div>
-              <div className="text-sm">{formatTime(status?.lastPriceCheck || null)}</div>
+              <div className="text-lg font-semibold text-gray-800 dark:text-gray-200">{formatTime(status?.lastPriceCheck || null)}</div>
             </div>
             
-            <div className="space-y-1">
-              <div className="text-sm font-medium">Recent Activity</div>
-              <div className="text-2xl font-bold">{status?.totalPriceChecks || 0} <span className="text-sm font-normal text-muted-foreground">checks performed</span></div>
-              <div className="text-sm text-muted-foreground">{status?.totalDiscrepanciesFound || 0} discrepancies found</div>
+            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-4 border border-gray-100 dark:border-gray-700">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recent Activity Summary</div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Total checks:</span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">{status?.totalPriceChecks || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Discrepancies:</span>
+                  <span className="text-lg font-bold text-amber-600 dark:text-amber-400">{status?.totalDiscrepanciesFound || 0}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </CardContent>
-      <CardFooter>
-        <div className="flex w-full flex-col space-y-3">
-          <div className="flex justify-between gap-3">
+      <CardFooter className="pt-2 pb-6 px-6">
+        <div className="flex w-full flex-col space-y-4">
+          <div className="flex justify-between gap-4">
             {isSchedulerActive ? (
               <Button 
                 variant="destructive" 
                 onClick={stopScheduler} 
                 disabled={actionInProgress !== null}
-                className="flex items-center gap-2 w-full"
+                className="flex items-center gap-2 w-full py-5 shadow-sm hover:shadow transition-shadow"
               >
                 {actionInProgress === "stop" ? (
                   <>
@@ -263,8 +286,8 @@ export function SchedulerStatus() {
                   </>
                 ) : (
                   <>
-                    <StopCircle className="h-4 w-4" />
-                    Stop Scheduler
+                    <StopCircle className="h-5 w-5" />
+                    <span className="font-medium">Stop Scheduler</span>
                   </>
                 )}
               </Button>
@@ -273,7 +296,7 @@ export function SchedulerStatus() {
                 variant="default" 
                 onClick={startScheduler} 
                 disabled={actionInProgress !== null}
-                className="flex items-center gap-2 w-full"
+                className="flex items-center gap-2 w-full py-5 shadow-sm hover:shadow transition-shadow bg-blue-600 hover:bg-blue-700"
               >
                 {actionInProgress === "start" ? (
                   <>
@@ -282,8 +305,8 @@ export function SchedulerStatus() {
                   </>
                 ) : (
                   <>
-                    <PlayCircle className="h-4 w-4" />
-                    Start Scheduler
+                    <PlayCircle className="h-5 w-5" />
+                    <span className="font-medium">Start Scheduler</span>
                   </>
                 )}
               </Button>
@@ -292,7 +315,7 @@ export function SchedulerStatus() {
               variant="outline" 
               onClick={runCheckNow} 
               disabled={actionInProgress !== null}
-              className="flex items-center gap-2 w-full"
+              className="flex items-center gap-2 w-full py-5 shadow-sm hover:shadow transition-shadow border-gray-300 dark:border-gray-600"
             >
               {actionInProgress === "run" ? (
                 <>
@@ -301,8 +324,8 @@ export function SchedulerStatus() {
                 </>
               ) : (
                 <>
-                  <RefreshCw className="h-4 w-4" />
-                  Run Check Now
+                  <RefreshCw className="h-5 w-5" />
+                  <span className="font-medium">Run Check Now</span>
                 </>
               )}
             </Button>
@@ -313,7 +336,7 @@ export function SchedulerStatus() {
             onClick={resetStats} 
             disabled={actionInProgress !== null}
             size="sm"
-            className="flex items-center gap-2 w-full border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50"
+            className="flex items-center gap-2 mx-auto px-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           >
             {actionInProgress === "reset" ? (
               <>
