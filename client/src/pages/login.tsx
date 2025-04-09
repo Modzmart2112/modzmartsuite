@@ -79,32 +79,19 @@ export default function LoginPage() {
         }}
       />
       
-      {/* Animated Gradient Overlay */}
+      {/* Minimal Tech Pattern (reduced opacity) */}
       <div 
-        className="absolute inset-0 z-10 bg-gradient-to-br from-black/70 via-black/50 to-transparent opacity-80" 
-      />
-      
-      {/* Animated Tech Pattern */}
-      <div 
-        className="absolute inset-0 z-10 opacity-20">
+        className="absolute inset-0 z-10 opacity-10">
         <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.2) 2px, transparent 0), radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.2) 2px, transparent 0)",
+          backgroundImage: "radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.15) 2px, transparent 0), radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.15) 2px, transparent 0)",
           backgroundSize: "100px 100px"
         }} />
       </div>
       
-      {/* Content Container */}
-      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-28 sm:mt-32 md:mt-36">
+      {/* Content Container - positioned near the SHOPIFY text */}
+      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-40 sm:mt-44 md:mt-48">
         <div className="w-full max-w-md">
-          {/* Brand Logo/Name */}
-          <div className="mb-8 text-center">
-            <div className="text-xl font-medium tracking-wide text-gray-400">
-              SHOPIFY SUITE
-            </div>
-            <div className="mt-2 text-xs font-light text-gray-500 tracking-widest">
-              MANAGEMENT PLATFORM
-            </div>
-          </div>
+          {/* Hide text elements that would overlap with background */}
           
           {/* Login Card */}
           <div 
