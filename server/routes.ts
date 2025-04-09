@@ -1977,17 +1977,7 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
     });
   }));
   
-  // Endpoint to stop the SIL-RP-016 price fix job
-  app.post("/api/scheduler/sil-rp-016-fix/stop", asyncHandler(async (req, res) => {
-    // Stop the SIL-RP-016 price fix job
-    scheduler.stopJob('fix-sil-rp-016-price');
-    
-    res.json({
-      success: true,
-      message: "SIL-RP-016 price fix job stopped",
-      jobName: 'fix-sil-rp-016-price'
-    });
-  }));
+  // SIL-RP-016 job endpoints have been removed as they are no longer needed
   
   app.post("/api/scheduler/price-check/run-now", asyncHandler(async (req, res) => {
     // Run the price check job immediately
