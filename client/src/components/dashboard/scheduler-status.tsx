@@ -226,7 +226,7 @@ export function SchedulerStatus() {
 
   return (
     <Card className="w-full">
-      <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+      <CardHeader className="pb-6 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
         <div className="flex items-center">
           <CalendarClock className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
           <div>
