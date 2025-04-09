@@ -26,42 +26,61 @@ if (fs.existsSync(path.join(__dirname, 'dist', 'index.js'))) {
   console.log('Loading bundled server from dist/index.js');
   
   // Use dynamic import for the bundled ESM file
-  import('./dist/index.js')
-    .catch(err => {
-      console.error('Failed to load bundled server:');
-      console.error(err);
-      
-      // Set up a basic fallback route to display error
-      app.get('*', (req, res) => {
-        res.status(500).send(`
-          <html>
-            <head><title>Server Error</title></head>
-            <body>
-              <h1>Server Error</h1>
-              <p>The application server failed to start. Please contact support.</p>
-            </body>
-          </html>
-        `);
+  import('./dist/index.js').then(module => {
+    // The exported default from server/index.ts is the setupApp function
+    const setupApp = module.default;
+    
+    if (typeof setupApp === 'function') {
+      // Call the setup function to get the server
+      setupApp().then(server => {
+        // Start the server on port 5000
+        const port = process.env.PORT || 5000;
+        server.listen({ port, host: "0.0.0.0" }, () => {
+          console.log(`Server running on port ${port}`);
+        });
+      }).catch(err => {
+        console.error('Failed to setup application:');
+        console.error(err);
+        startFallbackServer('Failed to setup application. Check logs for details.');
       });
-      
-      // Start listener on port 5000
-      const port = process.env.PORT || 5000;
-      app.listen(port, '0.0.0.0', () => {
-        console.log(`Fallback server running on port ${port}`);
-      });
-    });
+    } else {
+      console.error('Exported module does not contain a setupApp function');
+      startFallbackServer('Invalid server module. Missing setup function.');
+    }
+  }).catch(err => {
+    console.error('Failed to load bundled server:');
+    console.error(err);
+    startFallbackServer('Failed to load application. Check logs for details.');
+  });
 } else {
   console.error('Error: dist/index.js not found');
-  
-  // Create a simple fallback app
+  startFallbackServer('Application build missing. Run "npm run build" first.');
+}
+
+// Helper function to start a fallback server
+function startFallbackServer(errorMessage) {
+  // Set up a basic fallback route to display error
   app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(500).json({ error: 'Server Error', message: errorMessage });
+    }
+    
     res.status(500).send(`
       <html>
-        <head><title>Server Error</title></head>
+        <head>
+          <title>Server Error</title>
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+            h1 { color: #e74c3c; }
+            .error { background: #f8d7da; padding: 15px; border-radius: 5px; }
+          </style>
+        </head>
         <body>
           <h1>Server Error</h1>
-          <p>The application server failed to start. Please contact support.</p>
-          <p>Error: dist/index.js not found - build may be missing.</p>
+          <div class="error">
+            <p>${errorMessage}</p>
+          </div>
+          <p>Please contact support if this issue persists.</p>
         </body>
       </html>
     `);
@@ -70,6 +89,6 @@ if (fs.existsSync(path.join(__dirname, 'dist', 'index.js'))) {
   // Start listener on port 5000
   const port = process.env.PORT || 5000;
   app.listen(port, '0.0.0.0', () => {
-    console.log(`Emergency fallback server running on port ${port}`);
+    console.log(`Fallback server running on port ${port}`);
   });
 }

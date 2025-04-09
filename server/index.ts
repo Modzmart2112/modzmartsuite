@@ -78,17 +78,18 @@ async function setupApp() {
 }
 
 // Development mode
-if (process.env.NODE_ENV === 'development') {
-  setupApp().then(server => {
-    const port = process.env.PORT || 5000;
-    server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
-      log(`Server running on port ${port}`);
-    });
-  }).catch(err => {
-    console.error('Failed to start server:', err);
-    process.exit(1);
+// Always start the server regardless of environment
+// This ensures that both development and production will work
+setupApp().then(server => {
+  const port = process.env.PORT || 5000;
+  server.listen({ port, host: "0.0.0.0" }, () => {
+    log(`Server running on port ${port}`);
   });
-}
+}).catch(err => {
+  console.error('Failed to start server:', err);
+  console.error(err.stack); // Print stack trace for better debugging
+  process.exit(1);
+});
 
 // Export for production
 export default setupApp;
