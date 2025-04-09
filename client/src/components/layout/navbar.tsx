@@ -69,7 +69,7 @@ export default function Navbar() {
   const searchRef = useRef<HTMLDivElement>(null);
   
   // For handling notifications
-  const notifications = [
+  const [notifications, setNotifications] = useState([
     {
       id: 1,
       title: "Price Discrepancy Detected",
@@ -94,7 +94,7 @@ export default function Navbar() {
       type: "sync",
       read: true
     }
-  ];
+  ]);
   
   // For Shopify connection status in profile menu
   const { data: shopifyConnection } = useQuery<ConnectionStatus>({
@@ -170,8 +170,22 @@ export default function Navbar() {
   
   // Handle notification click
   const handleNotificationClick = (notification: any) => {
+    // Mark this specific notification as read
+    const updatedNotifications = notifications.map(n => 
+      n.id === notification.id ? { ...n, read: true } : n
+    );
+    setNotifications(updatedNotifications);
+    
+    // Show the notification details in a dialog
     setSelectedNotification(notification);
     setNotificationDialogOpen(true);
+  };
+  
+  // Mark all notifications as read
+  const markAllAsRead = () => {
+    const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
+    setNotifications(updatedNotifications);
+    toast({ title: "Marked all as read" });
   };
   
   // Format price with currency
@@ -483,7 +497,7 @@ export default function Navbar() {
                   {notifications.filter(n => !n.read).length > 0 && (
                     <button 
                       className="text-sm text-primary hover:underline"
-                      onClick={() => toast({ title: "Marked all as read" })}
+                      onClick={markAllAsRead}
                     >
                       Mark all as read
                     </button>
