@@ -493,7 +493,7 @@ export function ShopifySyncStatus() {
         {/* If not syncing, show last sync and run button */}
         {!isSyncing && (
           <div className="p-4 space-y-4">
-            <div className="p-3 bg-muted/50 rounded-md space-y-3">
+            <div className="p-3 bg-muted/50 rounded-md space-y-3 border border-border">
               {/* Top section with last sync info */}
               <div className="flex items-center">
                 <Clock className="h-5 w-5 text-muted-foreground mr-3" />
