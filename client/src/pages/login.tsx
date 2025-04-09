@@ -99,10 +99,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Brand Logo/Name */}
           <div className="mb-8 text-center">
-            <h1 className="text-5xl font-bold tracking-tighter text-white">
-              MODZ
-            </h1>
-            <div className="mt-3 text-xl font-medium tracking-wide text-gray-400">
+            <div className="text-xl font-medium tracking-wide text-gray-400">
               SHOPIFY SUITE
             </div>
             <div className="mt-2 text-xs font-light text-gray-500 tracking-widest">
