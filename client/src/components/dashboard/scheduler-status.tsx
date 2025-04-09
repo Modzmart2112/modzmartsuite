@@ -48,7 +48,7 @@ export function SchedulerStatus() {
     refetchInterval: 5000, // Refresh every 5 seconds
   });
   
-  const isSchedulerActive = !loading && status?.activeJobs?.includes('price-check');
+  const isSchedulerActive = !loading && status?.activeJobs?.includes('daily-price-check');
   
   const startSchedulerMutation = useMutation({
     mutationFn: async () => {
