@@ -810,54 +810,6 @@ class ShopifyClient {
       return { inventory_items: [] };
     }
   }
-  
-  // Get a specific variant by ID from Shopify
-  async getVariantById(variantId: string): Promise<any> {
-    try {
-      // Use Access Token directly since that's the proper way for private apps
-      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
-      const storeUrl = process.env.SHOPIFY_STORE_URL;
-      
-      if (!accessToken || !storeUrl) {
-        log('No Shopify credentials found in environment variables', 'shopify-api');
-        throw new Error('Shopify credentials not configured');
-      }
-      
-      // Normalize store URL
-      let normalizedUrl = storeUrl;
-      if (!normalizedUrl.startsWith('http')) {
-        normalizedUrl = `https://${normalizedUrl}`;
-      }
-      if (normalizedUrl.endsWith('/')) {
-        normalizedUrl = normalizedUrl.slice(0, -1);
-      }
-      
-      const baseUrl = `${normalizedUrl}/admin/api/2023-01`;
-      const url = `${baseUrl}/variants/${variantId}.json`;
-      
-      log(`Getting Shopify variant ${variantId} details`, 'shopify-api');
-      
-      // Make the API call to get the variant
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Shopify-Access-Token': accessToken
-        }
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Shopify API error (${response.status}): ${errorText}`);
-      }
-      
-      const data = await response.json();
-      return data.variant;
-    } catch (error) {
-      console.error('Error getting variant from Shopify:', error);
-      throw error;
-    }
-  }
 }
 
 export const shopifyClient = new ShopifyClient();
