@@ -2191,6 +2191,131 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
       timestamp: new Date().toISOString() 
     });
   }));
+  
+  // Debug endpoint to test a specific product
+  app.get("/api/debug/specific-product", asyncHandler(async (req, res) => {
+    try {
+      console.log("ROUTE: /api/debug/specific-product endpoint called");
+      
+      // Get a specific product we know has a cost price
+      const result = await db.execute(`
+        SELECT * FROM products 
+        WHERE sku = 'VA54229'
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.json({ error: "Product not found" });
+      }
+      
+      const product = result.rows[0];
+      
+      // Add logging to check what's in the database vs what's being returned
+      console.log("Raw database product data:", product);
+      console.log("Cost price in database:", product.cost_price);
+      console.log("Cost price type:", typeof product.cost_price);
+      
+      // Try to manually map the products the same way it's done in getProducts
+      const { 
+        id, sku, title, description, status, images, vendor, 
+        cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
+        last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
+        product_type, on_sale, original_price, sale_end_date, sale_id
+      } = product;
+      
+      // Parse cost_price to a number
+      const costPrice = cost_price !== null && cost_price !== undefined 
+        ? Number(cost_price) 
+        : null;
+      
+      // Create the mapped product
+      const mappedProduct = {
+        id, sku, title, description, status, images, vendor,
+        costPrice,
+        shopifyId: shopify_id,
+        shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
+        supplierUrl: supplier_url,
+        supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
+        lastScraped: last_scraped,
+        lastChecked: last_checked,
+        hasPriceDiscrepancy: has_price_discrepancy,
+        createdAt: created_at,
+        updatedAt: updated_at,
+        productType: product_type,
+        onSale: on_sale,
+        originalPrice: original_price !== null ? Number(original_price) : null,
+        saleEndDate: sale_end_date,
+        saleId: sale_id
+      };
+      
+      console.log("Mapped product:", mappedProduct);
+      console.log("Mapped costPrice:", mappedProduct.costPrice);
+      console.log("Mapped costPrice type:", typeof mappedProduct.costPrice);
+      
+      // Now try to fetch using the storage.getProductBySku method
+      const storedProduct = await storage.getProductBySku('VA54229');
+      console.log("Product from storage.getProductBySku:", storedProduct);
+      
+      if (storedProduct) {
+        console.log("Storage costPrice:", storedProduct.costPrice);
+        console.log("Storage costPrice type:", typeof storedProduct.costPrice);
+      }
+      
+      // Return both the raw and mapped results
+      res.json({
+        rawDatabaseProduct: product,
+        mappedProduct,
+        storageProduct: storedProduct,
+        message: "Check the server logs for detailed debug info"
+      });
+    } catch (error) {
+      console.error("Error in debug specific-product endpoint:", error);
+      res.status(500).json({ 
+        error: "Failed to retrieve specific product debug information", 
+        message: (error as Error).message
+      });
+    }
+  }));
+
+  // Debug endpoint to check cost prices
+  app.get("/api/debug/cost-prices", asyncHandler(async (req, res) => {
+    try {
+      console.log("ROUTE: /api/debug/cost-prices endpoint called");
+      
+      // Get a sample of products with cost prices
+      const productsWithCostPrice = await db.select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        costPrice: products.costPrice,
+        shopifyPrice: products.shopifyPrice,
+        shopifyId: products.shopifyId
+      })
+      .from(products)
+      .where(sql`cost_price IS NOT NULL AND cost_price > 0 AND shopify_id NOT LIKE 'local-%'`)
+      .limit(10);
+      
+      console.log(`Found ${productsWithCostPrice.length} products with cost prices`);
+      
+      // Also count total products with cost prices
+      const countResult = await db.select({ count: sql`count(*)` }).from(products)
+        .where(sql`cost_price IS NOT NULL AND cost_price > 0 AND shopify_id NOT LIKE 'local-%'`);
+      
+      const totalWithCostPrice = countResult[0] ? Number(countResult[0].count) : 0;
+      
+      // Return both sample data and counts
+      res.json({
+        sampleProducts: productsWithCostPrice,
+        totalWithCostPrice,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error in debug cost-prices endpoint:", error);
+      res.status(500).json({ 
+        error: "Failed to retrieve cost price debug information", 
+        message: (error as Error).message
+      });
+    }
+  }));
 
   // API endpoint to refresh only cost prices for products - dedicated endpoint
   // This endpoint is used to resolve issues with cost prices not updating in real-time

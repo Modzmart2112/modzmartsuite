@@ -11,7 +11,7 @@ import {
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
-import { eq, desc, and, asc, isNotNull, sql, inArray, type SQL } from "drizzle-orm";
+import { eq, desc, and, asc, isNotNull, sql, inArray, or, type SQL } from "drizzle-orm";
 
 // Define the storage interface
 export interface IStorage {
@@ -917,55 +917,41 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Getting products with limit: ${limit}, offset: ${offset}`);
       
-      // Use direct SQL instead of ORM, but now with a filter for local IDs
-      // Fixed parameter binding by providing integer values directly in SQL
-      // This avoids the parameter binding issue
-      const query = `
-        SELECT * FROM products
-        WHERE ${this.buildExcludeLocalIdsCondition()}
-        ORDER BY id DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      // Switch to use the ORM approach like in getProductBySku
+      // This ensures proper field selection and type mapping
+      const result = await db.select({
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      })
+      .from(products)
+      .where(sql`shopify_id NOT LIKE 'local-%'`)
+      .orderBy(desc(products.id))
+      .limit(limit)
+      .offset(offset);
       
-      // No parameters needed since values are directly in the query
-      const result = await db.execute(query);
-      
-      // Convert snake_case column names to camelCase for consistency
-      const mappedProducts = result.rows.map(product => {
-        // Extract all the snake_case fields we want to rename
-        const { 
-          id, sku, title, description, status, images, vendor, 
-          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
-          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
-          product_type, on_sale, original_price, sale_end_date, sale_id
-        } = product;
-        
-        // Parse cost_price to a number if it exists
-        const costPrice = cost_price !== null && cost_price !== undefined 
-          ? Number(cost_price) 
-          : null;
-        
-        // Return a new object with only the fields we need
-        return {
-          id, sku, title, description, status, images, vendor,
-          // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice, // Use the parsed number value
-          shopifyId: shopify_id,
-          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
-          supplierUrl: supplier_url,
-          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
-          lastScraped: last_scraped,
-          lastChecked: last_checked,
-          hasPriceDiscrepancy: has_price_discrepancy,
-          createdAt: created_at,
-          updatedAt: updated_at,
-          productType: product_type,
-          onSale: on_sale,
-          originalPrice: original_price !== null ? Number(original_price) : null,
-          saleEndDate: sale_end_date,
-          saleId: sale_id
-        };
-      });
+      // With the ORM approach, we don't need manual mapping anymore
+      // The fields are already properly named in camelCase according to the schema
+      const mappedProducts = result;
       
       // Check if we got results
       if (mappedProducts.length === 0) {
@@ -980,7 +966,7 @@ export class DatabaseStorage implements IStorage {
         console.log(`\tAll properties: ${Object.keys(sampleProduct).join(', ')}`);
       }
       
-      console.log(`Found ${mappedProducts.length} products, total: ${result.rowCount || 'unknown'}`);
+      console.log(`Found ${mappedProducts.length} products`);
       return mappedProducts as Product[];
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -1022,50 +1008,41 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log('Getting all products from database');
       
-      // Use direct SQL for better performance on large datasets
-      // Filter out products with local- IDs that are placeholders
-      const query = `
-        SELECT * FROM products
-        WHERE ${this.buildExcludeLocalIdsCondition()}
-        ORDER BY id ASC
-      `;
+      // Use ORM with explicit field selection for consistency
+      // Define the select fields object for reuse
+      const selectFields = {
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      };
       
-      const result = await db.execute(query);
+      // Use ORM with explicit field selection for consistency
+      const result = await db.select(selectFields)
+      .from(products)
+      .where(sql`shopify_id NOT LIKE 'local-%'`)
+      .orderBy(asc(products.id));
       
-      // Convert snake_case column names to camelCase for consistency
-      const mappedProducts = result.rows.map(product => {
-        const { 
-          id, sku, title, description, status, images, vendor, 
-          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
-          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
-          product_type, on_sale, original_price, sale_end_date, sale_id
-        } = product;
-        
-        // Parse cost_price to a number if it exists
-        const costPrice = cost_price !== null && cost_price !== undefined 
-          ? Number(cost_price) 
-          : null;
-        
-        // Return a new object with only the fields we need
-        return {
-          id, sku, title, description, status, images, vendor,
-          costPrice,
-          shopifyId: shopify_id,
-          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
-          supplierUrl: supplier_url,
-          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
-          lastScraped: last_scraped,
-          lastChecked: last_checked,
-          hasPriceDiscrepancy: has_price_discrepancy,
-          createdAt: created_at,
-          updatedAt: updated_at,
-          productType: product_type,
-          onSale: on_sale,
-          originalPrice: original_price !== null ? Number(original_price) : null,
-          saleEndDate: sale_end_date,
-          saleId: sale_id
-        };
-      });
+      // ORM directly gives us the mapped products
+      const mappedProducts = result;
       
       console.log(`Found ${mappedProducts.length} total products in database`);
       return mappedProducts as Product[];
@@ -1102,20 +1079,43 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Fetching products by SKUs: ${skus.join(', ')}`);
       
-      // Need to use a SQL expression directly since we need to normalize the SKUs case-insensitively
+      // Need to use a SQL expression for case-insensitive matching
       const normalizedSkus = skus.map(sku => sku.trim().toUpperCase());
       
-      // Generate placeholders and parameter values for the SQL query
-      const placeholders = normalizedSkus.map((_, i) => `$${i + 1}`).join(', ');
-      const query = `
-        SELECT * FROM products 
-        WHERE UPPER(sku) IN (${placeholders})
-      `;
+      // Define the select fields for consistency
+      const selectFields = {
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      };
       
-      // Execute with normalized SKUs as parameters
-      const result = await db.execute(query, normalizedSkus);
+      // Use ORM's sql template for IN clause
+      const result = await db.select(selectFields)
+        .from(products)
+        .where(
+          sql`UPPER(${products.sku}) IN (${sql.join(normalizedSkus, sql`, `)})`
+        );
       
-      return result.rows as Product[];
+      return result;
     } catch (error) {
       console.error('Error fetching products by SKU:', error);
       return [];
@@ -1289,56 +1289,53 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Getting products for vendor: ${vendor}, limit: ${limit}, offset: ${offset}`);
       
-      // Build query with direct value interpolation instead of parameters
-      // Filter out products with local- IDs that are placeholders
-      let queryStr = `SELECT * FROM products WHERE vendor = '${vendor.replace(/'/g, "''")}' AND ${this.buildExcludeLocalIdsCondition()} ORDER BY title ASC`;
+      // Define the select fields for consistency
+      const selectFields = {
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      };
+      
+      // Use ORM for cleaner and safer query
+      let query = db.select(selectFields)
+        .from(products)
+        .where(
+          and(
+            eq(products.vendor, vendor),
+            sql`${products.shopifyId} NOT LIKE 'local-%'`
+          )
+        )
+        .orderBy(asc(products.title));
       
       // Add pagination if needed
       if (limit !== undefined && offset !== undefined) {
-        queryStr += ` LIMIT ${limit} OFFSET ${offset}`;
+        query = query.limit(limit).offset(offset);
       }
       
-      // Execute raw query without parameters
-      const result = await db.execute(queryStr);
+      // Execute the query
+      const result = await query;
       
-      // Convert snake_case column names to camelCase for consistency
-      const mappedProducts = result.rows.map(product => {
-        // Extract all the snake_case fields we want to rename
-        const { 
-          id, sku, title, description, status, images, vendor: vendorName, 
-          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
-          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
-          product_type, on_sale, original_price, sale_end_date, sale_id
-        } = product;
-        
-        // Parse numeric fields to proper number types
-        const costPrice = cost_price !== null && cost_price !== undefined 
-          ? Number(cost_price) 
-          : null;
-        
-        // Return a new object with only the fields we need
-        return {
-          id, sku, title, description, status, images, vendor: vendorName,
-          // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice,
-          shopifyId: shopify_id,
-          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
-          supplierUrl: supplier_url,
-          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
-          lastScraped: last_scraped,
-          lastChecked: last_checked,
-          hasPriceDiscrepancy: has_price_discrepancy,
-          createdAt: created_at,
-          updatedAt: updated_at,
-          productType: product_type,
-          onSale: on_sale,
-          originalPrice: original_price !== null ? Number(original_price) : null,
-          saleEndDate: sale_end_date,
-          saleId: sale_id
-        };
-      });
-      
-      return mappedProducts as Product[];
+      // Return the results directly (ORM handles the mapping)
+      return result;
     } catch (error) {
       console.error(`Error fetching products for vendor ${vendor}:`, error);
       return [];
@@ -1349,56 +1346,53 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Getting products for product type: ${productType}, limit: ${limit}, offset: ${offset}`);
       
-      // Build query with direct value interpolation instead of parameters
-      // Filter out products with local- IDs that are placeholders
-      let queryStr = `SELECT * FROM products WHERE product_type = '${productType.replace(/'/g, "''")}' AND ${this.buildExcludeLocalIdsCondition()} ORDER BY title ASC`;
+      // Define the select fields for consistency
+      const selectFields = {
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      };
+      
+      // Use ORM for cleaner and safer query
+      let query = db.select(selectFields)
+        .from(products)
+        .where(
+          and(
+            eq(products.productType, productType),
+            sql`${products.shopifyId} NOT LIKE 'local-%'`
+          )
+        )
+        .orderBy(asc(products.title));
       
       // Add pagination if needed
       if (limit !== undefined && offset !== undefined) {
-        queryStr += ` LIMIT ${limit} OFFSET ${offset}`;
+        query = query.limit(limit).offset(offset);
       }
       
-      // Execute raw query without parameters
-      const result = await db.execute(queryStr);
+      // Execute the query
+      const result = await query;
       
-      // Convert snake_case column names to camelCase for consistency
-      const mappedProducts = result.rows.map(product => {
-        // Extract all the snake_case fields we want to rename
-        const { 
-          id, sku, title, description, status, images, vendor, 
-          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
-          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
-          product_type, on_sale, original_price, sale_end_date, sale_id
-        } = product;
-        
-        // Parse numeric fields to proper number types
-        const costPrice = cost_price !== null && cost_price !== undefined 
-          ? Number(cost_price) 
-          : null;
-        
-        // Return a new object with only the fields we need
-        return {
-          id, sku, title, description, status, images, vendor,
-          // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice,
-          shopifyId: shopify_id,
-          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
-          supplierUrl: supplier_url,
-          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
-          lastScraped: last_scraped,
-          lastChecked: last_checked,
-          hasPriceDiscrepancy: has_price_discrepancy,
-          createdAt: created_at,
-          updatedAt: updated_at,
-          productType: product_type,
-          onSale: on_sale,
-          originalPrice: original_price !== null ? Number(original_price) : null,
-          saleEndDate: sale_end_date,
-          saleId: sale_id
-        };
-      });
-      
-      return mappedProducts as Product[];
+      // Return the results directly (ORM handles the mapping)
+      return result;
     } catch (error) {
       console.error(`Error fetching products for product type ${productType}:`, error);
       return [];
@@ -1549,57 +1543,51 @@ export class DatabaseStorage implements IStorage {
   // Search operations
   async searchProducts(query: string, limit: number, offset: number): Promise<Product[]> {
     try {
-      const searchTerm = `%${query.trim().replace(/'/g, "''")}%`;
+      const searchTerm = `%${query.trim()}%`;
       
-      // Direct SQL approach with inline values to avoid parameter binding issues
-      const sqlQuery = `
-        SELECT * FROM products
-        WHERE (LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}'))
-        AND ${this.buildExcludeLocalIdsCondition()}
-        ORDER BY id DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+      // Define the select fields for consistency
+      const selectFields = {
+        id: products.id,
+        sku: products.sku,
+        title: products.title,
+        description: products.description,
+        shopifyId: products.shopifyId,
+        shopifyPrice: products.shopifyPrice,
+        costPrice: products.costPrice,  // Explicitly include costPrice
+        supplierUrl: products.supplierUrl,
+        supplierPrice: products.supplierPrice,
+        lastScraped: products.lastScraped,
+        lastChecked: products.lastChecked,
+        hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+        createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
+        status: products.status,
+        images: products.images,
+        vendor: products.vendor,
+        productType: products.productType,
+        onSale: products.onSale,
+        originalPrice: products.originalPrice,
+        saleEndDate: products.saleEndDate,
+        saleId: products.saleId
+      };
       
-      const result = await db.execute(sqlQuery);
+      // Use ORM for the search query
+      const result = await db.select(selectFields)
+        .from(products)
+        .where(
+          and(
+            or(
+              sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm})`,
+              sql`LOWER(${products.title}) LIKE LOWER(${searchTerm})`
+            ),
+            sql`${products.shopifyId} NOT LIKE 'local-%'`
+          )
+        )
+        .orderBy(desc(products.id))
+        .limit(limit)
+        .offset(offset);
       
-      // Convert snake_case column names to camelCase for consistency
-      const mappedProducts = result.rows.map(product => {
-        // Extract all the snake_case fields we want to rename
-        const { 
-          id, sku, title, description, status, images, vendor, 
-          cost_price, shopify_id, shopify_price, supplier_url, supplier_price,
-          last_scraped, last_checked, has_price_discrepancy, created_at, updated_at,
-          product_type, on_sale, original_price, sale_end_date, sale_id
-        } = product;
-        
-        // Parse numeric fields to proper number types
-        const costPrice = cost_price !== null && cost_price !== undefined 
-          ? Number(cost_price) 
-          : null;
-        
-        // Return a new object with only the fields we need
-        return {
-          id, sku, title, description, status, images, vendor,
-          // Manually map the snake_case fields to camelCase only (no duplicates)
-          costPrice,
-          shopifyId: shopify_id,
-          shopifyPrice: shopify_price !== null ? Number(shopify_price) : null,
-          supplierUrl: supplier_url,
-          supplierPrice: supplier_price !== null ? Number(supplier_price) : null,
-          lastScraped: last_scraped,
-          lastChecked: last_checked,
-          hasPriceDiscrepancy: has_price_discrepancy,
-          createdAt: created_at,
-          updatedAt: updated_at,
-          productType: product_type,
-          onSale: on_sale,
-          originalPrice: original_price !== null ? Number(original_price) : null,
-          saleEndDate: sale_end_date,
-          saleId: sale_id
-        };
-      });
-      
-      return mappedProducts as Product[];
+      return result;
     } catch (error) {
       console.error('Error searching products:', error);
       return [];
@@ -1608,17 +1596,24 @@ export class DatabaseStorage implements IStorage {
   
   async searchProductCount(query: string): Promise<number> {
     try {
-      const searchTerm = `%${query.trim().replace(/'/g, "''")}%`;
+      const searchTerm = `%${query.trim()}%`;
       
-      // Direct SQL count query with inline value to avoid parameter binding issues
-      const sqlQuery = `
-        SELECT COUNT(*) as count FROM products
-        WHERE (LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}'))
-        AND ${this.buildExcludeLocalIdsCondition()}
-      `;
+      // Use ORM for consistent approach
+      const result = await db.select({
+        count: sql`COUNT(*)`
+      })
+      .from(products)
+      .where(
+        and(
+          or(
+            sql`LOWER(${products.sku}) LIKE LOWER(${searchTerm})`,
+            sql`LOWER(${products.title}) LIKE LOWER(${searchTerm})`
+          ),
+          sql`${products.shopifyId} NOT LIKE 'local-%'`
+        )
+      );
       
-      const result = await db.execute(sqlQuery);
-      return Number(result.rows[0].count);
+      return Number(result[0].count);
     } catch (error) {
       console.error('Error counting search results:', error);
       return 0;
