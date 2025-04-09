@@ -238,44 +238,45 @@ export function ShopifyBrandDistribution() {
             </div>
           </div>
         </div>
+      </CardHeader>
+      
+      {/* Stats cards moved outside of header */}
+      <div className="grid grid-cols-3 gap-4 px-6 pt-6 pb-2">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-5 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm">
+          <div className="text-sm font-medium text-blue-700 dark:text-blue-400 flex items-center">
+            <Layers className="h-4 w-4 mr-1.5" />
+            Total Brands
+          </div>
+          <div className="text-3xl font-bold mt-2 text-blue-900 dark:text-blue-300">{Object.keys(brandStats).length}</div>
+          <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1.5">From Shopify catalog</div>
+        </div>
         
-        <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-5 rounded-lg border border-blue-100 dark:border-blue-900 shadow-sm">
-            <div className="text-sm font-medium text-blue-700 dark:text-blue-400 flex items-center">
-              <Layers className="h-4 w-4 mr-1.5" />
-              Total Brands
-            </div>
-            <div className="text-3xl font-bold mt-2 text-blue-900 dark:text-blue-300">{Object.keys(brandStats).length}</div>
-            <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1.5">From Shopify catalog</div>
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 p-5 rounded-lg border border-purple-100 dark:border-purple-900 shadow-sm">
+          <div className="text-sm font-medium text-purple-700 dark:text-purple-400 flex items-center">
+            <ShoppingBag className="h-4 w-4 mr-1.5" />
+            Total Products
           </div>
-          
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30 p-5 rounded-lg border border-purple-100 dark:border-purple-900 shadow-sm">
-            <div className="text-sm font-medium text-purple-700 dark:text-purple-400 flex items-center">
-              <ShoppingBag className="h-4 w-4 mr-1.5" />
-              Total Products
-            </div>
-            <div className="text-3xl font-bold mt-2 text-purple-900 dark:text-purple-300">{formatNumber(totalProducts)}</div>
-            <div className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1.5">Across all brands</div>
+          <div className="text-3xl font-bold mt-2 text-purple-900 dark:text-purple-300">{formatNumber(totalProducts)}</div>
+          <div className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1.5">Across all brands</div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-5 rounded-lg border border-emerald-100 dark:border-emerald-900 shadow-sm">
+          <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center">
+            <Award className="h-4 w-4 mr-1.5" />
+            Top Brand
           </div>
-          
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-5 rounded-lg border border-emerald-100 dark:border-emerald-900 shadow-sm">
-            <div className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center">
-              <Award className="h-4 w-4 mr-1.5" />
-              Top Brand
-            </div>
-            <div className="text-3xl font-bold mt-2 text-emerald-900 dark:text-emerald-300">
-              {chartData.length > 0 ? chartData[0].name : 'N/A'}
-            </div>
-            <div className="flex items-center mt-1.5">
-              {chartData.length > 0 && (
-                <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs px-2.5 py-0.5">
-                  {formatNumber(chartData[0].count)} products
-                </Badge>
-              )}
-            </div>
+          <div className="text-3xl font-bold mt-2 text-emerald-900 dark:text-emerald-300">
+            {chartData.length > 0 ? chartData[0].name : 'N/A'}
+          </div>
+          <div className="flex items-center mt-1.5">
+            {chartData.length > 0 && (
+              <Badge variant="outline" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-xs px-2.5 py-0.5">
+                {formatNumber(chartData[0].count)} products
+              </Badge>
+            )}
           </div>
         </div>
-      </CardHeader>
+      </div>
       
       <CardContent className="pt-0">
         <div className="h-[350px] mt-8">

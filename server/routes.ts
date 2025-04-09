@@ -117,6 +117,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }));
   
+  // Recent activity endpoint for dashboard
+  app.get("/api/dashboard/activity", asyncHandler(async (req, res) => {
+    const limit = parseInt(req.query.limit as string || "10");
+    const stats = await storage.getStats();
+    const uploads = await storage.getRecentCsvUploads(3);
+    
+    // Build a combined list of activity events
+    const events = [];
+    
+    // Add CSV uploads to events
+    for (const upload of uploads) {
+      events.push({
+        id: upload.id,
+        type: "csv_upload",
+        title: `CSV uploaded: ${upload.filename}`,
+        details: `${upload.processedCount} products updated`,
+        timestamp: upload.createdAt ? upload.createdAt.toISOString() : new Date().toISOString()
+      });
+    }
+    
+    // Add price checks to events
+    if (stats?.lastPriceCheck) {
+      events.push({
+        id: 1000,
+        type: "price_check",
+        title: "Price check completed",
+        details: `${stats.totalPriceChecks || 0} products checked, ${stats.totalDiscrepanciesFound || 0} discrepancies found`,
+        timestamp: stats.lastPriceCheck.toISOString()
+      });
+    }
+    
+    // Add Shopify sync events
+    if (stats?.lastShopifySync) {
+      events.push({
+        id: 2000,
+        type: "shopify_sync",
+        title: "Shopify sync completed",
+        details: `Products synchronized with Shopify store`,
+        timestamp: stats.lastShopifySync.toISOString()
+      });
+    }
+    
+    // Sort by timestamp descending (newest first)
+    events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    // Return only the requested number of events
+    res.json({ events: events.slice(0, limit) });
+  }));
+  
   // Products routes
   app.get("/api/products", asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit as string || "50");

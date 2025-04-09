@@ -47,6 +47,8 @@ export interface IStorage {
   createCsvUpload(upload: InsertCsvUpload): Promise<CsvUpload>;
   updateCsvUpload(id: number, upload: Partial<CsvUpload>): Promise<CsvUpload | undefined>;
   getRecentCsvUploads(limit: number): Promise<CsvUpload[]>;
+  getRecentPriceSyncs(limit: number): Promise<any[]>;
+  getRecentShopifySyncs(limit: number): Promise<any[]>;
   deleteCsvUpload(id: number): Promise<boolean>;
   
   // Notification operations
@@ -394,6 +396,57 @@ export class MemStorage implements IStorage {
     
     // Otherwise apply the limit
     return sorted.slice(0, limit);
+  }
+  
+  async getRecentPriceSyncs(limit: number): Promise<any[]> {
+    // In memory storage doesn't track individual price syncs separately
+    // We'll simulate them using price history data
+    const histories = Array.from(this.priceHistories.values())
+      .sort((a, b) => {
+        const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+        const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+        return timeB - timeA;
+      });
+    
+    // Group by date (by day) to simulate sync operations
+    const syncsByDay = new Map<string, any>();
+    for (const history of histories) {
+      if (!history.createdAt) continue;
+      
+      const day = history.createdAt.toISOString().split('T')[0];
+      if (!syncsByDay.has(day)) {
+        syncsByDay.set(day, {
+          id: syncsByDay.size + 1,
+          type: 'price_check',
+          processedCount: 0,
+          createdAt: history.createdAt
+        });
+      }
+      
+      const dayData = syncsByDay.get(day);
+      dayData.processedCount++;
+      syncsByDay.set(day, dayData);
+    }
+    
+    return Array.from(syncsByDay.values()).slice(0, limit);
+  }
+  
+  async getRecentShopifySyncs(limit: number): Promise<any[]> {
+    // Use sync progress data to create a list of recent syncs
+    const syncs = Array.from(this.syncProgresses.values())
+      .filter(progress => progress.type === 'shopify_sync' && progress.status === 'completed')
+      .sort((a, b) => {
+        const timeA = a.completedAt ? a.completedAt.getTime() : 0;
+        const timeB = b.completedAt ? b.completedAt.getTime() : 0;
+        return timeB - timeA;
+      });
+    
+    return syncs.map(sync => ({
+      id: sync.id,
+      type: sync.type,
+      processedCount: sync.processed,
+      createdAt: sync.completedAt || sync.updatedAt || sync.createdAt
+    })).slice(0, limit);
   }
   
   async deleteCsvUpload(id: number): Promise<boolean> {
