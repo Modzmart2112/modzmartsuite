@@ -8,6 +8,11 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.status(200).send('Health check OK');
+});
+
 // Serve the uploads directory directly to fix profile picture loading issues
 app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 

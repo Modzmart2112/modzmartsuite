@@ -1,22 +1,26 @@
-#!/usr/bin/env node
 
-// This wrapper script is designed to run the application
-// in production mode by setting NODE_ENV and loading the dist/index.js file.
-// It handles errors that might cause deployment failures.
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-process.env.NODE_ENV = 'production';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-console.log('Starting application in production mode...');
 console.log('Node version:', process.version);
-console.log('ESM import using wrapper...');
+console.log('Starting application in production mode...');
 
-import('./dist/index.js')
-  .then(() => {
-    console.log('Application loaded successfully!');
-  })
-  .catch(err => {
-    console.error('Failed to load application:');
-    console.error(err.message);
-    console.error(err.stack);
-    process.exit(1);
-  });
+// Start the application and keep it running
+const childProcess = spawn('node', ['--enable-source-maps', 'dist/index.js'], {
+  stdio: 'inherit',
+  cwd: __dirname
+});
+
+childProcess.on('error', (error) => {
+  console.error('Failed to start child process:', error);
+  process.exit(1);
+});
+
+// Keep the parent process running until child exits
+childProcess.on('exit', (code) => {
+  console.log(`Child process exited with code ${code}`);
+  process.exit(code);
+});
