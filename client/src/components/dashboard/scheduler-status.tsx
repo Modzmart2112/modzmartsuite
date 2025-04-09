@@ -231,9 +231,6 @@ export function SchedulerStatus() {
           <CalendarClock className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
           <div>
             <CardTitle className="text-lg">Scheduled Price Checks</CardTitle>
-            <CardDescription>
-              Automatically check all products with supplier URLs for price discrepancies
-            </CardDescription>
           </div>
         </div>
       </CardHeader>
