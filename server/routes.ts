@@ -12,6 +12,7 @@ import {
   Product, 
   products 
 } from "@shared/schema";
+import { sql } from "drizzle-orm";
 import { shopifyClient } from "./shopify";
 import { scrapePriceFromUrl } from "./scraper";
 import { sendTelegramNotification } from "./telegram";
@@ -25,7 +26,7 @@ import { scheduler, checkAllPrices } from "./scheduler";
 import { scheduledSyncShopifyProducts } from "./scheduler";
 import { improvedSyncShopifyProducts } from "./improved-shopify-sync";
 import { db } from "./db";
-import { sql, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 
 // Helper function to handle controller errors
@@ -2175,6 +2176,68 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
     } catch (error) {
       console.error(`Error reverting sale campaign:`, error);
       res.status(500).json({ error: "Failed to revert sale campaign" });
+    }
+  }));
+  
+  // API endpoint to manually refresh product data after sync completes
+  // This is a workaround for clients that have issues detecting sync completion
+  app.post("/api/products/refresh", asyncHandler(async (req, res) => {
+    console.log("Received product refresh request - forcing client refresh");
+    // No need to do anything on the server side - the products are already updated in the DB
+    // This endpoint exists solely to give clients a way to force a re-fetch of product data
+    // and break out of infinite rendering loops
+    res.json({ 
+      message: "Product refresh signal sent", 
+      timestamp: new Date().toISOString() 
+    });
+  }));
+
+  // API endpoint to refresh only cost prices for products - dedicated endpoint
+  // This endpoint is used to resolve issues with cost prices not updating in real-time
+  app.post("/api/products/refresh-cost-prices", asyncHandler(async (req, res) => {
+    try {
+      console.log("Received request to refresh cost prices");
+      
+      // Count products with cost prices (but don't need to actually fetch them all)
+      // We're using the database directly instead of going through storage.getAllProducts
+      const countResult = await db.select({ count: sql`count(*)` }).from(products)
+        .where(sql`shopify_id NOT LIKE 'local-%' AND cost_price IS NOT NULL`);
+      
+      console.log("Cost price refresh SQL result:", countResult);
+      
+      const productCount = countResult[0] ? Number(countResult[0].count) : 0;
+      console.log("Cost price refresh found", productCount, "products with cost prices");
+      
+      // Optional: Get a sample of products with cost prices for debugging
+      const sampleProducts = await db.select({
+        id: products.id,
+        sku: products.sku,
+        costPrice: products.costPrice,
+        shopifyId: products.shopifyId
+      })
+      .from(products)
+      .where(sql`shopify_id NOT LIKE 'local-%' AND cost_price IS NOT NULL`)
+      .limit(5);
+      
+      console.log("Sample products with cost prices:", sampleProducts);
+      
+      // Response with count but no actual processing needed
+      // The products already have their cost prices updated in the database
+      // This endpoint is only needed to break React rendering loops
+      const response = {
+        message: "Cost price refresh requested for UI update",
+        productCount,
+        timestamp: new Date().toISOString()
+      };
+      
+      console.log("Sending cost price refresh response:", response);
+      res.json(response);
+    } catch (error) {
+      console.error("Error in refresh-cost-prices endpoint:", error);
+      res.status(500).json({ 
+        error: "Failed to refresh cost prices", 
+        message: (error as Error).message
+      });
     }
   }));
 

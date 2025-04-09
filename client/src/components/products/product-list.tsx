@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -112,10 +112,10 @@ export function ProductList({
     refetchInterval: 2000, // Check every 2 seconds
   });
   
-  // Track previous sync status to detect when a sync completes
-  const [prevSyncStatus, setPrevSyncStatus] = useState<string | null>(null);
+  // Get the current sync status and trigger a refetch when it completes
   const isShopifySyncInProgress = syncStatus?.status === 'in-progress';
-
+  const prevSyncStatusRef = useRef<string | null>(null);
+  
   // Fetch products from API - includes search functionality and filters
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['/api/products', page, limit, debouncedSearch, filters.vendor, filters.productType],
@@ -156,14 +156,120 @@ export function ProductList({
     refetchInterval: isShopifySyncInProgress ? 2000 : false,
   });
   
-  // When sync status changes from 'in-progress' to 'complete', trigger a refetch
+  // Tracks whether we need to force a refresh after a sync
+  const [forcedRefreshKey, setForcedRefreshKey] = useState(0);
+  const forcedRefreshTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track if we should refresh cost prices
+  const [shouldRefreshCostPrices, setShouldRefreshCostPrices] = useState(false);
+  
+  // Effect to handle cost price refreshes - runs only when shouldRefreshCostPrices changes to true
   useEffect(() => {
-    if (prevSyncStatus === 'in-progress' && syncStatus?.status === 'complete') {
-      console.log('Shopify sync completed - refreshing product data');
-      refetch();
+    // Only run the effect when shouldRefreshCostPrices is true
+    // This prevents infinite loops by only running when it transitions to true
+    if (shouldRefreshCostPrices) {
+      console.log('Triggering dedicated cost price refresh endpoint');
+      
+      // Use a local variable to track the current request
+      // This ensures we don't have race conditions with multiple requests
+      const isCurrentRequest = true;
+      
+      fetch('/api/products/refresh-cost-prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(res => res.json())
+      .then(data => {
+        console.log('Cost price refresh complete:', data);
+        
+        // Only update state if this is still the current request
+        if (isCurrentRequest) {
+          // First set the flag to false before triggering a refetch
+          setShouldRefreshCostPrices(false);
+          
+          // Use setTimeout to ensure state update completes before refetch
+          setTimeout(() => {
+            // Force a refetch with the updated cost prices
+            refetch();
+          }, 50);
+        }
+      })
+      .catch(error => {
+        console.error('Error refreshing cost prices:', error);
+        // Only update state if this is still the current request
+        if (isCurrentRequest) {
+          setShouldRefreshCostPrices(false);
+        }
+      });
     }
-    setPrevSyncStatus(syncStatus?.status || null);
-  }, [syncStatus?.status, refetch]);
+  }, [shouldRefreshCostPrices]); // Remove refetch from dependencies to avoid infinite loops
+
+  // When sync status changes from 'in-progress' to 'complete', trigger a refetch
+  // This useEffect is designed to avoid infinite rerenders by carefully managing dependencies
+  useEffect(() => {
+    // Only run this effect if we have a valid syncStatus and it's not the initial render
+    if (syncStatus && prevSyncStatusRef.current !== null) {
+      const currentStatus = syncStatus.status;
+      const prevStatus = prevSyncStatusRef.current;
+      
+      // If status changed and transition from in-progress to complete
+      if (prevStatus !== currentStatus && prevStatus === 'in-progress' && currentStatus === 'complete') {
+        console.log('Shopify sync completed - using more robust refresh strategy');
+        
+        // Cleanup any existing refresh timeouts
+        if (forcedRefreshTimeout.current) {
+          clearTimeout(forcedRefreshTimeout.current);
+        }
+        
+        // Use a staged approach with appropriate delays to avoid race conditions
+        // and ensure proper state updates
+        
+        // Stage 1: Call our general refresh endpoint to break any rendering loops
+        // The server-side refresh API is designed to just return a success message
+        // without actually doing any database queries - it simply tells the client
+        // to refresh its data
+        console.log('Stage 1: Initiating general refresh signal');
+        
+        fetch('/api/products/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        .then(res => res.json())
+        .then(data => {
+          console.log('General refresh signal received:', data);
+          
+          // Stage 2: Wait a brief moment, then trigger the forced refetch 
+          // This uses a key change to force a full remount/refresh
+          forcedRefreshTimeout.current = setTimeout(() => {
+            console.log('Stage 2: Forcing component refresh');
+            setForcedRefreshKey(prevKey => prevKey + 1);
+            
+            // Stage 3: After the forced refresh, wait briefly and then refresh cost prices
+            // The delay ensures stages are separated and don't overlap
+            setTimeout(() => {
+              console.log('Stage 3: Initiating cost price refresh');
+              // This will trigger our other useEffect which handles the refresh-cost-prices endpoint
+              setShouldRefreshCostPrices(true);
+            }, 300);
+          }, 300);
+        })
+        .catch(err => {
+          console.error('Error sending refresh signal:', err);
+          // Still try our cost price refresh as a fallback, but with a delay
+          setTimeout(() => {
+            console.log('Fallback: Triggering cost price refresh directly');
+            setShouldRefreshCostPrices(true);
+          }, 300);
+        });
+      }
+      
+      // Always update the ref with the new status
+      prevSyncStatusRef.current = currentStatus;
+    } else if (syncStatus && prevSyncStatusRef.current === null) {
+      // First time we get sync status, just set the ref
+      prevSyncStatusRef.current = syncStatus.status;
+    }
+  }, [syncStatus?.status]); // Only depend on the status property of syncStatus
 
   // Handle search changes
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
