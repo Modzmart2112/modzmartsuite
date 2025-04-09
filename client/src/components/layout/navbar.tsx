@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/lib/authContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { 
@@ -87,6 +88,7 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const { logout } = useAuth();
   
   // Add user profile query
   const { data: userData } = useQuery({
@@ -354,7 +356,10 @@ export default function Navbar() {
                           variant="ghost" 
                           size="sm" 
                           className="text-gray-500 hover:text-gray-800"
-                          onClick={() => toast({ title: "Logged Out", description: "You have been logged out" })}
+                          onClick={() => {
+                            logout();
+                            toast({ title: "Logged Out", description: "You have been logged out" });
+                          }}
                         >
                           <LogOut className="h-4 w-4" />
                         </Button>
@@ -735,7 +740,10 @@ export default function Navbar() {
                   </a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => toast({ title: "Logged Out", description: "You have been logged out" })}>
+                <DropdownMenuItem onClick={() => {
+                  logout();
+                  toast({ title: "Logged Out", description: "You have been logged out" });
+                }}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>

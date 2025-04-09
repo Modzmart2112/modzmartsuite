@@ -9,17 +9,44 @@ import Suppliers from "@/pages/suppliers";
 import SaleManagement from "@/pages/sale-management";
 import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import LoginPage from "@/pages/login";
+import { AuthProvider } from "@/lib/authContext";
+import { PrivateRoute } from "@/components/auth/PrivateRoute";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/products" component={Products} />
-      <Route path="/suppliers" component={Suppliers} />
-      <Route path="/sales" component={SaleManagement} />
-      <Route path="/settings" component={Settings} />
-      {/* Add more routes as needed */}
-      <Route component={NotFound} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/">
+        <PrivateRoute>
+          <Dashboard />
+        </PrivateRoute>
+      </Route>
+      <Route path="/products">
+        <PrivateRoute>
+          <Products />
+        </PrivateRoute>
+      </Route>
+      <Route path="/suppliers">
+        <PrivateRoute>
+          <Suppliers />
+        </PrivateRoute>
+      </Route>
+      <Route path="/sales">
+        <PrivateRoute>
+          <SaleManagement />
+        </PrivateRoute>
+      </Route>
+      <Route path="/settings">
+        <PrivateRoute>
+          <Settings />
+        </PrivateRoute>
+      </Route>
+      <Route>
+        <PrivateRoute>
+          <NotFound />
+        </PrivateRoute>
+      </Route>
     </Switch>
   );
 }
@@ -27,10 +54,17 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <DashboardLayout>
-        <Router />
-      </DashboardLayout>
-      <Toaster />
+      <AuthProvider>
+        <Switch>
+          <Route path="/login" component={LoginPage} />
+          <Route>
+            <DashboardLayout>
+              <Router />
+            </DashboardLayout>
+          </Route>
+        </Switch>
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
