@@ -9,7 +9,8 @@ import { format, formatDistanceToNow } from "date-fns";
 import { 
   Loader2, RefreshCw, CheckCircle, XCircle, 
   ShoppingCart, Clock, ChevronRight,
-  BarChart2, Zap, Check, CircleDashed
+  BarChart2, Zap, Check, CircleDashed,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -328,6 +329,46 @@ export function ShopifySyncStatus() {
         // Refresh data to show new sync state
         refetch();
         syncProgressQuery.refetch();
+      });
+  };
+  
+  // Handler for syncing ONLY products missing cost prices
+  const handleSyncMissingCostPrices = () => {
+    // Clear cost price logs for a fresh view
+    setCostPriceLogs([]);
+    
+    // First validate that we can actually start a sync
+    if (!isReady) {
+      toast({
+        title: "Cannot Start Missing Cost Price Sync",
+        description: "Please reset the current sync before starting a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Show immediate feedback
+    toast({
+      title: "Starting Missing Cost Price Sync",
+      description: "Checking for products without cost prices...",
+    });
+    
+    // Call the new dedicated endpoint
+    fetch("/api/products/sync-missing-cost-prices", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(response => response.json())
+      .then(data => {
+        // Success - show a toast with the count of affected products
+        toast({
+          title: "Missing Cost Price Sync Started",
+          description: `Syncing ${data.missingCostPriceCount} products missing cost prices`
+        });
+        
+        // Refresh data to show new sync state
+        refetch();
+        syncProgressQuery.refetch();
         
         // Simple polling to keep UI updated
         setTimeout(() => syncProgressQuery.refetch(), 500);
@@ -457,6 +498,16 @@ export function ShopifySyncStatus() {
                 </div>
               </div>
               <div className="flex space-x-2">
+                <Button 
+                  onClick={handleSyncMissingCostPrices}
+                  disabled={!isConnected}
+                  variant="outline"
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950"
+                  title="Only sync products that are missing cost prices"
+                >
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Fix Missing Cost Prices
+                </Button>
                 <Button 
                   onClick={handleCostPriceSync}
                   disabled={!isConnected}

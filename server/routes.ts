@@ -2240,6 +2240,43 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
       });
     }
   }));
+  
+  // API endpoint to specifically target products missing cost prices
+  // This is separated from the main sync to be more efficient and focused
+  app.post("/api/products/sync-missing-cost-prices", asyncHandler(async (req, res) => {
+    try {
+      console.log("Received request to sync products missing cost prices");
+      
+      // Count products missing cost prices before we sync
+      const countResult = await db.select({ count: sql`count(*)` }).from(products)
+        .where(sql`shopify_id NOT LIKE 'local-%' AND cost_price IS NULL`);
+      
+      const missingCount = countResult[0] ? Number(countResult[0].count) : 0;
+      console.log(`Found ${missingCount} products missing cost prices - starting specialized sync`);
+      
+      // Start the specialized sync process using dynamic import
+      // This runs asynchronously and we don't wait for it to complete
+      import('./enhanced-shopify-sync').then(module => {
+        module.syncProductsWithoutCostPrice().catch(err => {
+          console.error("Error in sync-missing-cost-prices async process:", err);
+        });
+      });
+      
+      // Return immediately with count and sync started confirmation
+      res.json({
+        message: "Started sync process for products missing cost prices",
+        missingCostPriceCount: missingCount,
+        timestamp: new Date().toISOString(),
+        status: "started"
+      });
+    } catch (error) {
+      console.error("Error in sync-missing-cost-prices endpoint:", error);
+      res.status(500).json({ 
+        error: "Failed to start cost price sync", 
+        message: (error as Error).message 
+      });
+    }
+  }));
 
   // Create HTTP server
   const httpServer = createServer(app);
