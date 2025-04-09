@@ -322,6 +322,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(productTypes);
   }));
   
+  // Get products without supplier URLs for the suppliers page
+  app.get("/api/products/without-supplier-urls", asyncHandler(async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      console.log(`Fetching products without supplier URLs (limit: ${limit})`);
+      const products = await storage.getProductsWithoutSupplierUrls(limit);
+      console.log(`Found ${products.length} products without supplier URLs`);
+      res.json(products);
+    } catch (error) {
+      console.error("Error getting products without supplier URLs:", error);
+      res.status(500).json({ message: "Failed to fetch products without supplier URLs" });
+    }
+  }));
+  
   // Get products by vendor
   app.get("/api/products/by-vendor/:vendor", asyncHandler(async (req, res) => {
     const vendor = req.params.vendor;

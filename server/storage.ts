@@ -32,6 +32,7 @@ export interface IStorage {
   getProductsWithoutCostPrice(): Promise<Product[]>;
   getProductBySku(sku: string): Promise<Product | undefined>;
   getProductsWithSupplierUrls(): Promise<Product[]>;
+  getProductsWithoutSupplierUrls(limit?: number): Promise<Product[]>;
   getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]>;
   getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]>;
   getVendors(): Promise<string[]>;
@@ -261,6 +262,17 @@ export class MemStorage implements IStorage {
         product.supplierUrl !== null && 
         product.supplierUrl !== ''
       );
+  }
+  
+  async getProductsWithoutSupplierUrls(limit?: number): Promise<Product[]> {
+    const products = Array.from(this.products.values())
+      .filter(product => 
+        this.isValidShopifyProduct(product) && 
+        (product.supplierUrl === null || product.supplierUrl === '')
+      )
+      .sort((a, b) => b.id - a.id);
+    
+    return limit ? products.slice(0, limit) : products;
   }
   
   async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {
@@ -1242,6 +1254,51 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(products.id));
+  }
+  
+  async getProductsWithoutSupplierUrls(limit?: number): Promise<Product[]> {
+    const query = db.select({
+      id: products.id,
+      sku: products.sku,
+      title: products.title,
+      description: products.description,
+      shopifyId: products.shopifyId,
+      shopifyPrice: products.shopifyPrice,
+      costPrice: products.costPrice,
+      supplierUrl: products.supplierUrl,
+      supplierPrice: products.supplierPrice,
+      lastScraped: products.lastScraped,
+      lastChecked: products.lastChecked,
+      hasPriceDiscrepancy: products.hasPriceDiscrepancy,
+      createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
+      status: products.status,
+      images: products.images,
+      vendor: products.vendor,
+      productType: products.productType,
+      onSale: products.onSale,
+      originalPrice: products.originalPrice,
+      saleEndDate: products.saleEndDate,
+      saleId: products.saleId
+    })
+      .from(products)
+      .where(
+        and(
+          or(
+            sql`${products.supplierUrl} IS NULL`,
+            sql`${products.supplierUrl} = ''`
+          ),
+          isNotNull(products.shopifyId),
+          sql`${products.shopifyId} NOT LIKE 'local-%'`
+        )
+      )
+      .orderBy(desc(products.id));
+    
+    if (limit) {
+      query.limit(limit);
+    }
+    
+    return await query;
   }
   
   async getProductsWithoutCostPrice(): Promise<Product[]> {

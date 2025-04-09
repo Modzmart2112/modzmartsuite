@@ -26,9 +26,37 @@ import {
   RefreshCw,
   Link2,
   Percent,
-  Globe
+  Globe,
+  Image
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+// Define Product interface locally to avoid import issues
+interface Product {
+  id: number;
+  sku: string;
+  title: string;
+  description?: string | null;
+  shopifyId: string;
+  shopifyPrice: number;
+  costPrice: number | null;
+  supplierUrl: string | null;
+  supplierPrice: number | null;
+  vendor?: string | null;
+  productType?: string | null;
+  status?: string | null;
+  images?: string[] | null;
+}
 import { apiRequest } from "@/lib/queryClient";
 import { Progress } from "@/components/ui/progress";
 import { CsvUploadModal } from "@/modals/csv-upload-modal";
@@ -64,7 +92,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 
 interface CsvUpload {
@@ -299,6 +326,69 @@ export default function Suppliers() {
   const calculatePercentage = (value: number, total: number) => {
     if (total === 0) return 0;
     return Math.round((value / total) * 100);
+  };
+  
+  // Get products without supplier URLs
+  const productsWithoutUrlsQuery = useQuery({
+    queryKey: ['/api/products/without-supplier-urls'],
+    queryFn: async () => {
+      const response = await fetch('/api/products/without-supplier-urls');
+      if (!response.ok) {
+        throw new Error('Failed to fetch products without supplier URLs');
+      }
+      return response.json();
+    }
+  });
+  
+  // Add supplier URL mutation
+  const updateSupplierUrlMutation = useMutation({
+    mutationFn: async ({ productId, supplierUrl }: { productId: number, supplierUrl: string }) => {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ supplierUrl }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update supplier URL');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products/without-supplier-urls'] });
+      toast({
+        title: 'Supplier URL updated',
+        description: 'The supplier URL has been successfully updated.',
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating supplier URL:', error);
+      toast({
+        title: 'Failed to update supplier URL',
+        description: 'There was an error updating the supplier URL. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // Form for adding supplier URL
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [supplierUrl, setSupplierUrl] = useState('');
+  
+  const handleUpdateSupplierUrl = () => {
+    if (selectedProduct && supplierUrl) {
+      updateSupplierUrlMutation.mutate({
+        productId: selectedProduct.id,
+        supplierUrl,
+      });
+      
+      // Reset state
+      setSelectedProduct(null);
+      setSupplierUrl('');
+    }
   };
   
   return (
@@ -635,7 +725,192 @@ export default function Suppliers() {
         </Card>
       </div>
       
-      <div className="mb-8"></div>
+      {/* Products Without Supplier URLs Section */}
+      <div className="mt-8 mb-8">
+        <Card className="shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Products Without Supplier URLs</CardTitle>
+                <CardDescription>Add supplier URLs to products to enable price monitoring</CardDescription>
+              </div>
+              {productsWithoutUrlsQuery.isLoading ? (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  Loading
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                  {productsWithoutUrlsQuery.data?.length || 0} products
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {productsWithoutUrlsQuery.isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-12 rounded-md" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-full max-w-[250px]" />
+                      <Skeleton className="h-4 w-full max-w-[200px]" />
+                    </div>
+                    <Skeleton className="h-9 w-24" />
+                  </div>
+                ))}
+              </div>
+            ) : productsWithoutUrlsQuery.data?.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <CheckCircle2 className="h-16 w-16 text-green-200 mb-4" />
+                <h3 className="text-xl font-medium text-gray-900 mb-1">All Products Have Supplier URLs</h3>
+                <p className="text-gray-500 max-w-md">
+                  Great job! All your products have supplier URLs configured for price monitoring.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="relative overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm text-left text-gray-700">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3">Product</th>
+                        <th scope="col" className="px-6 py-3">SKU</th>
+                        <th scope="col" className="px-6 py-3">Shopify Price</th>
+                        <th scope="col" className="px-6 py-3">Vendor</th>
+                        <th scope="col" className="px-6 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productsWithoutUrlsQuery.data?.slice(0, 10).map((product: Product) => (
+                        <tr key={product.id} className="bg-white border-b">
+                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {product.images && product.images.length > 0 ? (
+                                <img 
+                                  src={product.images[0]} 
+                                  alt={product.title} 
+                                  className="h-10 w-10 mr-4 object-cover rounded"
+                                />
+                              ) : (
+                                <div className="h-10 w-10 mr-4 bg-gray-100 rounded flex items-center justify-center">
+                                  <span className="h-5 w-5 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                                  </span>
+                                </div>
+                              )}
+                              <span className="font-medium">{product.title}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-sm">{product.sku}</td>
+                          <td className="px-6 py-4">${product.shopifyPrice.toFixed(2)}</td>
+                          <td className="px-6 py-4">{product.vendor || '-'}</td>
+                          <td className="px-6 py-4 text-right">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedProduct(product);
+                                setSupplierUrl('');
+                              }}
+                            >
+                              Add URL
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {productsWithoutUrlsQuery.data && productsWithoutUrlsQuery.data.length > 10 && (
+                  <div className="text-center pt-2">
+                    <p className="text-sm text-gray-500">
+                      Showing 10 of {productsWithoutUrlsQuery.data.length} products without supplier URLs.
+                    </p>
+                    <Button variant="link" className="text-sm" onClick={() => refetch()}>
+                      Refresh list
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Add Supplier URL Dialog */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Supplier URL</DialogTitle>
+            <DialogDescription>
+              Enter the URL where this product can be found on the supplier's website. 
+              This will enable automated price monitoring.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedProduct && (
+            <div className="flex items-center space-x-4 py-2">
+              {selectedProduct.images && selectedProduct.images.length > 0 ? (
+                <img 
+                  src={selectedProduct.images[0]} 
+                  alt={selectedProduct.title} 
+                  className="h-12 w-12 object-cover rounded-md"
+                />
+              ) : (
+                <div className="h-12 w-12 bg-gray-100 rounded-md flex items-center justify-center">
+                  <span className="h-6 w-6 text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                  </span>
+                </div>
+              )}
+              <div>
+                <h4 className="font-medium text-gray-900">{selectedProduct.title}</h4>
+                <p className="text-sm text-gray-500">SKU: {selectedProduct.sku}</p>
+              </div>
+            </div>
+          )}
+          
+          <div className="py-4">
+            <Label htmlFor="supplier-url" className="mb-2">Supplier URL</Label>
+            <Input
+              id="supplier-url"
+              placeholder="https://supplier.com/product/123"
+              value={supplierUrl}
+              onChange={(e) => setSupplierUrl(e.target.value)}
+              autoComplete="off"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Make sure the URL points to a page where the price is clearly displayed.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setSelectedProduct(null)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="button" 
+              onClick={handleUpdateSupplierUrl}
+              disabled={!supplierUrl || updateSupplierUrlMutation.isPending}
+            >
+              {updateSupplierUrlMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save URL'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <Tabs defaultValue="upload">
         <TabsList className="mb-6">
