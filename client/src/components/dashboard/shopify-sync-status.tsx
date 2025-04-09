@@ -17,6 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 export function ShopifySyncStatus() {
@@ -543,6 +544,8 @@ export function ShopifySyncStatus() {
                 </Button>
               </div>
             </div>
+            
+            <Separator className="my-3" />
             
             {/* Info about what sync does */}
             <div className="space-y-3 text-sm text-muted-foreground">
