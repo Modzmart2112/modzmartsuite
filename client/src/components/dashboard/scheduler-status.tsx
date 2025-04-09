@@ -234,18 +234,19 @@ export function SchedulerStatus() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-6 pt-2">
-          <div className="flex items-center justify-between">
+      <CardContent className="pt-4">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-1">
             <span className="text-sm font-medium">Status:</span>
+            <div className="flex-grow"></div>
             {loading ? (
-              <Badge variant="outline" className="animate-pulse">
+              <Badge variant="outline" className="animate-pulse px-3 py-1">
                 Loading...
               </Badge>
             ) : isSchedulerActive ? (
-              <Badge variant="default" className="bg-green-600 hover:bg-green-700">Active</Badge>
+              <Badge variant="default" className="bg-green-600 hover:bg-green-700 px-4 py-1">Active</Badge>
             ) : (
-              <Badge variant="destructive">Inactive</Badge>
+              <Badge variant="destructive" className="px-3 py-1">Inactive</Badge>
             )}
           </div>
 
