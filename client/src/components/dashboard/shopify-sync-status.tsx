@@ -10,7 +10,7 @@ import {
   Loader2, RefreshCw, CheckCircle, XCircle, 
   ShoppingCart, Clock, ChevronRight,
   BarChart2, Zap, Check, CircleDashed,
-  AlertCircle, AlertOctagon, User, Settings
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -493,34 +493,14 @@ export function ShopifySyncStatus() {
       <CardContent className="p-0">
         {/* If not syncing, show last sync and run button */}
         {!isSyncing && (
-          <div className="px-3 pt-2 pb-3 space-y-3">
-            <div className="flex items-center justify-between bg-muted/50 rounded border border-border px-2 py-1.5">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-blue-600" />
+          <div className="p-4 space-y-4">
+            <div className="p-3 bg-muted/50 rounded-md space-y-3 border border-border">
+              {/* Top section with last sync info */}
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 text-muted-foreground mr-3" />
                 <div>
-                  <div className="text-xs font-medium">Shopify Status</div>
-                  <div className="text-xs text-blue-600 font-medium">
-                    {shopifyConnectionQuery.data?.connected ? (
-                      <span className="flex items-center">
-                        <CheckCircle className="h-3 w-3 mr-1 text-green-600" />
-                        Connected
-                      </span>
-                    ) : (
-                      <span className="flex items-center">
-                        <AlertOctagon className="h-3 w-3 mr-1 text-amber-600" />
-                        Not Connected
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Last sync time */}
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <div className="text-xs font-medium">Last Sync</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-sm font-medium">Last Sync</div>
+                  <div className="text-sm text-muted-foreground">
                     {isLoading ? (
                       <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
                     ) : (
@@ -529,45 +509,43 @@ export function ShopifySyncStatus() {
                   </div>
                 </div>
               </div>
-            </div>
-            
-            {/* Button section with compact layout */}
-            <div>
-              <div className="grid grid-cols-3 gap-1">
+              
+              {/* Button section with grid layout for better fit */}
+              <div className="grid grid-cols-3 gap-2">
                 <Button 
                   onClick={handleSyncMissingCostPrices}
                   disabled={!isConnected}
                   variant="outline"
                   size="sm"
-                  className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950 h-8"
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950"
                   title="Only sync products that are missing cost prices"
                 >
-                  <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                  <span className="whitespace-nowrap text-xs">Fix Missing</span>
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  <span className="whitespace-nowrap text-xs">Fix Missing Costs</span>
                 </Button>
                 <Button 
                   onClick={handleCostPriceSync}
                   disabled={!isConnected}
                   variant="outline"
                   size="sm"
-                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-900 dark:text-blue-400 dark:hover:bg-blue-950 h-8"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-900 dark:text-blue-400 dark:hover:bg-blue-950"
                 >
-                  <Zap className="h-3.5 w-3.5 mr-1" />
-                  <span className="whitespace-nowrap text-xs">Cost Only</span>
+                  <Zap className="h-4 w-4 mr-1" />
+                  <span className="whitespace-nowrap text-xs">Cost Prices Only</span>
                 </Button>
                 <Button 
                   onClick={handleManualSync}
                   disabled={!isConnected}
                   size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 text-white h-8"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  <RefreshCw className="h-4 w-4 mr-1" />
                   <span className="whitespace-nowrap text-xs">Sync All</span>
                 </Button>
               </div>
-              
-              <Separator className="my-3" />
             </div>
+            
+            <Separator className="my-3" />
             
             {/* Info about what sync does */}
             <div className="space-y-3 text-sm text-muted-foreground">
