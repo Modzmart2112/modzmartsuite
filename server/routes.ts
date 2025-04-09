@@ -2229,30 +2229,34 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
       console.log(`Current price in database: ${product.shopifyPrice}`);
       console.log(`Shopify ID: ${product.shopifyId}`);
       
-      // Set the correct price (original value)
-      const correctPrice = 14.95;
+      // Set the sale price to $14.20 and original price to $14.95
+      const salePrice = 14.20;
+      const originalPrice = 14.95;
+      
+      console.log(`Setting sale price: $${salePrice}, original price: $${originalPrice}`);
       
       // Update the product price in our database
       await storage.updateProduct(product.id, {
-        shopifyPrice: correctPrice,
-        onSale: false,
-        originalPrice: null,
-        saleEndDate: null,
-        saleId: null
+        shopifyPrice: salePrice,
+        onSale: true,
+        originalPrice: originalPrice,
+        saleEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        saleId: 999 // Special "test" sale ID
       });
       
-      console.log(`Updated database price for ${product.sku} to $${correctPrice}`);
+      console.log(`Updated database price for ${product.sku} to $${salePrice} (original: $${originalPrice})`);
       
       // Update the price in Shopify
       try {
         // Let's use the shopifyClient to update the price instead of direct API call
-        console.log(`Updating Shopify price for variant ${product.shopifyId} to ${correctPrice}`);
+        console.log(`Updating Shopify price for variant ${product.shopifyId} to ${salePrice} (compareAtPrice: ${originalPrice})`);
         
         // Update the price in Shopify using the shopifyClient
+        // Show the original higher price as compare-at price to indicate it's on sale
         await shopifyClient.updateProductPrice(
           product.shopifyId,
-          correctPrice,
-          null // Set compare-at-price to null to remove any sale indicators
+          salePrice,
+          originalPrice // Show the original higher price as compare-at price
         );
         
         console.log('Successfully updated price in Shopify API');
@@ -2260,8 +2264,8 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
         return res.json({
           success: true,
           message: `Successfully fixed price for ${product.sku}`,
-          originalPrice: product.shopifyPrice,
-          newPrice: correctPrice
+          originalPrice: originalPrice,
+          newPrice: salePrice
         });
       }
       catch (error) {
@@ -2272,6 +2276,8 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
         return res.status(500).json({
           partialSuccess: true,
           message: "Database updated but Shopify update failed",
+          originalPrice: originalPrice,
+          newPrice: salePrice,
           error: shopifyError.message
         });
       }
@@ -2279,6 +2285,85 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
     catch (error) {
       console.error('Error in fix-sil-rp-016 endpoint:', error);
       res.status(500).json({ error: "Failed to fix product price" });
+    }
+  }));
+  
+  // Endpoint to revert SIL-RP-016 price to original
+  app.post("/api/products/revert-sil-rp-016", asyncHandler(async (req, res) => {
+    try {
+      console.log("Reverting price for SIL-RP-016 product");
+      
+      // First find the product in the database
+      const product = await storage.getProductBySku('SIL-RP-016');
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      console.log(`Found product: ${product.title}`);
+      console.log(`Current price in database: ${product.shopifyPrice}`);
+      console.log(`Original price: ${product.originalPrice}`);
+      console.log(`Shopify ID: ${product.shopifyId}`);
+      
+      if (!product.onSale || !product.originalPrice) {
+        return res.status(400).json({ error: "Product is not on sale or has no original price stored" });
+      }
+      
+      // Get the sale price before reverting (to use as compare-at price)
+      const salePrice = product.shopifyPrice;
+      const originalPrice = product.originalPrice;
+      
+      console.log(`Current sale price: $${salePrice}, original price: $${originalPrice}`);
+      
+      // Update the product price in our database
+      await storage.updateProduct(product.id, {
+        shopifyPrice: originalPrice,
+        onSale: false,
+        originalPrice: null,
+        saleEndDate: null,
+        saleId: null
+      });
+      
+      console.log(`Reverted database price for ${product.sku} to $${originalPrice} (was on sale for: $${salePrice})`);
+      
+      // Update the price in Shopify
+      try {
+        // Let's use the shopifyClient to update the price instead of direct API call
+        console.log(`Updating Shopify price for variant ${product.shopifyId} to ${originalPrice} (compareAtPrice: ${salePrice})`);
+        
+        // Update the price in Shopify using the shopifyClient
+        // Show the sale price as compare-at price to indicate price history
+        await shopifyClient.updateProductPrice(
+          product.shopifyId,
+          originalPrice,
+          salePrice // Show the previous sale price as compare-at price
+        );
+        
+        console.log('Successfully reverted price in Shopify API');
+        
+        return res.json({
+          success: true,
+          message: `Successfully reverted price for ${product.sku}`,
+          salePrice: salePrice,
+          revertedPrice: originalPrice
+        });
+      }
+      catch (error) {
+        const shopifyError = error as Error;
+        console.error('Error updating Shopify:', shopifyError);
+        
+        // Even if Shopify update fails, at least our database is correct now
+        return res.status(500).json({
+          partialSuccess: true,
+          message: "Database updated but Shopify update failed",
+          salePrice: salePrice,
+          revertedPrice: originalPrice,
+          error: shopifyError.message
+        });
+      }
+    }
+    catch (error) {
+      console.error('Error in revert-sil-rp-016 endpoint:', error);
+      res.status(500).json({ error: "Failed to revert product price" });
     }
   }));
   
@@ -2366,6 +2451,47 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
     }
   }));
 
+  // Endpoint to get variant details from Shopify
+  app.get("/api/shopify/variant/:variantId", asyncHandler(async (req, res) => {
+    try {
+      const { variantId } = req.params;
+      
+      if (!variantId) {
+        return res.status(400).json({ error: "Variant ID is required" });
+      }
+      
+      console.log(`Getting Shopify variant ${variantId}`);
+      
+      // Get the store URL and access token
+      const user = await storage.getUser(1); // Using first user
+      
+      if (!user?.shopifyApiKey || !user?.shopifyApiSecret || !user?.shopifyStoreUrl) {
+        return res.status(400).json({ error: "Shopify credentials not configured" });
+      }
+      
+      // Use the shopifyClient to get the variant
+      try {
+        const variant = await shopifyClient.getVariantById(variantId);
+        return res.json({
+          variant,
+          message: "Retrieved variant details from Shopify"
+        });
+      } catch (error) {
+        console.error("Error fetching variant from Shopify:", error);
+        return res.status(500).json({ 
+          error: "Failed to fetch variant from Shopify",
+          message: (error as Error).message
+        });
+      }
+    } catch (error) {
+      console.error("Error in get variant endpoint:", error);
+      return res.status(500).json({ 
+        error: "Error processing request",
+        message: (error as Error).message
+      });
+    }
+  }));
+  
   // Debug endpoint to check cost prices
   app.get("/api/debug/cost-prices", asyncHandler(async (req, res) => {
     try {

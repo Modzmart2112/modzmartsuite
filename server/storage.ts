@@ -2259,11 +2259,11 @@ export class DatabaseStorage implements IStorage {
               console.log(`Reverting Shopify price for variant ${variantId} to original price: ${product.originalPrice}`);
               
               // Call the Shopify API to update the price
-              // We also remove the compare-at price by setting it to null
+              // Use the current sale price as compare-at price to show price history
               await shopifyClient.updateProductPrice(
                 variantId, 
                 product.originalPrice, 
-                null // Remove compare-at price to hide the sale indicator
+                product.shopifyPrice // Show sale price as compare-at price for history
               );
               
               console.log(`Successfully reverted Shopify price for product ${product.sku} (ID: ${product.id})`);
