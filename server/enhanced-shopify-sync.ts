@@ -955,7 +955,8 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
       const productMap = new Map(); // Map inventory item IDs to our product records
       
       for (const product of batch) {
-        if (product.shopifyId) {
+        // Skip products with placeholder local IDs since they don't exist in Shopify
+        if (product.shopifyId && !product.shopifyId.startsWith('local-')) {
           try {
             // Get the inventory item ID for this product
             const shopifyProduct = await shopifyClient.getProductByID(
@@ -973,6 +974,9 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
             log(`Error getting inventory item ID for product ${product.sku}: ${error}`, "cost-price-sync");
             failedCount++;
           }
+        } else if (product.shopifyId && product.shopifyId.startsWith('local-')) {
+          // Skip products with local IDs but don't count as failures
+          log(`Skipping product ${product.sku} with local ID (not in Shopify)`, "cost-price-sync");
         }
         
         processedCount++;
