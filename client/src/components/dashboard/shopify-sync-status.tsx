@@ -308,26 +308,60 @@ export function ShopifySyncStatus() {
         return;
       }
       
-      const response = await fetch("/api/scheduler/run-cost-price-sync", {
-        method: "POST",
+      console.log("Starting cost price sync - making API request...");
+      
+      // Show immediate feedback
+      toast({
+        title: "Starting Cost Price Sync",
+        description: "Making API request...",
       });
       
+      // Use the API client utility instead of raw fetch
+      const response = await fetch("/api/scheduler/run-cost-price-sync", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json'
+        },
+      });
+      
+      // Log the full response for debugging
+      console.log("Cost price sync API response status:", response.status);
+      
       if (response.ok) {
+        const data = await response.json();
+        console.log("Cost price sync started successfully:", data);
+        
         toast({
           title: "Cost Price Sync Started",
           description: "Syncing only products without cost prices",
         });
         
-        // Refresh data after a short delay to ensure the backend has updated
-        setTimeout(() => {
-          refetch();
+        // Refresh data right away to pick up the new sync session
+        refetch();
+        syncProgressQuery.refetch();
+        
+        // Keep refreshing to show live updates
+        const refreshInterval = setInterval(() => {
           syncProgressQuery.refetch();
         }, 1000);
+        
+        // Clear the interval after 5 seconds
+        setTimeout(() => {
+          clearInterval(refreshInterval);
+        }, 5000);
       } else {
-        const errorData = await response.json();
+        let errorMessage = "Could not start cost price sync";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.message || errorMessage;
+          console.error("Error response from API:", errorData);
+        } catch (jsonError) {
+          console.error("Could not parse error response:", jsonError);
+        }
+        
         toast({
           title: "Cost Price Sync Failed",
-          description: errorData?.message || "Could not start cost price sync",
+          description: errorMessage,
           variant: "destructive",
         });
       }
@@ -335,7 +369,7 @@ export function ShopifySyncStatus() {
       console.error("Error starting cost price sync:", error);
       toast({
         title: "Error",
-        description: "An error occurred while syncing cost prices",
+        description: "An error occurred while syncing cost prices: " + (error instanceof Error ? error.message : String(error)),
         variant: "destructive",
       });
     }
