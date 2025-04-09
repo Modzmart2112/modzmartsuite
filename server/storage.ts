@@ -2211,6 +2211,49 @@ export class DatabaseStorage implements IStorage {
     return progress || null;
   }
   
+  async getRecentPriceSyncs(limit: number): Promise<any[]> {
+    // Use price history data to determine when price checks occurred
+    // Group by day to simulate sync operations
+    const results = await db.execute(sql`
+      SELECT 
+        DATE(created_at) as check_date, 
+        MIN(created_at) as created_at,
+        COUNT(*) as processed_count 
+      FROM price_histories 
+      GROUP BY DATE(created_at) 
+      ORDER BY check_date DESC
+      LIMIT ${limit}
+    `);
+    
+    // Handle the result type properly
+    const rows = Array.isArray(results) ? results : (results as any).rows || [];
+    return rows.map((row: any, index: number) => ({
+      id: index + 1,
+      type: 'price_check',
+      processedCount: Number(row.processed_count),
+      createdAt: new Date(row.created_at)
+    }));
+  }
+  
+  async getRecentShopifySyncs(limit: number): Promise<any[]> {
+    // Get completed Shopify sync operations
+    const completedSyncs = await db.select()
+      .from(syncProgress)
+      .where(and(
+        eq(syncProgress.type, 'shopify_sync'),
+        eq(syncProgress.status, 'completed')
+      ))
+      .orderBy(desc(syncProgress.completedAt))
+      .limit(limit);
+    
+    return completedSyncs.map(sync => ({
+      id: sync.id,
+      type: sync.type,
+      processedCount: sync.processedItems || 0,
+      createdAt: sync.completedAt || sync.startedAt || new Date()
+    }));
+  }
+  
   /**
    * Get recent Shopify API logs for analyzing sync progress
    * @param limit The maximum number of logs to retrieve
