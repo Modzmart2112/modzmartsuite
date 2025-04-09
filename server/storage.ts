@@ -203,51 +203,68 @@ export class MemStorage implements IStorage {
     return updatedUser;
   }
 
+  // Helper function to check if a product has a valid Shopify ID (not a local placeholder)
+  private isValidShopifyProduct(product: Product): boolean {
+    return product.shopifyId !== null && 
+           product.shopifyId !== undefined && 
+           !product.shopifyId.startsWith('local-');
+  }
+
   // Product operations
   async getProducts(limit: number, offset: number): Promise<Product[]> {
     return Array.from(this.products.values())
+      .filter(product => this.isValidShopifyProduct(product))
       .sort((a, b) => b.id - a.id)
       .slice(offset, offset + limit);
   }
 
   async getProductCount(): Promise<number> {
-    return this.products.size;
+    return Array.from(this.products.values())
+      .filter(product => this.isValidShopifyProduct(product))
+      .length;
   }
 
   async getActiveProductCount(): Promise<number> {
-    return Array.from(this.products.values()).filter(p => p.status === 'active').length;
+    return Array.from(this.products.values())
+      .filter(product => this.isValidShopifyProduct(product) && product.status === 'active')
+      .length;
   }
 
   async getProductsBySku(skus: string[]): Promise<Product[]> {
     return Array.from(this.products.values()).filter(product => 
-      skus.includes(product.sku)
+      this.isValidShopifyProduct(product) && skus.includes(product.sku)
     );
   }
   
   async getProductsWithoutCostPrice(): Promise<Product[]> {
     return Array.from(this.products.values()).filter(product => 
-      product.costPrice === null || product.costPrice === 0
+      this.isValidShopifyProduct(product) && (product.costPrice === null || product.costPrice === 0)
     );
   }
 
   async getProductById(id: number): Promise<Product | undefined> {
-    return this.products.get(id);
+    const product = this.products.get(id);
+    return product && this.isValidShopifyProduct(product) ? product : undefined;
   }
 
   async getProductBySku(sku: string): Promise<Product | undefined> {
     return Array.from(this.products.values()).find(
-      (product) => product.sku === sku
+      (product) => this.isValidShopifyProduct(product) && product.sku === sku
     );
   }
   
   async getProductsWithSupplierUrls(): Promise<Product[]> {
     return Array.from(this.products.values())
-      .filter(product => product.supplierUrl !== null && product.supplierUrl !== '');
+      .filter(product => 
+        this.isValidShopifyProduct(product) && 
+        product.supplierUrl !== null && 
+        product.supplierUrl !== ''
+      );
   }
   
   async getProductsByVendor(vendor: string, limit?: number, offset?: number): Promise<Product[]> {
     const filteredProducts = Array.from(this.products.values())
-      .filter(product => product.vendor === vendor)
+      .filter(product => this.isValidShopifyProduct(product) && product.vendor === vendor)
       .sort((a, b) => a.title.localeCompare(b.title));
     
     if (limit !== undefined && offset !== undefined) {
@@ -258,7 +275,7 @@ export class MemStorage implements IStorage {
   
   async getProductsByProductType(productType: string, limit?: number, offset?: number): Promise<Product[]> {
     const filteredProducts = Array.from(this.products.values())
-      .filter(product => product.productType === productType)
+      .filter(product => this.isValidShopifyProduct(product) && product.productType === productType)
       .sort((a, b) => a.title.localeCompare(b.title));
     
     if (limit !== undefined && offset !== undefined) {
@@ -890,16 +907,22 @@ export class DatabaseStorage implements IStorage {
     return updatedUser;
   }
 
+  // Helper method to exclude products with placeholder local IDs
+  private buildExcludeLocalIdsCondition(): string {
+    return "shopify_id IS NOT NULL AND shopify_id NOT LIKE 'local-%'";
+  }
+
   // Product operations
   async getProducts(limit: number, offset: number): Promise<Product[]> {
     try {
       console.log(`Getting products with limit: ${limit}, offset: ${offset}`);
       
-      // Use direct SQL instead of ORM
+      // Use direct SQL instead of ORM, but now with a filter for local IDs
       // Fixed parameter binding by providing integer values directly in SQL
       // This avoids the parameter binding issue
       const query = `
         SELECT * FROM products
+        WHERE ${this.buildExcludeLocalIdsCondition()}
         ORDER BY id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -971,10 +994,17 @@ export class DatabaseStorage implements IStorage {
    * @returns The count of unique products
    */
   async getProductCount(): Promise<number> {
-    // Count distinct shopify_id values to get unique products
+    // Count distinct shopify_id values to get unique products, excluding local IDs
     const result = await db.select({ 
       count: sql`count(DISTINCT ${products.shopifyId})` 
-    }).from(products);
+    })
+    .from(products)
+    .where(
+      and(
+        isNotNull(products.shopifyId),
+        sql`${products.shopifyId} NOT LIKE 'local-%'`
+      )
+    );
     return Number(result[0].count);
   }
   
@@ -996,8 +1026,10 @@ export class DatabaseStorage implements IStorage {
       console.log('Getting all products from database');
       
       // Use direct SQL for better performance on large datasets
+      // Filter out products with local- IDs that are placeholders
       const query = `
         SELECT * FROM products
+        WHERE ${this.buildExcludeLocalIdsCondition()}
         ORDER BY id ASC
       `;
       
@@ -1056,7 +1088,13 @@ export class DatabaseStorage implements IStorage {
       count: sql`count(DISTINCT ${products.shopifyId})` 
     })
       .from(products)
-      .where(eq(products.status, 'active'));
+      .where(
+        and(
+          eq(products.status, 'active'),
+          isNotNull(products.shopifyId),
+          sql`${products.shopifyId} NOT LIKE 'local-%'`
+        )
+      );
     return Number(result[0].count);
   }
 
@@ -1199,7 +1237,9 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           isNotNull(products.supplierUrl),
-          sql`${products.supplierUrl} != ''`
+          sql`${products.supplierUrl} != ''`,
+          isNotNull(products.shopifyId),
+          sql`${products.shopifyId} NOT LIKE 'local-%'`
         )
       )
       .orderBy(asc(products.id));
@@ -1235,7 +1275,11 @@ export class DatabaseStorage implements IStorage {
       })
         .from(products)
         .where(
-          sql`(${products.costPrice} IS NULL OR ${products.costPrice} = 0)`
+          and(
+            sql`(${products.costPrice} IS NULL OR ${products.costPrice} = 0)`,
+            isNotNull(products.shopifyId),
+            sql`${products.shopifyId} NOT LIKE 'local-%'`
+          )
         )
         .orderBy(asc(products.id));
     } catch (error) {
@@ -1249,7 +1293,8 @@ export class DatabaseStorage implements IStorage {
       console.log(`Getting products for vendor: ${vendor}, limit: ${limit}, offset: ${offset}`);
       
       // Build query with direct value interpolation instead of parameters
-      let queryStr = `SELECT * FROM products WHERE vendor = '${vendor.replace(/'/g, "''")}' ORDER BY title ASC`;
+      // Filter out products with local- IDs that are placeholders
+      let queryStr = `SELECT * FROM products WHERE vendor = '${vendor.replace(/'/g, "''")}' AND ${this.buildExcludeLocalIdsCondition()} ORDER BY title ASC`;
       
       // Add pagination if needed
       if (limit !== undefined && offset !== undefined) {
@@ -1308,7 +1353,8 @@ export class DatabaseStorage implements IStorage {
       console.log(`Getting products for product type: ${productType}, limit: ${limit}, offset: ${offset}`);
       
       // Build query with direct value interpolation instead of parameters
-      let queryStr = `SELECT * FROM products WHERE product_type = '${productType.replace(/'/g, "''")}' ORDER BY title ASC`;
+      // Filter out products with local- IDs that are placeholders
+      let queryStr = `SELECT * FROM products WHERE product_type = '${productType.replace(/'/g, "''")}' AND ${this.buildExcludeLocalIdsCondition()} ORDER BY title ASC`;
       
       // Add pagination if needed
       if (limit !== undefined && offset !== undefined) {
@@ -1368,6 +1414,7 @@ export class DatabaseStorage implements IStorage {
         SELECT DISTINCT vendor 
         FROM products 
         WHERE vendor IS NOT NULL AND vendor != '' 
+        AND ${this.buildExcludeLocalIdsCondition()}
         ORDER BY vendor ASC
       `;
       
@@ -1386,6 +1433,7 @@ export class DatabaseStorage implements IStorage {
         SELECT DISTINCT product_type 
         FROM products 
         WHERE product_type IS NOT NULL AND product_type != '' 
+        AND ${this.buildExcludeLocalIdsCondition()}
         ORDER BY product_type ASC
       `;
       
@@ -1509,7 +1557,8 @@ export class DatabaseStorage implements IStorage {
       // Direct SQL approach with inline values to avoid parameter binding issues
       const sqlQuery = `
         SELECT * FROM products
-        WHERE LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}')
+        WHERE (LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}'))
+        AND ${this.buildExcludeLocalIdsCondition()}
         ORDER BY id DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
@@ -1567,7 +1616,8 @@ export class DatabaseStorage implements IStorage {
       // Direct SQL count query with inline value to avoid parameter binding issues
       const sqlQuery = `
         SELECT COUNT(*) as count FROM products
-        WHERE LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}')
+        WHERE (LOWER(sku) LIKE LOWER('${searchTerm}') OR LOWER(title) LIKE LOWER('${searchTerm}'))
+        AND ${this.buildExcludeLocalIdsCondition()}
       `;
       
       const result = await db.execute(sqlQuery);
@@ -1728,7 +1778,8 @@ export class DatabaseStorage implements IStorage {
       .from(products)
       .where(and(
         eq(products.hasPriceDiscrepancy, true),
-        isNotNull(products.supplierPrice)
+        isNotNull(products.supplierPrice),
+        sql`${this.buildExcludeLocalIdsCondition()}`
       ));
     
     for (const product of discrepancyProducts) {
@@ -1761,7 +1812,10 @@ export class DatabaseStorage implements IStorage {
       // First, get products with price discrepancies
       const discrepancyProducts = await db.select({ id: products.id })
         .from(products)
-        .where(eq(products.hasPriceDiscrepancy, true));
+        .where(and(
+          eq(products.hasPriceDiscrepancy, true),
+          sql`${this.buildExcludeLocalIdsCondition()}`
+        ));
         
       const discrepancyIds = discrepancyProducts.map(p => p.id);
       
@@ -1777,9 +1831,10 @@ export class DatabaseStorage implements IStorage {
           hasPriceDiscrepancy: false,
           updatedAt: now
         })
-        .where(
-          eq(products.hasPriceDiscrepancy, true)
-        )
+        .where(and(
+          eq(products.hasPriceDiscrepancy, true),
+          sql`${this.buildExcludeLocalIdsCondition()}`
+        ))
         .returning({ id: products.id });
       
       console.log(`Cleared price discrepancies for ${result.length} products`);
@@ -2141,7 +2196,8 @@ export class DatabaseStorage implements IStorage {
         .where(
           and(
             eq(products.onSale, true),
-            eq(products.saleId, campaignId)
+            eq(products.saleId, campaignId),
+            sql`${this.buildExcludeLocalIdsCondition()}`
           )
         );
       
