@@ -332,7 +332,11 @@ export default function Navbar() {
                     <div className="flex items-center">
                       <Avatar>
                         {userData?.profilePicture ? (
-                          <AvatarImage src={userData.profilePicture} alt={userData.firstName || 'User'} />
+                          <AvatarImage 
+                            src={`${userData.profilePicture}?v=${Date.now()}`} 
+                            alt={userData.firstName || 'User'} 
+                            onError={() => console.error("Failed to load mobile menu profile image:", userData.profilePicture)}
+                          />
                         ) : (
                           <AvatarFallback>
                             {userData?.firstName?.charAt(0) || userData?.username?.charAt(0) || 'U'}
@@ -672,7 +676,7 @@ export default function Navbar() {
                   <Avatar>
                     {userData?.profilePicture ? (
                       <AvatarImage 
-                        src={userData.profilePicture} 
+                        src={`${userData.profilePicture}?v=${Date.now()}`} 
                         alt={userData.firstName || 'User'} 
                         onError={() => console.error("Failed to load navbar profile image:", userData.profilePicture)}
                       />

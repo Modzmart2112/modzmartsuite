@@ -642,8 +642,12 @@ export default function Settings() {
                       <Avatar className="w-32 h-32 cursor-pointer" onClick={handleProfilePictureClick}>
                         {profilePicture ? (
                           <>
-                            <AvatarImage src={profilePicture} alt="Profile" onError={() => console.error("Failed to load image:", profilePicture)} />
-                            {console.log("Rendering profile picture:", profilePicture)}
+                            <AvatarImage 
+                              src={`${profilePicture}?v=${Date.now()}`} 
+                              alt="Profile" 
+                              onError={() => console.error("Failed to load image:", profilePicture)} 
+                            />
+                            {console.log("Rendering profile picture with cache busting:", `${profilePicture}?v=${Date.now()}`)}
                           </>
                         ) : (
                           <>
