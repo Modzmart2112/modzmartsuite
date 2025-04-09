@@ -54,10 +54,15 @@ export function RecentActivityCard() {
   });
 
   return (
-    <Card className="col-span-1 shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xl font-bold">Recent Activity</CardTitle>
-        <CardDescription>Latest actions and system events</CardDescription>
+    <Card className="col-span-1 shadow-md overflow-hidden border-0">
+      <CardHeader className="pb-2 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 border-b">
+        <div className="flex items-center">
+          <Clock className="h-5 w-5 mr-2 text-amber-600 dark:text-amber-400" />
+          <div>
+            <CardTitle className="text-lg">Recent Activity</CardTitle>
+            <CardDescription>Latest actions and system events</CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -77,33 +82,39 @@ export function RecentActivityCard() {
             Failed to load activity data
           </div>
         ) : data && data.events && data.events.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {data.events.map((event: ActivityEvent) => (
-              <div key={event.id} className="flex items-start space-y-1">
-                <div className="flex-1">
+              <div key={event.id} className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/30 border border-gray-100 dark:border-gray-800 hover:bg-amber-50/50 dark:hover:bg-amber-950/10 transition-colors">
+                <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center">
                     {getEventIcon(event.type)}
                     <h4 className="font-medium text-sm">
                       {event.title}
-                      {getEventBadge(event.type)}
                     </h4>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1 ml-6">
-                    {event.details}
-                  </p>
-                  <div className="flex items-center mt-1 ml-6">
-                    <Clock className="w-3 h-3 mr-1 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground" title={format(new Date(event.timestamp), 'PPpp')}>
-                      {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
-                    </span>
-                  </div>
+                  {getEventBadge(event.type)}
+                </div>
+                <p className="text-sm text-muted-foreground ml-6 mb-2">
+                  {event.details}
+                </p>
+                <div className="flex items-center ml-6">
+                  <Clock className="w-3 h-3 mr-1 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground" title={format(new Date(event.timestamp), 'PPpp')}>
+                    {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-muted-foreground">
-            No recent activity to display
+          <div className="py-10 text-center">
+            <div className="inline-flex rounded-full bg-amber-100/30 p-3 mb-4">
+              <Clock className="h-6 w-6 text-amber-500/70" />
+            </div>
+            <h3 className="text-base font-medium mb-1">No Recent Activity</h3>
+            <p className="text-sm text-muted-foreground">
+              Activities will appear here as you use the system
+            </p>
           </div>
         )}
       </CardContent>
