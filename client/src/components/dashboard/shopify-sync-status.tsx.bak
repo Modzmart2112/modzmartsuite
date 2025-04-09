@@ -532,8 +532,7 @@ export function ShopifySyncStatus() {
             </div>
             
             {/* Button section with compact layout */}
-            <div>
-              <div className="grid grid-cols-3 gap-1">
+            <div className="grid grid-cols-3 gap-1">
                 <Button 
                   onClick={handleSyncMissingCostPrices}
                   disabled={!isConnected}
@@ -565,9 +564,8 @@ export function ShopifySyncStatus() {
                   <span className="whitespace-nowrap text-xs">Sync All</span>
                 </Button>
               </div>
-              
-              <Separator className="my-3" />
-            </div>
+            
+            <Separator className="my-3" />
             
             {/* Info about what sync does */}
             <div className="space-y-3 text-sm text-muted-foreground">
