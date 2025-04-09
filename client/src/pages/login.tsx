@@ -10,8 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { EyeIcon, EyeOffIcon, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 
-// Use a solid background color instead of an image
-// Matching the MODZ image black color
+// Import background image directly
+import backgroundImage from "@assets/MODZ.png";
 
 // Form validation schema
 const loginSchema = z.object({
@@ -69,29 +69,43 @@ export default function LoginPage() {
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-black">
-      {/* Background Image */}
+      {/* Background Image with Full Bleed */}
       <div 
         className="absolute inset-0 z-0" 
         style={{ 
-          backgroundImage: "url('/modz-bg-2.png')",
+          backgroundImage: `url(${backgroundImage})`, 
           backgroundSize: "cover",
           backgroundPosition: "center",
+          filter: "brightness(0.8)" 
         }}
       />
       
-      {/* Minimal Tech Pattern (reduced opacity) */}
+      {/* Animated Gradient Overlay */}
       <div 
-        className="absolute inset-0 z-10 opacity-10">
+        className="absolute inset-0 z-10 bg-gradient-to-br from-black/70 via-black/50 to-transparent opacity-80" 
+      />
+      
+      {/* Animated Tech Pattern */}
+      <div 
+        className="absolute inset-0 z-10 opacity-20">
         <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.15) 2px, transparent 0), radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.15) 2px, transparent 0)",
+          backgroundImage: "radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.2) 2px, transparent 0), radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.2) 2px, transparent 0)",
           backgroundSize: "100px 100px"
         }} />
       </div>
       
-      {/* Content Container - positioned near the SHOPIFY text */}
-      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-40 sm:mt-44 md:mt-48">
+      {/* Content Container */}
+      <div className="relative z-20 flex h-full w-full items-center justify-center px-4">
         <div className="w-full max-w-md">
-          {/* Hide text elements that would overlap with background */}
+          {/* Brand Logo/Name */}
+          <div className="mb-8 text-center">
+            <div className="text-xl font-medium tracking-wide text-gray-400">
+              SHOPIFY SUITE
+            </div>
+            <div className="mt-2 text-xs font-light text-gray-500 tracking-widest">
+              MANAGEMENT PLATFORM
+            </div>
+          </div>
           
           {/* Login Card */}
           <div 
