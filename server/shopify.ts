@@ -446,14 +446,27 @@ class ShopifyClient {
   // Update product price in Shopify
   async updateProductPrice(variantId: string, price: number, compareAtPrice?: number | null): Promise<void> {
     try {
-      // Get credentials from the database
-      const credentials = await storage.getShopifyCredentials();
-      if (!credentials) {
-        log('No Shopify credentials found', 'shopify-api');
+      // Use Access Token directly since that's the proper way for private apps
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      const storeUrl = process.env.SHOPIFY_STORE_URL;
+      
+      if (!accessToken || !storeUrl) {
+        log('No Shopify credentials found in environment variables', 'shopify-api');
         throw new Error('Shopify credentials not configured');
       }
       
-      const baseUrl = this.buildApiUrl(credentials.storeUrl);
+      // Normalize store URL
+      let normalizedUrl = storeUrl;
+      if (!normalizedUrl.startsWith('http')) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+      if (normalizedUrl.endsWith('/')) {
+        normalizedUrl = normalizedUrl.slice(0, -1);
+      }
+      
+      console.log(`Using Shopify store URL: ${normalizedUrl}`);
+      
+      const baseUrl = `${normalizedUrl}/admin/api/2023-01`;
       const url = `${baseUrl}/variants/${variantId}.json`;
       
       log(`Updating Shopify variant ${variantId} price to ${price}${compareAtPrice ? ` (compareAtPrice: ${compareAtPrice})` : ''}`, 'shopify-api');
@@ -474,7 +487,11 @@ class ShopifyClient {
       // Make the API call to update the variant
       const response = await fetch(url, {
         method: 'PUT',
-        headers: this.buildHeaders(credentials.apiSecret),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        },
         body: JSON.stringify(updateData)
       });
       
@@ -487,7 +504,7 @@ class ShopifyClient {
       const data = await response.json();
       log(`Successfully updated Shopify variant ${variantId} price to ${price}`, 'shopify-api');
       
-      return data;
+      return;
     } catch (error) {
       log(`Error updating Shopify variant ${variantId} price: ${error}`, 'shopify-api-error');
       throw error;
@@ -531,20 +548,35 @@ class ShopifyClient {
    */
   async getInventoryCostPrice(inventoryItemId: string): Promise<number | null> {
     try {
-      // Get credentials from the database
-      const credentials = await storage.getShopifyCredentials();
-      if (!credentials) {
-        log('No Shopify credentials found', 'shopify-api');
+      // Use Access Token directly since that's the proper way for private apps
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      const storeUrl = process.env.SHOPIFY_STORE_URL;
+      
+      if (!accessToken || !storeUrl) {
+        log('No Shopify credentials found in environment variables', 'shopify-api');
         return null;
       }
       
-      const baseUrl = this.buildApiUrl(credentials.storeUrl);
+      // Normalize store URL
+      let normalizedUrl = storeUrl;
+      if (!normalizedUrl.startsWith('http')) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+      if (normalizedUrl.endsWith('/')) {
+        normalizedUrl = normalizedUrl.slice(0, -1);
+      }
+      
+      const baseUrl = `${normalizedUrl}/admin/api/2023-01`;
       const url = `${baseUrl}/inventory_items/${inventoryItemId}.json`;
       
       log(`Fetching inventory item ${inventoryItemId}`, 'shopify-api');
       
       const response = await this.rateLimit<{ inventory_item: any }>(url, {
-        headers: this.buildHeaders(credentials.apiSecret)
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        }
       });
       
       if (response && response.inventory_item && response.inventory_item.cost) {
@@ -565,11 +597,23 @@ class ShopifyClient {
    */
   async getBulkInventoryCostPrices(items: {inventoryItemId: string, sku: string}[]): Promise<Map<string, {costPrice: number, sku: string}>> {
     const costPrices = new Map<string, {costPrice: number, sku: string}>();
-    const credentials = await storage.getShopifyCredentials();
+
+    // Use Access Token directly since that's the proper way for private apps
+    const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+    const storeUrl = process.env.SHOPIFY_STORE_URL;
     
-    if (!credentials) {
-      log('No Shopify credentials found', 'shopify-api');
+    if (!accessToken || !storeUrl) {
+      log('No Shopify credentials found in environment variables', 'shopify-api');
       return costPrices;
+    }
+    
+    // Normalize store URL
+    let normalizedUrl = storeUrl;
+    if (!normalizedUrl.startsWith('http')) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    }
+    if (normalizedUrl.endsWith('/')) {
+      normalizedUrl = normalizedUrl.slice(0, -1);
     }
     
     // Process in chunks of 50 items to avoid API limits
@@ -585,7 +629,7 @@ class ShopifyClient {
     
     // Process each chunk
     for (const chunk of chunks) {
-      const baseUrl = this.buildApiUrl(credentials.storeUrl);
+      const baseUrl = `${normalizedUrl}/admin/api/2023-01`;
       
       // Create comma-separated list of IDs for query parameter
       const inventoryItemIds = chunk.map(item => item.inventoryItemId).join(',');
@@ -595,7 +639,11 @@ class ShopifyClient {
       
       try {
         const response = await this.rateLimit<{ inventory_items: any[] }>(url, {
-          headers: this.buildHeaders(credentials.apiSecret)
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Shopify-Access-Token': accessToken
+          }
         });
         
         if (response && response.inventory_items && response.inventory_items.length > 0) {
@@ -649,9 +697,9 @@ class ShopifyClient {
    * Get a product by its Shopify product ID
    * This retrieves the product and extracts the inventory item ID
    * 
-   * @param apiKey API key
-   * @param apiSecret API secret (access token)
-   * @param storeUrl Store URL
+   * @param apiKey API key (not used anymore, kept for compatibility)
+   * @param apiSecret API secret (access token) (not used anymore, kept for compatibility)
+   * @param storeUrl Store URL (not used anymore, kept for compatibility)
    * @param productId Shopify product ID
    * @returns Product details with inventory item ID
    */
@@ -662,13 +710,35 @@ class ShopifyClient {
     productId: string
   ): Promise<{ inventoryItemId: string | null }> {
     try {
-      const baseUrl = this.buildApiUrl(storeUrl);
+      // Use Access Token directly since that's the proper way for private apps
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
+      
+      if (!accessToken || !shopifyStoreUrl) {
+        log('No Shopify credentials found in environment variables', 'shopify-api');
+        return { inventoryItemId: null };
+      }
+      
+      // Normalize store URL
+      let normalizedUrl = shopifyStoreUrl;
+      if (!normalizedUrl.startsWith('http')) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+      if (normalizedUrl.endsWith('/')) {
+        normalizedUrl = normalizedUrl.slice(0, -1);
+      }
+      
+      const baseUrl = `${normalizedUrl}/admin/api/2023-01`;
       const url = `${baseUrl}/products/${productId}.json`;
       
       log(`Fetching product by ID: ${url}`, 'shopify-api');
       
       const response = await this.rateLimit<{ product: any }>(url, {
-        headers: this.buildHeaders(apiSecret)
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        }
       });
       
       // Extract the inventory item ID from the first variant
@@ -690,9 +760,9 @@ class ShopifyClient {
    * Get inventory items by their IDs in bulk
    * This uses the bulk endpoint to efficiently fetch multiple inventory items
    * 
-   * @param apiKey API key
-   * @param apiSecret API secret (access token)
-   * @param storeUrl Store URL
+   * @param apiKey API key (not used anymore, kept for compatibility)
+   * @param apiSecret API secret (access token) (not used anymore, kept for compatibility)
+   * @param storeUrl Store URL (not used anymore, kept for compatibility)
    * @param inventoryItemIds Comma-separated list of inventory item IDs
    * @returns Inventory items data
    */
@@ -703,13 +773,35 @@ class ShopifyClient {
     inventoryItemIds: string
   ): Promise<{ inventory_items: any[] }> {
     try {
-      const baseUrl = this.buildApiUrl(storeUrl);
+      // Use Access Token directly since that's the proper way for private apps
+      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
+      
+      if (!accessToken || !shopifyStoreUrl) {
+        log('No Shopify credentials found in environment variables', 'shopify-api');
+        return { inventory_items: [] };
+      }
+      
+      // Normalize store URL
+      let normalizedUrl = shopifyStoreUrl;
+      if (!normalizedUrl.startsWith('http')) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+      if (normalizedUrl.endsWith('/')) {
+        normalizedUrl = normalizedUrl.slice(0, -1);
+      }
+      
+      const baseUrl = `${normalizedUrl}/admin/api/2023-01`;
       const url = `${baseUrl}/inventory_items.json?ids=${inventoryItemIds}`;
       
       log(`Fetching inventory items by IDs: ${url}`, 'shopify-api');
       
       const response = await this.rateLimit<{ inventory_items: any[] }>(url, {
-        headers: this.buildHeaders(apiSecret)
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Shopify-Access-Token': accessToken
+        }
       });
       
       return response;

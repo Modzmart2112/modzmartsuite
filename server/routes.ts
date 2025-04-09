@@ -2214,6 +2214,74 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
     });
   }));
   
+  // Special endpoint to fix a specific product price (SIL-RP-016) which got stuck at an incorrect price
+  app.post("/api/products/fix-sil-rp-016", asyncHandler(async (req, res) => {
+    try {
+      console.log("Fixing price for SIL-RP-016 product");
+      
+      // First find the product in the database
+      const product = await storage.getProductBySku('SIL-RP-016');
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      console.log(`Found product: ${product.title}`);
+      console.log(`Current price in database: ${product.shopifyPrice}`);
+      console.log(`Shopify ID: ${product.shopifyId}`);
+      
+      // Set the correct price (original value)
+      const correctPrice = 14.95;
+      
+      // Update the product price in our database
+      await storage.updateProduct(product.id, {
+        shopifyPrice: correctPrice,
+        onSale: false,
+        originalPrice: null,
+        saleEndDate: null,
+        saleId: null
+      });
+      
+      console.log(`Updated database price for ${product.sku} to $${correctPrice}`);
+      
+      // Update the price in Shopify
+      try {
+        // Let's use the shopifyClient to update the price instead of direct API call
+        console.log(`Updating Shopify price for variant ${product.shopifyId} to ${correctPrice}`);
+        
+        // Update the price in Shopify using the shopifyClient
+        await shopifyClient.updateProductPrice(
+          product.shopifyId,
+          correctPrice,
+          null // Set compare-at-price to null to remove any sale indicators
+        );
+        
+        console.log('Successfully updated price in Shopify API');
+        
+        return res.json({
+          success: true,
+          message: `Successfully fixed price for ${product.sku}`,
+          originalPrice: product.shopifyPrice,
+          newPrice: correctPrice
+        });
+      }
+      catch (error) {
+        const shopifyError = error as Error;
+        console.error('Error updating Shopify:', shopifyError);
+        
+        // Even if Shopify update fails, at least our database is correct now
+        return res.status(500).json({
+          partialSuccess: true,
+          message: "Database updated but Shopify update failed",
+          error: shopifyError.message
+        });
+      }
+    }
+    catch (error) {
+      console.error('Error in fix-sil-rp-016 endpoint:', error);
+      res.status(500).json({ error: "Failed to fix product price" });
+    }
+  }));
+  
   // Debug endpoint to test a specific product
   app.get("/api/debug/specific-product", asyncHandler(async (req, res) => {
     try {
@@ -2420,7 +2488,8 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
         } else {
           throw new Error("syncProductsWithoutCostPrice is not a function in the imported module");
         }
-      } catch (importError) {
+      } catch (error) {
+        const importError = error as Error; 
         console.error("Error executing cost price sync:", importError);
         throw new Error(`Failed to execute sync: ${importError.message}`);
       }
