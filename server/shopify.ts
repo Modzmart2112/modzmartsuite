@@ -513,8 +513,14 @@ class ShopifyClient {
   
   // Helper methods
   private buildApiUrl(storeUrl: string): string {
+    // Handle missing or empty store URL
+    if (!storeUrl || typeof storeUrl !== 'string') {
+      log(`ERROR: Invalid Shopify store URL provided: ${storeUrl}`, 'shopify-api');
+      throw new Error('Invalid Shopify store URL. Please check your Shopify configuration.');
+    }
+    
     // Make sure the storeUrl includes both protocol and myshopify.com domain
-    let normalizedUrl = storeUrl;
+    let normalizedUrl = storeUrl.trim();
     
     // Add protocol if missing
     if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
@@ -538,9 +544,16 @@ class ShopifyClient {
   
   // Shopify expects the Access Token as a bearer token
   private buildHeaders(accessToken: string): { [key: string]: string } {
+    // Validate accessToken to avoid API errors
+    if (!accessToken || typeof accessToken !== 'string') {
+      log(`ERROR: Invalid Shopify API token provided: ${accessToken}`, 'shopify-api');
+      throw new Error('Invalid Shopify API token. Please check your Shopify configuration.');
+    }
+    
     return {
       'X-Shopify-Access-Token': accessToken,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     };
   }
   /**

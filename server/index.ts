@@ -54,8 +54,12 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    // Log the error for debugging
+    console.error('Express ERROR:', err);
+    
+    // Send the error response without throwing the error again
+    // which would crash the Node.js application
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after

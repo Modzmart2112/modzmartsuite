@@ -1636,7 +1636,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // and make sure they include "cost price" to avoid including unrelated logs
         const timeBased = currentSyncLogs.length === 0 && syncProgress.startedAt
           ? shopifyLogs.filter(log => {
-              const logDate = new Date(log.createdAt);
+              // Safely handle potentially null createdAt
+              const logDate = log.createdAt ? new Date(log.createdAt) : new Date();
               // Handle nullable startedAt by providing a fallback
               const syncStartDate = syncProgress.startedAt ? new Date(syncProgress.startedAt) : new Date(0);
               const tenMinutesBeforeNow = new Date(Date.now() - 10 * 60 * 1000);
