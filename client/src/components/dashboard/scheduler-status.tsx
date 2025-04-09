@@ -43,7 +43,7 @@ export function SchedulerStatus() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const { data: status, isLoading: loading } = useQuery({
+  const { data: status, isLoading: loading } = useQuery<SchedulerStatus>({
     queryKey: ['/api/scheduler/status'],
     refetchInterval: 5000, // Refresh every 5 seconds
   });
@@ -53,7 +53,7 @@ export function SchedulerStatus() {
   const startSchedulerMutation = useMutation({
     mutationFn: async () => {
       setActionInProgress("start");
-      return await apiRequest('/api/scheduler/start', 'POST');
+      return await apiRequest('POST', '/api/scheduler/price-check/start', { interval: 86400000 });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/scheduler/status'] });
@@ -77,7 +77,7 @@ export function SchedulerStatus() {
   const stopSchedulerMutation = useMutation({
     mutationFn: async () => {
       setActionInProgress("stop");
-      return await apiRequest('/api/scheduler/stop', 'POST');
+      return await apiRequest('POST', '/api/scheduler/price-check/stop');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/scheduler/status'] });
@@ -101,7 +101,7 @@ export function SchedulerStatus() {
   const runCheckNowMutation = useMutation({
     mutationFn: async () => {
       setActionInProgress("run");
-      return await apiRequest('/api/scheduler/run-check', 'POST');
+      return await apiRequest('POST', '/api/scheduler/price-check/run-now');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/scheduler/status'] });
@@ -126,7 +126,7 @@ export function SchedulerStatus() {
   const resetStatsMutation = useMutation({
     mutationFn: async () => {
       setActionInProgress("reset");
-      return await apiRequest('/api/scheduler/reset-stats', 'POST');
+      return await apiRequest('POST', '/api/scheduler/stats/reset');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/scheduler/status'] });
