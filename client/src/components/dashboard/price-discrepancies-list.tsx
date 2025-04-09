@@ -207,18 +207,13 @@ export function PriceDiscrepancyList() {
   
   return (
     <Card>
-      <CardHeader className="pb-3 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />
-            <CardTitle className="text-lg">Price Discrepancies</CardTitle>
-          </div>
-          <Badge variant="outline" className="text-yellow-600 border-yellow-500">
-            {discrepancies.length} Found
-          </Badge>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex items-center space-x-2">
+          <AlertTriangle className="h-5 w-5 text-yellow-500" />
+          <CardTitle>Price Discrepancies</CardTitle>
         </div>
         {discrepancies.length > 0 && (
-          <div className="flex space-x-2 mt-2 pt-2">
+          <div className="flex space-x-2">
             <Button 
               variant="outline" 
               size="sm" 

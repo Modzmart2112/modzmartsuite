@@ -203,12 +203,12 @@ export function SchedulerStatus() {
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-2 pb-2">
-        <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-muted/50 border border-border">
+      <CardContent className="pt-4">
+        <div className="space-y-6">
+          <div className="p-4 rounded-lg bg-muted/50 border border-border">
             {isSchedulerActive ? (
               <div className="flex items-center gap-3 text-foreground">
-                <Calendar className="h-8 w-8 text-primary" />
+                <Calendar className="h-10 w-10 text-primary" />
                 <div>
                   <div className="font-medium">Next Price Check:</div>
                   <div className="text-sm">{formatTime(status?.nextScheduledRun || calculateNextRun().toISOString())}</div>
@@ -217,7 +217,7 @@ export function SchedulerStatus() {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <AlertCircle className="h-8 w-8 text-destructive" />
+                <AlertCircle className="h-10 w-10 text-destructive" />
                 <div>
                   <div className="font-medium">Schedule Inactive</div>
                   <div className="text-sm text-muted-foreground">Price checks are not currently scheduled</div>
@@ -227,20 +227,20 @@ export function SchedulerStatus() {
             )}
           </div>
 
-          <Separator className="my-2" />
+          <Separator />
           
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center gap-1 mb-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Last Check</span>
               </div>
               <div className="text-sm">{formatTime(status?.lastPriceCheck || null)}</div>
             </div>
             
-            <div>
-              <div className="text-sm font-medium mb-1">Recent Activity</div>
-              <div className="text-xl font-bold">{status?.totalPriceChecks || 0} <span className="text-sm font-normal text-muted-foreground">checks</span></div>
+            <div className="space-y-1">
+              <div className="text-sm font-medium">Recent Activity</div>
+              <div className="text-2xl font-bold">{status?.totalPriceChecks || 0} <span className="text-sm font-normal text-muted-foreground">checks performed</span></div>
               <div className="text-sm text-muted-foreground">{status?.totalDiscrepanciesFound || 0} discrepancies found</div>
             </div>
           </div>
