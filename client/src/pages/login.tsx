@@ -100,9 +100,7 @@ export default function LoginPage() {
           {/* Brand Logo/Name */}
           <div className="mb-8 text-center">
             <h1 className="text-5xl font-bold tracking-tighter text-white">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400">
-                MODZ
-              </span>
+              MODZ
             </h1>
             <div className="mt-3 text-xl font-medium tracking-wide text-gray-400">
               SHOPIFY SUITE
