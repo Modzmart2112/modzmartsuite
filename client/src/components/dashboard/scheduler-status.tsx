@@ -157,6 +157,31 @@ export function SchedulerStatus() {
     }
   });
   
+  // Add a mutation to stop the SIL-RP-016 price fix job
+  const stopSilRp016Mutation = useMutation({
+    mutationFn: async () => {
+      setActionInProgress("stop-sil");
+      return await apiRequest('POST', '/api/scheduler/sil-rp-016-fix/stop');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/scheduler/status'] });
+      toast({
+        title: "Special Job Stopped",
+        description: "SIL-RP-016 price fix job has been stopped",
+      });
+      setActionInProgress(null);
+    },
+    onError: (error) => {
+      console.error("Failed to stop SIL-RP-016 job:", error);
+      toast({
+        title: "Failed to Stop Job",
+        description: "An error occurred while stopping the special job",
+        variant: "destructive",
+      });
+      setActionInProgress(null);
+    }
+  });
+  
   const startScheduler = () => {
     startSchedulerMutation.mutate();
   };
@@ -171,6 +196,11 @@ export function SchedulerStatus() {
   
   const resetStats = () => {
     resetStatsMutation.mutate();
+  };
+  
+  // Function to stop the SIL-RP-016 price fix job
+  const stopSilRp016Job = () => {
+    stopSilRp016Mutation.mutate();
   };
   
   // Calculate next scheduled run if not provided by the server
@@ -457,25 +487,50 @@ export function SchedulerStatus() {
           </div>
           
           <div className="flex justify-between items-center gap-4 pt-2">
-            <Button 
-              variant="ghost" 
-              onClick={resetStats} 
-              disabled={actionInProgress !== null}
-              size="sm"
-              className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              {actionInProgress === "reset" ? (
-                <>
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                  <span className="text-xs">Resetting Stats...</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-3 w-3" />
-                  <span className="text-xs">Reset Statistics</span>
-                </>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                onClick={resetStats} 
+                disabled={actionInProgress !== null}
+                size="sm"
+                className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                {actionInProgress === "reset" ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    <span className="text-xs">Resetting Stats...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3" />
+                    <span className="text-xs">Reset Statistics</span>
+                  </>
+                )}
+              </Button>
+              
+              {/* Add button to stop the SIL-RP-016 special job */}
+              {status?.activeJobs?.includes('fix-sil-rp-016-price') && (
+                <Button 
+                  variant="ghost" 
+                  onClick={stopSilRp016Job} 
+                  disabled={actionInProgress !== null}
+                  size="sm"
+                  className="flex items-center gap-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  {actionInProgress === "stop-sil" ? (
+                    <>
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span className="text-xs">Stopping SIL job...</span>
+                    </>
+                  ) : (
+                    <>
+                      <StopCircle className="h-3 w-3" />
+                      <span className="text-xs">Stop SIL-RP-016 Job</span>
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+            </div>
             
             <div className="text-xs text-gray-500 dark:text-gray-400">
               {isSchedulerRunning
