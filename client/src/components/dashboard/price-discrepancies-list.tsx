@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Trash2, RefreshCw, ArrowRight, Redo } from "lucide-react";
+import { AlertTriangle, Trash2, RefreshCw, ArrowRight, Redo } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import type { PriceDiscrepancy } from "@shared/types";
@@ -207,36 +207,37 @@ export function PriceDiscrepancyList() {
   
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-xl font-semibold">Price Discrepancies</CardTitle>
-          {discrepancies.length > 0 && (
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1 text-sm font-medium" 
-                onClick={() => handleReCheckAll()}
-                disabled={reCheckAllMutation.isPending}
-              >
-                <Redo size={14} />
-                Re-check Discrepancies
-                {reCheckAllMutation.isPending && "..."}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1 text-sm font-medium" 
-                onClick={() => clearAllDiscrepanciesMutation.mutate()}
-                disabled={clearAllDiscrepanciesMutation.isPending}
-              >
-                <Trash2 size={14} />
-                Clear All
-                {clearAllDiscrepanciesMutation.isPending && "..."}
-              </Button>
-            </div>
-          )}
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex items-center space-x-2">
+          <AlertTriangle className="h-5 w-5 text-yellow-500" />
+          <CardTitle>Price Discrepancies</CardTitle>
         </div>
+        {discrepancies.length > 0 && (
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1 text-sm font-medium" 
+              onClick={() => handleReCheckAll()}
+              disabled={reCheckAllMutation.isPending}
+            >
+              <Redo size={14} />
+              Re-check Discrepancies
+              {reCheckAllMutation.isPending && "..."}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1 text-sm font-medium" 
+              onClick={() => clearAllDiscrepanciesMutation.mutate()}
+              disabled={clearAllDiscrepanciesMutation.isPending}
+            >
+              <Trash2 size={14} />
+              Clear All
+              {clearAllDiscrepanciesMutation.isPending && "..."}
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
