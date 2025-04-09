@@ -1822,6 +1822,8 @@ export class DatabaseStorage implements IStorage {
           .limit(10);
         console.log('Sample Shopify IDs from database for reference:', 
           sampleShopifyIds.map(p => ({ id: p.id, sku: p.sku, shopifyId: p.shopifyId })));
+      } catch (error) {
+        console.error('Error fetching sample Shopify IDs:', error);
       }
       
       let affectedProductCount = 0;
