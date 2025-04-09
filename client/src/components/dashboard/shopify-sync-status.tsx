@@ -293,89 +293,55 @@ export function ShopifySyncStatus() {
   };
   
   // Handle specialized cost price sync - only updates products without cost prices
-  const handleCostPriceSync = async () => {
-    try {
-      // Clear the cost price logs to start with a fresh view
-      setCostPriceLogs([]);
-      
-      // First validate that we can actually start a sync
-      if (!isReady) {
-        toast({
-          title: "Cannot Start Cost Price Sync",
-          description: "Please reset the current sync before starting a new one.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log("Starting cost price sync - making API request...");
-      
-      // Show immediate feedback to user
+  const handleCostPriceSync = () => {
+    // Clear the cost price logs to start with a fresh view
+    setCostPriceLogs([]);
+    
+    // First validate that we can actually start a sync
+    if (!isReady) {
       toast({
-        title: "Starting Cost Price Sync",
-        description: "Initializing synchronization process...",
-      });
-      
-      try {
-        // Use the API client utility instead of raw fetch
-        const response = await fetch("/api/scheduler/run-cost-price-sync", {
-          method: "POST",
-          headers: {
-            'Content-Type': 'application/json'
-          },
-        });
-        
-        // Log the full response for debugging
-        console.log("Cost price sync API response status:", response.status);
-        
-        // Always parse the response first
-        const data = await response.json();
-        console.log("Cost price sync response data:", data);
-        
-        if (response.ok) {
-          toast({
-            title: "Cost Price Sync Started",
-            description: "Syncing only products without cost prices",
-          });
-          
-          // Refresh data right away to pick up the new sync session
-          refetch();
-          syncProgressQuery.refetch();
-          
-          // Keep refreshing to show live updates
-          const refreshInterval = setInterval(() => {
-            syncProgressQuery.refetch();
-          }, 1000);
-          
-          // Clear the interval after 5 seconds
-          setTimeout(() => {
-            clearInterval(refreshInterval);
-          }, 5000);
-        } else {
-          // Handle server error with response
-          toast({
-            title: "Cost Price Sync Failed",
-            description: data?.message || "Error from server: " + response.statusText,
-            variant: "destructive",
-          });
-        }
-      } catch (fetchError) {
-        console.error("Fetch error during cost price sync:", fetchError);
-        toast({
-          title: "Network Error",
-          description: "Failed to communicate with the server. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      // This catches any other errors in the outer function
-      console.error("Unexpected error during cost price sync:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please check console logs.",
+        title: "Cannot Start Cost Price Sync",
+        description: "Please reset the current sync before starting a new one.",
         variant: "destructive",
       });
+      return;
     }
+    
+    // Show immediate feedback
+    toast({
+      title: "Starting Cost Price Sync",
+      description: "Initializing synchronization...",
+    });
+    
+    // Make a simple POST request - no complex error handling
+    fetch("/api/scheduler/run-cost-price-sync", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(() => {
+        // Success - just show a success toast
+        toast({
+          title: "Cost Price Sync Started",
+          description: "Syncing only products without cost prices"
+        });
+        
+        // Refresh data to show new sync state
+        refetch();
+        syncProgressQuery.refetch();
+        
+        // Simple polling to keep UI updated
+        setTimeout(() => syncProgressQuery.refetch(), 500);
+        setTimeout(() => syncProgressQuery.refetch(), 1500);
+        setTimeout(() => syncProgressQuery.refetch(), 3000);
+      })
+      .catch(() => {
+        // Simple error message on failure
+        toast({
+          title: "Sync Failed",
+          description: "Could not start cost price sync",
+          variant: "destructive"
+        });
+      });
   };
 
   // Handle complete reset for stuck sync - forces a fresh start
