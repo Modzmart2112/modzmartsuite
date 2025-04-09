@@ -25,80 +25,6 @@ interface ThemePreset {
 // Define all the theme presets with their colors
 const themePresets: ThemePreset[] = [
   {
-    name: "Classic Light",
-    description: "Default purple theme with light background",
-    primary: "#7B61FF",
-    accent: "#B39DFF",
-    background: "#F9F9FF",
-    text: "#1C1C1E",
-    config: {
-      primary: "hsl(250 46% 57%)",
-      appearance: "light",
-      variant: "professional",
-      radius: 0.5
-    }
-  },
-  {
-    name: "Midnight Dark",
-    description: "Dark theme with blue accents",
-    primary: "#1E1E2F",
-    accent: "#5A55FF",
-    background: "#121217",
-    text: "#E1E1E6",
-    highlight: "#00D1FF",
-    config: {
-      primary: "hsl(240 24% 15%)",
-      appearance: "dark",
-      variant: "professional",
-      radius: 0.5
-    }
-  },
-  {
-    name: "Neo Mint",
-    description: "Fresh mint green theme",
-    primary: "#3EB489",
-    accent: "#8FFFC1",
-    background: "#F0FFFA",
-    text: "#1E2A2E",
-    highlight: "#1C9E89",
-    config: {
-      primary: "hsl(153 48% 47%)",
-      appearance: "light",
-      variant: "vibrant",
-      radius: 0.75
-    }
-  },
-  {
-    name: "Sunset Sorbet",
-    description: "Warm red and orange theme",
-    primary: "#FF6B6B",
-    accent: "#FFD93D",
-    background: "#FFF8F2",
-    text: "#322F2F",
-    highlight: "#FFA987",
-    config: {
-      primary: "hsl(0 100% 71%)",
-      appearance: "light",
-      variant: "vibrant",
-      radius: 1
-    }
-  },
-  {
-    name: "Cyber Blue",
-    description: "Bright blue with light background",
-    primary: "#00A6FB",
-    accent: "#0582CA",
-    background: "#F3F9FF",
-    text: "#0B132B",
-    highlight: "#FF595E",
-    config: {
-      primary: "hsl(203 100% 49%)",
-      appearance: "light",
-      variant: "professional",
-      radius: 0.5
-    }
-  },
-  {
     name: "Charcoal & Gold",
     description: "Elegant dark theme with gold accents",
     primary: "#1F1F1F",
@@ -114,33 +40,108 @@ const themePresets: ThemePreset[] = [
     }
   },
   {
-    name: "Blush Rose",
-    description: "Soft pink theme with light background",
-    primary: "#EFA5B4",
-    accent: "#FADADD",
-    background: "#FFF6F9",
-    text: "#4A4A4A",
-    highlight: "#D67A93",
+    name: "Royal Navy",
+    description: "Deep navy blue with gold accents",
+    primary: "#0A2342",
+    accent: "#D5A021",
+    background: "#F5F7FA",
+    text: "#292F36",
+    highlight: "#A68A3F",
     config: {
-      primary: "hsl(348 68% 79%)",
+      primary: "hsl(214 75% 15%)",
       appearance: "light",
-      variant: "tint",
-      radius: 1
+      variant: "professional",
+      radius: 0.4
     }
   },
   {
-    name: "Ocean Breeze",
-    description: "Refreshing blue theme",
-    primary: "#1CA9C9",
-    accent: "#A1EAFB",
-    background: "#E7F9FF",
-    text: "#0B2C3F",
-    highlight: "#17BEBB",
+    name: "Alpine Emerald",
+    description: "Rich emerald green with cream tones",
+    primary: "#0F5C3B",
+    accent: "#5D987E",
+    background: "#F7F6F1",
+    text: "#2D2D2A",
+    highlight: "#E0DCC5",
     config: {
-      primary: "hsl(193 72% 45%)",
+      primary: "hsl(155 72% 21%)",
       appearance: "light",
       variant: "professional",
       radius: 0.5
+    }
+  },
+  {
+    name: "Obsidian Dark",
+    description: "Premium dark theme with slate accents",
+    primary: "#121212",
+    accent: "#8A8D93",
+    background: "#1E1E1E",
+    text: "#F8F9FA",
+    highlight: "#4D97FF",
+    config: {
+      primary: "hsl(0 0% 7%)",
+      appearance: "dark",
+      variant: "professional",
+      radius: 0.35
+    }
+  },
+  {
+    name: "Burgundy Estate",
+    description: "Rich burgundy with warm tan accents",
+    primary: "#6E1423",
+    accent: "#A4957A",
+    background: "#F9F6F0",
+    text: "#32292F",
+    highlight: "#D0B59E",
+    config: {
+      primary: "hsl(350 68% 25%)",
+      appearance: "light",
+      variant: "professional",
+      radius: 0.3
+    }
+  },
+  {
+    name: "Indigo Frost",
+    description: "Deep indigo with silver accents",
+    primary: "#32407B",
+    accent: "#AEB8FE",
+    background: "#F6F8FF",
+    text: "#28293D",
+    highlight: "#D1DCF0",
+    config: {
+      primary: "hsl(229 43% 34%)",
+      appearance: "light",
+      variant: "professional",
+      radius: 0.5
+    }
+  },
+  {
+    name: "Espresso",
+    description: "Rich coffee tones with cream finish",
+    primary: "#3A2618",
+    accent: "#D5BFA9",
+    background: "#F9F4F0",
+    text: "#2C2824",
+    highlight: "#C08552",
+    config: {
+      primary: "hsl(24 42% 16%)",
+      appearance: "light",
+      variant: "professional",
+      radius: 0.5
+    }
+  },
+  {
+    name: "Graphite",
+    description: "Clean slate gray with teal accents",
+    primary: "#37474F",
+    accent: "#4DB6AC",
+    background: "#ECEFF1",
+    text: "#263238",
+    highlight: "#80CBC4",
+    config: {
+      primary: "hsl(200 18% 26%)",
+      appearance: "light",
+      variant: "professional",
+      radius: 0.4
     }
   }
 ];
@@ -186,41 +187,63 @@ export function ThemeSelector() {
         Choose a theme preset to customize the application's appearance. Click on a theme to apply it.
       </p>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {themePresets.map((preset) => (
           <Card 
             key={preset.name}
-            className="overflow-hidden cursor-pointer transition-all hover:shadow-md"
+            className="overflow-hidden cursor-pointer transition-all hover:shadow-lg border-2 hover:border-primary/50"
             onClick={() => applyTheme(preset)}
           >
             <div 
-              className="h-24 w-full" 
+              className="h-28 w-full relative" 
               style={{ backgroundColor: preset.primary }}
             >
-              <div className="flex h-full">
-                <div className="w-1/4" style={{ backgroundColor: preset.accent }}></div>
-                <div className="w-1/4 flex items-end justify-end p-2">
+              <div className="absolute inset-0 flex">
+                <div className="w-1/3 h-full" style={{ backgroundColor: preset.accent }}></div>
+                <div className="w-2/3 flex items-center justify-center">
                   {preset.highlight && (
                     <div 
-                      className="w-6 h-6 rounded-full" 
+                      className="w-8 h-8 rounded-full shadow-md flex items-center justify-center"
                       style={{ backgroundColor: preset.highlight }}
-                    ></div>
+                    >
+                      <div className="w-3 h-3 rounded-full bg-white opacity-75"></div>
+                    </div>
                   )}
                 </div>
               </div>
+              <div 
+                className="absolute bottom-0 left-0 right-0 h-6 flex items-center px-3" 
+                style={{ backgroundColor: preset.background }}
+              >
+                <div className="w-full flex justify-between items-center">
+                  <div className="h-3 w-16 rounded-sm" style={{ backgroundColor: preset.primary }}></div>
+                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: preset.accent }}></div>
+                </div>
+              </div>
             </div>
+
             <CardContent className="pt-4">
-              <h4 className="font-medium text-base">{preset.name}</h4>
-              <p className="text-xs text-gray-500 mt-1">{preset.description}</p>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-base">{preset.name}</h4>
+                {preset.config.appearance === "dark" ? (
+                  <div className="text-xs bg-gray-900 text-white px-2 py-0.5 rounded-full">Dark</div>
+                ) : (
+                  <div className="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full">Light</div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mb-3">{preset.description}</p>
               
               <div className="flex mt-3 space-x-2">
-                <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: preset.primary }}></div>
-                <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: preset.accent }}></div>
-                <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: preset.background }}></div>
-                <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: preset.text }}></div>
+                <div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: preset.primary }}></div>
+                <div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: preset.accent }}></div>
                 {preset.highlight && (
-                  <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: preset.highlight }}></div>
+                  <div className="w-6 h-6 rounded-full shadow-sm" style={{ backgroundColor: preset.highlight }}></div>
                 )}
+                <div className="w-6 h-6 rounded-full shadow-sm ml-auto" style={{ backgroundColor: preset.background }}>
+                  <div className="h-full w-full rounded-full flex items-center justify-center">
+                    <div className="w-3 h-0.5 rounded-full" style={{ backgroundColor: preset.text }}></div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -228,8 +251,12 @@ export function ThemeSelector() {
       </div>
       
       {themeMutation.isPending && (
-        <div className="mt-4 p-2 bg-primary/10 rounded-md">
-          <p className="text-sm text-center">
+        <div className="mt-4 p-3 bg-primary/10 rounded-md flex items-center justify-center">
+          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p className="text-sm font-medium">
             Applying theme...
           </p>
         </div>
