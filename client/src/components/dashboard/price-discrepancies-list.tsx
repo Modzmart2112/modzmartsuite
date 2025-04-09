@@ -209,7 +209,7 @@ export function PriceDiscrepancyList() {
   return (
     <Card className="overflow-hidden">
       {/* Modern Header with Better Status Indication */}
-      <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+      <CardHeader className="pb-2 pt-3 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />
