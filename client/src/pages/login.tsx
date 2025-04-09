@@ -10,8 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { EyeIcon, EyeOffIcon, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 
-// Using the new background image
-const backgroundImage = "/images/MODZ-2.png";
+// Import background image directly
+import backgroundImage from "@assets/MODZ.png";
 
 // Form validation schema
 const loginSchema = z.object({
@@ -95,26 +95,29 @@ export default function LoginPage() {
       </div>
       
       {/* Content Container */}
-      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-40 sm:mt-44 md:mt-48">
+      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-28 sm:mt-32 md:mt-36">
         <div className="w-full max-w-md">
           {/* Brand Logo/Name */}
-          <div className="mb-6 text-center">
+          <div className="mb-8 text-center">
             <div className="text-xl font-medium tracking-wide text-gray-400">
+              SHOPIFY SUITE
+            </div>
+            <div className="mt-2 text-xs font-light text-gray-500 tracking-widest">
               MANAGEMENT PLATFORM
             </div>
           </div>
           
           {/* Login Card */}
           <div 
-            className="relative overflow-hidden rounded-xl border border-gray-800 bg-black/40 backdrop-blur-lg shadow-2xl"
+            className="relative overflow-hidden rounded-2xl border border-gray-800 bg-black/40 backdrop-blur-lg shadow-2xl"
           >
             {/* Animated card border glow */}
             <div 
-              className="absolute inset-0 rounded-xl z-[-1]"
+              className="absolute inset-0 rounded-2xl z-[-1]"
               style={{
-                background: "linear-gradient(45deg, rgba(0, 0, 0, 0.8), rgba(30, 30, 30, 0.5))",
-                filter: "blur(10px)",
-                opacity: 0.8,
+                background: "linear-gradient(45deg, rgba(59, 130, 246, 0.3), rgba(147, 51, 234, 0.3))",
+                filter: "blur(20px)",
+                opacity: 0.7,
               }} 
             />
             
