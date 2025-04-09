@@ -207,37 +207,39 @@ export function PriceDiscrepancyList() {
   
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center space-x-2">
-          <AlertTriangle className="h-5 w-5 text-yellow-500" />
-          <CardTitle>Price Discrepancies</CardTitle>
-        </div>
-        {discrepancies.length > 0 && (
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1 text-sm font-medium" 
-              onClick={() => handleReCheckAll()}
-              disabled={reCheckAllMutation.isPending}
-            >
-              <Redo size={14} />
-              Re-check Discrepancies
-              {reCheckAllMutation.isPending && "..."}
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-1 text-sm font-medium" 
-              onClick={() => clearAllDiscrepanciesMutation.mutate()}
-              disabled={clearAllDiscrepanciesMutation.isPending}
-            >
-              <Trash2 size={14} />
-              Clear All
-              {clearAllDiscrepanciesMutation.isPending && "..."}
-            </Button>
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-500" />
+            <CardTitle>Price Discrepancies</CardTitle>
           </div>
-        )}
+          {discrepancies.length > 0 && (
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1 text-sm font-medium" 
+                onClick={() => handleReCheckAll()}
+                disabled={reCheckAllMutation.isPending}
+              >
+                <Redo size={14} />
+                Re-check Discrepancies
+                {reCheckAllMutation.isPending && "..."}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1 text-sm font-medium" 
+                onClick={() => clearAllDiscrepanciesMutation.mutate()}
+                disabled={clearAllDiscrepanciesMutation.isPending}
+              >
+                <Trash2 size={14} />
+                Clear All
+                {clearAllDiscrepanciesMutation.isPending && "..."}
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
