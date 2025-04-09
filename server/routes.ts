@@ -180,6 +180,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Save the profile picture path in the database
       const profilePicturePath = `/uploads/${filename}`;
+      
+      console.log(`Profile picture uploaded to ${destPath}`);
+      console.log(`Profile picture path in DB: ${profilePicturePath}`);
+      console.log(`File exists check: ${fs.existsSync(destPath)}`);
+      
       const updatedUser = await storage.updateUser(userId, {
         profilePicture: profilePicturePath
       });

@@ -2,10 +2,20 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { scheduler, checkAllPrices, scheduledSyncShopifyProducts, fixSilRp016Price } from "./scheduler";
+import path from "path";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Serve the uploads directory directly to fix profile picture loading issues
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+
+// Log any requests to /uploads to help debug profile picture issues
+app.use('/uploads', (req, res, next) => {
+  console.log(`Debug - Static file request: ${req.url}`);
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
