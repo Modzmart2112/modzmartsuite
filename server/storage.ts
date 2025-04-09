@@ -945,6 +945,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(products)
       .where(sql`shopify_id NOT LIKE 'local-%'`)
+      .orderBy(isNotNull(products.costPrice))  // Show products with cost prices first
       .orderBy(desc(products.id))
       .limit(limit)
       .offset(offset);
