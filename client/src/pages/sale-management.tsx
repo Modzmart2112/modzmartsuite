@@ -449,23 +449,40 @@ const SaleManagementPage: React.FC = () => {
           
           if (selectedProductIds.length > 0) {
             // Get the products data to extract Shopify IDs
-            // Using URL parameters for GET request instead of body
-            const queryParams = new URLSearchParams({ ids: selectedProductIds.join(',') }).toString();
-            const productsResponse = await apiRequest('GET', `/api/products?${queryParams}`);
+            // Using URL parameters for GET request instead of body, getting only specifically selected IDs
+            const queryParams = new URLSearchParams();
+            
+            // Add each ID individually to ensure we get ONLY the selected products
+            selectedProductIds.forEach(id => {
+              queryParams.append('ids', id.toString());
+            });
+            
+            const productsResponse = await apiRequest('GET', `/api/products?${queryParams.toString()}`);
             
             if (productsResponse.products) {
-              console.log(`Found ${productsResponse.products.length} products to target`);
-              // Process one product at a time instead of using map to ensure reliable sequential processing
+              console.log(`Found ${productsResponse.products.length} products to target out of ${selectedProductIds.length} selected`);
+              
+              // Verify we only have exactly the selected products
+              const retrievedIds = productsResponse.products.map((p: any) => p.id);
+              console.log('Retrieved product IDs:', retrievedIds);
+              console.log('Selected product IDs:', selectedProductIds);
+              
+              // Only process products that were explicitly selected
               targetPromises = [];
               for (const product of productsResponse.products) {
-                const targetData = {
-                  targetType: 'product',
-                  targetId: null,
-                  targetValue: product.shopifyId.toString() // Use Shopify ID as targetValue
-                };
-                // Log the targeting information to help with debugging
-                console.log(`Adding target for Shopify ID: ${product.shopifyId} (Product: ${product.title})`);
-                targetPromises.push(apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData));
+                // Double check this product was actually selected
+                if (selectedProductIds.includes(product.id)) {
+                  const targetData = {
+                    targetType: 'product',
+                    targetId: null,
+                    targetValue: product.shopifyId.toString() // Use Shopify ID as targetValue
+                  };
+                  // Log the targeting information to help with debugging
+                  console.log(`Adding target for Shopify ID: ${product.shopifyId} (Product: ${product.title}, ID: ${product.id})`);
+                  targetPromises.push(apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData));
+                } else {
+                  console.warn(`Skipping product that wasn't explicitly selected: ${product.title} (ID: ${product.id})`);
+                }
               }
             }
           } else if (selectedVendor) {
