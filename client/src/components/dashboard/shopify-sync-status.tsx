@@ -358,9 +358,18 @@ export function ShopifySyncStatus() {
       method: "POST",
       headers: { 'Content-Type': 'application/json' }
     })
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) {
+          return response.text().then(text => {
+            console.error("Error response from server:", text);
+            throw new Error(`Server responded with status: ${response.status}`);
+          });
+        }
+        return response.json();
+      })
       .then(data => {
         // Success - show a toast with the count of affected products
+        console.log("Sync missing cost prices success:", data);
         toast({
           title: "Missing Cost Price Sync Started",
           description: `Syncing ${data.missingCostPriceCount} products missing cost prices`
@@ -375,11 +384,12 @@ export function ShopifySyncStatus() {
         setTimeout(() => syncProgressQuery.refetch(), 1500);
         setTimeout(() => syncProgressQuery.refetch(), 3000);
       })
-      .catch(() => {
-        // Simple error message on failure
+      .catch((error) => {
+        // Detailed error message on failure
+        console.error("Error syncing missing cost prices:", error);
         toast({
           title: "Sync Failed",
-          description: "Could not start cost price sync",
+          description: "Could not start cost price sync: " + error.message,
           variant: "destructive"
         });
       });
@@ -483,9 +493,10 @@ export function ShopifySyncStatus() {
         {/* If not syncing, show last sync and run button */}
         {!isSyncing && (
           <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-md">
-              <div className="flex items-center space-x-3">
-                <Clock className="h-5 w-5 text-muted-foreground" />
+            <div className="p-3 bg-muted/50 rounded-md space-y-3">
+              {/* Top section with last sync info */}
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 text-muted-foreground mr-3" />
                 <div>
                   <div className="text-sm font-medium">Last Sync</div>
                   <div className="text-sm text-muted-foreground">
@@ -497,33 +508,38 @@ export function ShopifySyncStatus() {
                   </div>
                 </div>
               </div>
-              <div className="flex space-x-2">
+              
+              {/* Button section with grid layout for better fit */}
+              <div className="grid grid-cols-3 gap-2">
                 <Button 
                   onClick={handleSyncMissingCostPrices}
                   disabled={!isConnected}
                   variant="outline"
+                  size="sm"
                   className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:border-amber-900 dark:text-amber-400 dark:hover:bg-amber-950"
                   title="Only sync products that are missing cost prices"
                 >
-                  <AlertCircle className="h-4 w-4 mr-2" />
-                  Fix Missing Cost Prices
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  <span className="whitespace-nowrap text-xs">Fix Missing Costs</span>
                 </Button>
                 <Button 
                   onClick={handleCostPriceSync}
                   disabled={!isConnected}
                   variant="outline"
+                  size="sm"
                   className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 dark:border-blue-900 dark:text-blue-400 dark:hover:bg-blue-950"
                 >
-                  <Zap className="h-4 w-4 mr-2" />
-                  Cost Prices Only
+                  <Zap className="h-4 w-4 mr-1" />
+                  <span className="whitespace-nowrap text-xs">Cost Prices Only</span>
                 </Button>
                 <Button 
                   onClick={handleManualSync}
                   disabled={!isConnected}
+                  size="sm"
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Sync All
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  <span className="whitespace-nowrap text-xs">Sync All</span>
                 </Button>
               </div>
             </div>

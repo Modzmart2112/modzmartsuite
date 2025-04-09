@@ -2245,24 +2245,41 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
   // This is separated from the main sync to be more efficient and focused
   app.post("/api/products/sync-missing-cost-prices", asyncHandler(async (req, res) => {
     try {
-      console.log("Received request to sync products missing cost prices");
+      console.log("ROUTE: /api/products/sync-missing-cost-prices endpoint called");
       
       // Count products missing cost prices before we sync
+      console.log("Counting products missing cost prices...");
       const countResult = await db.select({ count: sql`count(*)` }).from(products)
         .where(sql`shopify_id NOT LIKE 'local-%' AND cost_price IS NULL`);
       
       const missingCount = countResult[0] ? Number(countResult[0].count) : 0;
       console.log(`Found ${missingCount} products missing cost prices - starting specialized sync`);
       
-      // Start the specialized sync process using dynamic import
-      // This runs asynchronously and we don't wait for it to complete
-      import('./enhanced-shopify-sync').then(module => {
-        module.syncProductsWithoutCostPrice().catch(err => {
-          console.error("Error in sync-missing-cost-prices async process:", err);
-        });
-      });
+      // We need to explicitly import and create a reference to the function to ensure
+      // it's properly loaded and executed
+      try {
+        console.log("Dynamically importing enhanced-shopify-sync module...");
+        const syncModule = await import('./enhanced-shopify-sync');
+        console.log("Module imported successfully, syncProductsWithoutCostPrice exists:", !!syncModule.syncProductsWithoutCostPrice);
+        
+        // Try to execute the function directly
+        if (typeof syncModule.syncProductsWithoutCostPrice === 'function') {
+          console.log("Starting syncProductsWithoutCostPrice function...");
+          // We start the process but don't wait for it to complete
+          syncModule.syncProductsWithoutCostPrice().catch(err => {
+            console.error("Error in cost price sync process:", err);
+          });
+          console.log("Cost price sync process started successfully");
+        } else {
+          throw new Error("syncProductsWithoutCostPrice is not a function in the imported module");
+        }
+      } catch (importError) {
+        console.error("Error executing cost price sync:", importError);
+        throw new Error(`Failed to execute sync: ${importError.message}`);
+      }
       
       // Return immediately with count and sync started confirmation
+      console.log("Sending success response to client");
       res.json({
         message: "Started sync process for products missing cost prices",
         missingCostPriceCount: missingCount,
@@ -2273,7 +2290,8 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
       console.error("Error in sync-missing-cost-prices endpoint:", error);
       res.status(500).json({ 
         error: "Failed to start cost price sync", 
-        message: (error as Error).message 
+        message: (error as Error).message,
+        stack: process.env.NODE_ENV === 'production' ? undefined : (error as Error).stack
       });
     }
   }));
