@@ -448,6 +448,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Endpoint to re-check all products with supplier URLs for price discrepancies
   
+  // Endpoint to update a product's supplier URL
+  app.patch("/api/products/:productId", asyncHandler(async (req, res) => {
+    const productId = parseInt(req.params.productId);
+    
+    if (isNaN(productId)) {
+      return res.status(400).json({ message: "Invalid product ID" });
+    }
+    
+    const product = await storage.getProductById(productId);
+    
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    
+    const { supplierUrl } = req.body;
+    
+    if (typeof supplierUrl !== 'string') {
+      return res.status(400).json({ message: "Invalid supplier URL" });
+    }
+    
+    // Update the product with the new supplier URL
+    const updated = await storage.updateProduct(productId, { supplierUrl });
+    
+    if (!updated) {
+      return res.status(500).json({ message: "Failed to update product" });
+    }
+    
+    return res.json(updated);
+  }));
+
   // Endpoint to re-scrape a product's supplier price
   app.post("/api/products/:productId/rescrape", asyncHandler(async (req, res) => {
     const productId = parseInt(req.params.productId);
