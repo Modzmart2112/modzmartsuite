@@ -843,12 +843,17 @@ async function processProduct(product: any, processedSkus: Set<string>): Promise
 
 /**
  * Specialized function that only syncs products without cost prices
- * This is more efficient than a full sync when you just need to update cost prices
+ * This function uses a multi-stage approach for maximum reliability:
+ * 1. First try to get cost prices from Shopify API 
+ * 2. Then check shopify_logs for any previously recorded cost prices
+ * 3. Finally, set default cost prices based on retail price (65%)
+ * 
+ * This approach ensures we get cost prices for all products with minimal API calls.
  */
 export async function syncProductsWithoutCostPrice(): Promise<void> {
   // Create a new sync record for this specialized operation
   let syncProgress = await storage.initializeShopifySyncProgress();
-  log(`Starting cost-price-only sync with ID ${syncProgress.id}`);
+  log(`Starting enhanced cost-price-only sync with ID ${syncProgress.id}`);
   const startTime = Date.now();
   
   try {
@@ -861,7 +866,7 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
         completedAt: new Date(),
         details: {
           error: "API credentials missing",
-          syncType: "cost-price-only"
+          syncType: "enhanced-cost-price-sync"
         }
       });
       log("Cost price sync failed: Shopify API credentials are missing or incomplete");
@@ -876,7 +881,7 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
       status: "in-progress",
       message: "Identifying products without cost prices...",
       details: {
-        syncType: "cost-price-only",
+        syncType: "enhanced-cost-price-sync",
         step: "identifying"
       }
     });
@@ -893,7 +898,7 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
         message: "No products without cost prices found",
         completedAt: new Date(),
         details: {
-          syncType: "cost-price-only",
+          syncType: "enhanced-cost-price-sync",
           productsChecked: 0
         }
       });
@@ -917,20 +922,29 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
     // Update progress to show we're starting to process
     await storage.updateShopifySyncProgress({
       status: "in-progress",
-      message: `Processing ${productCount} products without cost prices...`,
+      message: `STAGE 1: Retrieving cost prices from Shopify API...`,
       totalItems: productCount,
       processedItems: 0,
       details: {
-        syncType: "cost-price-only",
+        syncType: "enhanced-cost-price-sync",
         batchCount: batches.length,
-        step: "processing"
+        step: "stage-1-api",
+        stage: 1,
+        description: "Checking Shopify for cost prices"
       }
     });
     
     // Process each batch
     let processedCount = 0;
-    let updatedCount = 0;
+    let updatedFromShopify = 0;
+    let localSkipped = 0;
     let failedCount = 0;
+    
+    // Keep track of products that still need cost prices after Stage 1
+    const remainingProducts = [];
+    
+    // STAGE 1: Try to get cost prices from Shopify API first
+    log("STAGE 1: Retrieving cost prices from Shopify API");
     
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
@@ -939,14 +953,15 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
       // Update progress for this batch
       await storage.updateShopifySyncProgress({
         status: "in-progress",
-        message: `Processing batch ${batchNumber}/${batches.length}...`,
+        message: `STAGE 1: Processing batch ${batchNumber}/${batches.length}...`,
         processedItems: processedCount,
         totalItems: productCount,
         details: {
-          syncType: "cost-price-only",
+          syncType: "enhanced-cost-price-sync",
           currentBatch: batchNumber,
           totalBatches: batches.length,
-          progress: (processedCount / productCount) * 100
+          progress: (processedCount / productCount) * 100,
+          stage: 1
         }
       });
       
@@ -969,14 +984,23 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
             if (shopifyProduct && shopifyProduct.inventoryItemId) {
               inventoryItemIds.push(shopifyProduct.inventoryItemId);
               productMap.set(shopifyProduct.inventoryItemId, product);
+            } else {
+              // If we couldn't get the inventory item ID, add to remaining products
+              remainingProducts.push(product);
             }
           } catch (error) {
             log(`Error getting inventory item ID for product ${product.sku}: ${error}`, "cost-price-sync");
-            failedCount++;
+            // Add to remaining products to try fallback methods
+            remainingProducts.push(product);
           }
         } else if (product.shopifyId && product.shopifyId.startsWith('local-')) {
           // Skip products with local IDs but don't count as failures
           log(`Skipping product ${product.sku} with local ID (not in Shopify)`, "cost-price-sync");
+          localSkipped++;
+          remainingProducts.push(product); // Still add to remaining for fallback calculation
+        } else {
+          // No shopify ID, add to remaining
+          remainingProducts.push(product);
         }
         
         processedCount++;
@@ -1009,28 +1033,37 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
                 });
                 
                 // Log the cost price for real-time UI display
-                await logCostPrice(product.sku, costPrice);
+                await logCostPrice(product.sku, costPrice, `Updated cost price for ${product.sku}: ${costPrice} (from Shopify API)`);
                 
-                updatedCount++;
-                log(`Updated cost price for ${product.sku}: ${costPrice}`);
+                updatedFromShopify++;
+                
+                // Remove this product from remaining products since we got a cost price
+                const index = remainingProducts.findIndex(p => p.id === product.id);
+                if (index !== -1) {
+                  remainingProducts.splice(index, 1);
+                }
+                
+                log(`Updated cost price for ${product.sku}: ${costPrice} (from Shopify API)`);
               }
             }
           }
         } catch (error) {
           log(`Error processing inventory items: ${error}`, "cost-price-sync");
-          failedCount += inventoryItemIds.length;
+          // We don't mark these as failed since we'll try fallback methods
         }
       }
       
       // Update progress after this batch
       await storage.updateShopifySyncProgress({
         processedItems: processedCount,
-        successItems: updatedCount,
+        successItems: updatedFromShopify,
         failedItems: failedCount,
         details: {
-          syncType: "cost-price-only",
+          syncType: "enhanced-cost-price-sync",
           progress: (processedCount / productCount) * 100,
-          timeElapsed: formatDuration(Date.now() - startTime)
+          timeElapsed: formatDuration(Date.now() - startTime),
+          remainingProducts: remainingProducts.length,
+          stage: 1
         }
       });
       
@@ -1038,21 +1071,162 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
+    // STAGE 2: Extract cost prices from logs for remaining products
+    const remainingCount = remainingProducts.length;
+    log(`STAGE 2: Checking logs for ${remainingCount} products still missing cost prices`);
+    
+    await storage.updateShopifySyncProgress({
+      message: `STAGE 2: Checking logs for ${remainingCount} products still missing cost prices`,
+      details: {
+        syncType: "enhanced-cost-price-sync",
+        stage: 2,
+        description: "Extracting cost prices from logs",
+        remainingProducts: remainingCount
+      }
+    });
+    
+    let logBasedUpdates = 0;
+    const productsAfterLogCheck = [];
+    
+    // Import PostgreSQL client
+    const { Pool } = await import('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    
+    // Check logs for each remaining product in batches
+    for (let i = 0; i < remainingProducts.length; i++) {
+      const product = remainingProducts[i];
+      
+      try {
+        // Look for cost price logs for this SKU
+        const logResult = await pool.query(`
+          SELECT metadata->>'price' AS price 
+          FROM shopify_logs 
+          WHERE message LIKE $1 
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `, [`Got cost price for ${product.sku}:%`]);
+        
+        if (logResult.rows.length > 0 && logResult.rows[0].price) {
+          const price = parseFloat(logResult.rows[0].price);
+          
+          // Update the product with the price from the log
+          await storage.updateProduct(product.id, { costPrice: price });
+          
+          // Log to UI and console
+          await logCostPrice(product.sku, price, `Updated cost price for ${product.sku}: ${price} (from logs)`);
+          log(`Updated cost price for ${product.sku}: ${price} (from logs)`);
+          
+          logBasedUpdates++;
+        } else {
+          // No log entry found, keep in list for stage 3
+          productsAfterLogCheck.push(product);
+        }
+      } catch (error) {
+        log(`Error processing logs for ${product.sku}: ${error}`, "cost-price-sync");
+        productsAfterLogCheck.push(product);
+      }
+      
+      // Update progress periodically
+      if (i % 10 === 0 || i === remainingProducts.length - 1) {
+        await storage.updateShopifySyncProgress({
+          successItems: updatedFromShopify + logBasedUpdates,
+          details: {
+            syncType: "enhanced-cost-price-sync",
+            stage: 2,
+            logBasedUpdates,
+            remainingAfterLogs: productsAfterLogCheck.length,
+            progress: ((i + 1) / remainingProducts.length) * 100
+          }
+        });
+      }
+    }
+    
+    // Clean up DB connection
+    await pool.end();
+    
+    // STAGE 3: Set default cost prices for any remaining products based on retail price
+    const finalRemainingCount = productsAfterLogCheck.length;
+    log(`STAGE 3: Setting default cost prices for ${finalRemainingCount} products still missing cost prices`);
+    
+    await storage.updateShopifySyncProgress({
+      message: `STAGE 3: Setting default cost prices for ${finalRemainingCount} products`,
+      details: {
+        syncType: "enhanced-cost-price-sync",
+        stage: 3,
+        description: "Calculating default cost prices (65% of retail)",
+        remainingProducts: finalRemainingCount
+      }
+    });
+    
+    let defaultPriceUpdates = 0;
+    
+    // Set default cost prices for remaining products
+    for (let i = 0; i < productsAfterLogCheck.length; i++) {
+      const product = productsAfterLogCheck[i];
+      
+      try {
+        // Calculate a default cost price as 65% of the shopify_price
+        if (product.shopifyPrice) {
+          const defaultCostPrice = parseFloat((product.shopifyPrice * 0.65).toFixed(2));
+          
+          // Update the product with the calculated cost price
+          await storage.updateProduct(product.id, { costPrice: defaultCostPrice });
+          
+          // Log to UI and console
+          await logCostPrice(
+            product.sku, 
+            defaultCostPrice, 
+            `Set default cost price for ${product.sku}: ${defaultCostPrice} (calculated from retail price)`
+          );
+          log(`Set default cost price for ${product.sku}: ${defaultCostPrice} (calculated from retail price)`);
+          
+          defaultPriceUpdates++;
+        } else {
+          failedCount++;
+          log(`Cannot set default cost price for ${product.sku}: No retail price available`);
+        }
+      } catch (error) {
+        failedCount++;
+        log(`Error setting default cost price for ${product.sku}: ${error}`, "cost-price-sync");
+      }
+      
+      // Update progress periodically
+      if (i % 10 === 0 || i === productsAfterLogCheck.length - 1) {
+        await storage.updateShopifySyncProgress({
+          successItems: updatedFromShopify + logBasedUpdates + defaultPriceUpdates,
+          failedItems: failedCount,
+          details: {
+            syncType: "enhanced-cost-price-sync",
+            stage: 3,
+            defaultPriceUpdates,
+            progress: ((i + 1) / productsAfterLogCheck.length) * 100
+          }
+        });
+      }
+    }
+    
+    // Calculate total updates
+    const totalUpdatedCount = updatedFromShopify + logBasedUpdates + defaultPriceUpdates;
+    
     // Complete the sync
     const totalTimeMs = Date.now() - startTime;
     
     await storage.updateShopifySyncProgress({
       status: "complete",
-      message: `Cost price sync completed: ${updatedCount} products updated, ${failedCount} failed`,
+      message: `Enhanced cost price sync completed: ${totalUpdatedCount} products updated (${updatedFromShopify} from API, ${logBasedUpdates} from logs, ${defaultPriceUpdates} defaults)`,
       processedItems: processedCount,
       totalItems: productCount,
-      successItems: updatedCount,
+      successItems: totalUpdatedCount,
       failedItems: failedCount,
       completedAt: new Date(),
       details: {
-        syncType: "cost-price-only",
+        syncType: "enhanced-cost-price-sync",
         totalDuration: totalTimeMs,
-        formattedDuration: formatDuration(totalTimeMs)
+        formattedDuration: formatDuration(totalTimeMs),
+        shopifyUpdates: updatedFromShopify,
+        logBasedUpdates: logBasedUpdates,
+        defaultPriceUpdates: defaultPriceUpdates,
+        skippedLocalProductCount: localSkipped
       }
     });
     
@@ -1061,23 +1235,23 @@ export async function syncProductsWithoutCostPrice(): Promise<void> {
       lastShopifySync: new Date()
     });
     
-    log(`Cost price sync completed in ${formatDuration(totalTimeMs)}`);
-    log(`Results: ${updatedCount} cost prices updated, ${failedCount} failed`);
+    log(`Enhanced cost price sync completed in ${formatDuration(totalTimeMs)}`);
+    log(`Results: ${totalUpdatedCount} cost prices updated (${updatedFromShopify} from API, ${logBasedUpdates} from logs, ${defaultPriceUpdates} defaults), ${failedCount} failed`);
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`Unexpected error in cost price sync: ${errorMessage}`, 'cost-price-sync-error');
+    log(`Unexpected error in enhanced cost price sync: ${errorMessage}`, 'cost-price-sync-error');
     
     // Update progress with error information
     await storage.updateShopifySyncProgress({
       status: "failed",
-      message: `Cost price sync failed: ${errorMessage}`,
+      message: `Enhanced cost price sync failed: ${errorMessage}`,
       completedAt: new Date(),
       details: {
         error: errorMessage,
         errorStack: error instanceof Error ? error.stack : undefined,
         duration: Date.now() - startTime,
-        syncType: "cost-price-only"
+        syncType: "enhanced-cost-price-sync"
       }
     });
   }
