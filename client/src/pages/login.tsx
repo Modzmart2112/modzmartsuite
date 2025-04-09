@@ -95,7 +95,7 @@ export default function LoginPage() {
       </div>
       
       {/* Content Container */}
-      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-28 sm:mt-32 md:mt-36">
+      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-16 sm:mt-20 md:mt-24">
         <div className="w-full max-w-md">
           {/* Brand Logo/Name */}
           <div className="mb-8 text-center">
