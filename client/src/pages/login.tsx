@@ -11,7 +11,7 @@ import { EyeIcon, EyeOffIcon, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 
 // Define the background path directly
-const backgroundImage = "/assets/MODZ-new.png";
+const backgroundImage = "/MODZ-new.png";
 
 // Form validation schema
 const loginSchema = z.object({
