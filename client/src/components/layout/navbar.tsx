@@ -58,6 +58,28 @@ type ConnectionStatus = {
   lastSync: string | null;
 };
 
+// Format relative time (e.g., "2 hours ago", "5 minutes ago", etc.)
+const formatRelativeTime = (date: Date): string => {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) {
+    return 'Just now';
+  } else if (diffMins < 60) {
+    return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  } else if (diffDays < 7) {
+    return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  } else {
+    return date.toLocaleDateString();
+  }
+};
+
 export default function Navbar() {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,32 +91,20 @@ export default function Navbar() {
   const searchRef = useRef<HTMLDivElement>(null);
   
   // For handling notifications
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: "Price Discrepancy Detected",
-      message: "APR Performance FRONT BRAKE COOLING DUCTS - MITSUBISHI LANCER EVOLUTION X 08-15 has a 15% price increase",
-      time: "10 minutes ago",
-      type: "price-increase",
-      read: false
+  const [notifications, setNotifications] = useState<any[]>([]);
+  
+  // Fetch notifications from API
+  const { data: fetchedNotifications, isLoading: isLoadingNotifications } = useQuery({
+    queryKey: ['/api/notifications'],
+    queryFn: async () => {
+      const response = await fetch('/api/notifications?limit=10');
+      if (!response.ok) {
+        throw new Error('Failed to fetch notifications');
+      }
+      return response.json();
     },
-    {
-      id: 2,
-      title: "Price Decrease Alert",
-      message: "Bilstein B8 STRUTS/SHOCKS FRONT & REAR KIT - SUBARU WRX/STI 15-19 has decreased by 5%",
-      time: "2 hours ago",
-      type: "price-decrease",
-      read: false
-    },
-    {
-      id: 3,
-      title: "Shopify Sync Completed",
-      message: "Successfully synced 1604 products with your Shopify store",
-      time: "Yesterday",
-      type: "sync",
-      read: true
-    }
-  ]);
+    refetchInterval: 60000, // Refresh every minute
+  });
   
   // For Shopify connection status in profile menu
   const { data: shopifyConnection } = useQuery<ConnectionStatus>({
@@ -168,24 +178,80 @@ export default function Navbar() {
     }
   };
   
+  // Update notifications state when API data is loaded
+  useEffect(() => {
+    if (fetchedNotifications) {
+      setNotifications(fetchedNotifications);
+    }
+  }, [fetchedNotifications]);
+  
   // Handle notification click
-  const handleNotificationClick = (notification: any) => {
-    // Mark this specific notification as read
-    const updatedNotifications = notifications.map(n => 
-      n.id === notification.id ? { ...n, read: true } : n
-    );
-    setNotifications(updatedNotifications);
-    
-    // Show the notification details in a dialog
-    setSelectedNotification(notification);
-    setNotificationDialogOpen(true);
+  const handleNotificationClick = async (notification: any) => {
+    try {
+      // Mark this specific notification as read via API
+      const response = await fetch(`/api/notifications/${notification.id}/mark-read`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to mark notification as read');
+      }
+      
+      // Update local state
+      const updatedNotifications = notifications.map(n => 
+        n.id === notification.id ? { ...n, status: "read" } : n
+      );
+      setNotifications(updatedNotifications);
+      
+      // Show the notification details in a dialog
+      setSelectedNotification(notification);
+      setNotificationDialogOpen(true);
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to mark notification as read",
+        variant: "destructive"
+      });
+    }
   };
   
   // Mark all notifications as read
-  const markAllAsRead = () => {
-    const updatedNotifications = notifications.map(n => ({ ...n, read: true }));
-    setNotifications(updatedNotifications);
-    toast({ title: "Marked all as read" });
+  const markAllAsRead = async () => {
+    try {
+      // Call API to mark all as read
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to mark all notifications as read');
+      }
+      
+      const result = await response.json();
+      
+      // Update local state
+      const updatedNotifications = notifications.map(n => ({ ...n, status: "read" }));
+      setNotifications(updatedNotifications);
+      
+      toast({ 
+        title: "Success", 
+        description: `Marked ${result.count} notifications as read` 
+      });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      toast({ 
+        title: "Error", 
+        description: "Failed to mark all notifications as read",
+        variant: "destructive"
+      });
+    }
   };
   
   // Format price with currency
@@ -479,9 +545,15 @@ export default function Navbar() {
                     <DropdownMenuTrigger asChild>
                       <button className="text-gray-300 hover:text-white relative">
                         <Bell className="h-6 w-6" />
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-                          {notifications.filter(n => !n.read).length}
-                        </span>
+                        {isLoadingNotifications ? (
+                          <span className="absolute -top-1 -right-1 bg-gray-400 text-white text-xs px-1.5 py-0.5 rounded-full">
+                            ...
+                          </span>
+                        ) : (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                            {notifications.filter(n => n.status === "pending").length}
+                          </span>
+                        )}
                       </button>
                     </DropdownMenuTrigger>
                   </TooltipTrigger>
@@ -494,7 +566,7 @@ export default function Navbar() {
               <DropdownMenuContent align="end" className="w-[90vw] sm:w-80">
                 <DropdownMenuLabel className="flex justify-between">
                   <span>Notifications</span>
-                  {notifications.filter(n => !n.read).length > 0 && (
+                  {notifications.filter(n => n.status === "pending").length > 0 && (
                     <button 
                       className="text-sm text-primary hover:underline"
                       onClick={markAllAsRead}
@@ -504,46 +576,66 @@ export default function Navbar() {
                   )}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {notifications.length === 0 ? (
+                
+                {isLoadingNotifications ? (
+                  <div className="py-6 text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading notifications...</p>
+                  </div>
+                ) : notifications.length === 0 ? (
                   <div className="py-4 text-center text-gray-500">
                     No notifications
                   </div>
                 ) : (
-                  notifications.map((notification) => (
-                    <DropdownMenuItem 
-                      key={notification.id}
-                      className="cursor-pointer"
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      <div className="flex items-start w-full">
-                        <div className={`mt-0.5 mr-2 flex-shrink-0 ${
-                          notification.type === 'price-increase' ? 'text-red-500' : 
-                          notification.type === 'price-decrease' ? 'text-green-500' : 'text-blue-500'
-                        }`}>
-                          {notification.type === 'price-increase' ? (
-                            <AlertCircle className="h-5 w-5" />
-                          ) : notification.type === 'price-decrease' ? (
-                            <Info className="h-5 w-5" />
-                          ) : (
-                            <CheckCircle className="h-5 w-5" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between">
-                            <span className={`font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
-                              {notification.title}
-                            </span>
-                            <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                              {notification.time}
-                            </span>
+                  notifications.map((notification) => {
+                    // Detect notification type based on message content
+                    const isDiscrepancy = notification.message?.includes('price discrepancy') || false;
+                    const isPriceIncrease = notification.message?.includes('increased') || false;
+                    const isPriceDecrease = notification.message?.includes('decreased') || false;
+                    
+                    // Format relative time
+                    const createdAtDate = notification.createdAt ? new Date(notification.createdAt) : new Date();
+                    const timeAgo = formatRelativeTime(createdAtDate);
+                    
+                    return (
+                      <DropdownMenuItem 
+                        key={notification.id}
+                        className="cursor-pointer"
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex items-start w-full">
+                          <div className={`mt-0.5 mr-2 flex-shrink-0 ${
+                            isPriceIncrease ? 'text-red-500' : 
+                            isPriceDecrease ? 'text-green-500' : 
+                            isDiscrepancy ? 'text-yellow-500' : 'text-blue-500'
+                          }`}>
+                            {isPriceIncrease ? (
+                              <AlertCircle className="h-5 w-5" />
+                            ) : isPriceDecrease ? (
+                              <Info className="h-5 w-5" />
+                            ) : isDiscrepancy ? (
+                              <AlertTriangle className="h-5 w-5" />
+                            ) : (
+                              <CheckCircle className="h-5 w-5" />
+                            )}
                           </div>
-                          <p className={`text-sm ${!notification.read ? 'text-gray-700' : 'text-gray-500'} line-clamp-2`}>
-                            {notification.message}
-                          </p>
+                          <div className="flex-1">
+                            <div className="flex justify-between">
+                              <span className={`font-medium ${notification.status === "pending" ? 'text-gray-900' : 'text-gray-700'}`}>
+                                {notification.product?.title?.slice(0, 25)}...
+                              </span>
+                              <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                                {timeAgo}
+                              </span>
+                            </div>
+                            <p className={`text-sm ${notification.status === "pending" ? 'text-gray-700' : 'text-gray-500'} line-clamp-2`}>
+                              {notification.message}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </DropdownMenuItem>
-                  ))
+                      </DropdownMenuItem>
+                    );
+                  })
                 )}
                 <DropdownMenuSeparator />
                 <Link href="/notifications">
@@ -718,33 +810,47 @@ export default function Navbar() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center">
-                {selectedNotification.type === 'price-increase' ? (
-                  <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
-                ) : selectedNotification.type === 'price-decrease' ? (
-                  <Info className="h-5 w-5 mr-2 text-green-500" />
-                ) : (
-                  <CheckCircle className="h-5 w-5 mr-2 text-blue-500" />
-                )}
-                {selectedNotification.title}
+                {(() => {
+                  // Detect notification type
+                  const isDiscrepancy = selectedNotification.message?.includes('price discrepancy') || false;
+                  const isPriceIncrease = selectedNotification.message?.includes('increased') || false;
+                  const isPriceDecrease = selectedNotification.message?.includes('decreased') || false;
+                  
+                  if (isPriceIncrease) {
+                    return <AlertCircle className="h-5 w-5 mr-2 text-red-500" />;
+                  } else if (isPriceDecrease) {
+                    return <Info className="h-5 w-5 mr-2 text-green-500" />;
+                  } else if (isDiscrepancy) {
+                    return <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />;
+                  } else {
+                    return <CheckCircle className="h-5 w-5 mr-2 text-blue-500" />;
+                  }
+                })()}
+                {selectedNotification.product?.title || 'Notification'}
               </DialogTitle>
               <DialogDescription className="text-right text-xs">
-                {selectedNotification.time}
+                {selectedNotification.createdAt 
+                  ? formatRelativeTime(new Date(selectedNotification.createdAt))
+                  : 'Recent'}
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4">
               <p>{selectedNotification.message}</p>
               
-              {selectedNotification.type === 'price-increase' || selectedNotification.type === 'price-decrease' ? (
+              {selectedNotification.productId ? (
                 <div className="flex space-x-2 mt-4">
                   <Button className="flex-1" onClick={() => {
                     setNotificationDialogOpen(false);
-                    toast({ title: "Action taken", description: "Navigating to product details" });
+                    window.location.href = `/products/${selectedNotification.productId}`;
                   }}>View Product</Button>
                   <Button variant="outline" className="flex-1" onClick={() => {
                     setNotificationDialogOpen(false);
-                    toast({ title: "Action taken", description: "Discrepancy has been cleared" });
-                  }}>Clear Discrepancy</Button>
+                    toast({ 
+                      title: "Acknowledged", 
+                      description: "Notification has been marked as read" 
+                    });
+                  }}>Acknowledge</Button>
                 </div>
               ) : (
                 <Button className="w-full" onClick={() => setNotificationDialogOpen(false)}>

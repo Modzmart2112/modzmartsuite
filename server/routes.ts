@@ -26,7 +26,7 @@ import { scheduler, checkAllPrices } from "./scheduler";
 import { scheduledSyncShopifyProducts } from "./scheduler";
 import { improvedSyncShopifyProducts } from "./improved-shopify-sync";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 
 
 // Helper function to handle controller errors
@@ -88,6 +88,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // In a real app, we'd use a secure authentication method
     res.json({ id: user.id, username: user.username });
+  }));
+  
+  // Notifications endpoints
+  app.get("/api/notifications", asyncHandler(async (req, res) => {
+    const limit = parseInt(req.query.limit as string || "10");
+    const status = req.query.status as string || null;
+    
+    console.log(`Fetching notifications - limit: ${limit}, status: ${status || 'all'}`);
+    
+    const notifications = await storage.getNotifications(limit, status || undefined);
+    
+    console.log(`Found ${notifications.length} notifications`);
+    
+    // For each notification, fetch the associated product to include in the response
+    const notificationsWithProducts = await Promise.all(
+      notifications.map(async (notification) => {
+        const product = await storage.getProductById(notification.productId);
+        return {
+          ...notification,
+          product: product ? {
+            id: product.id,
+            sku: product.sku,
+            title: product.title,
+            shopifyPrice: product.shopifyPrice,
+            supplierPrice: product.supplierPrice
+          } : null
+        };
+      })
+    );
+    
+    res.json(notificationsWithProducts);
+  }));
+  
+  // Mark notification as read
+  app.post("/api/notifications/:id/mark-read", asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid notification ID" });
+    }
+    
+    const notification = await storage.updateNotification(id, { 
+      status: "read",
+      sentAt: new Date()
+    });
+    
+    if (!notification) {
+      return res.status(404).json({ message: "Notification not found" });
+    }
+    
+    res.json({ success: true, notification });
+  }));
+  
+  // Mark all notifications as read
+  app.post("/api/notifications/mark-all-read", asyncHandler(async (req, res) => {
+    // Get all pending notifications
+    const pendingNotifications = await storage.getPendingNotifications();
+    
+    // Mark each one as read
+    const now = new Date();
+    const promises = pendingNotifications.map(notification => 
+      storage.updateNotification(notification.id, { 
+        status: "read",
+        sentAt: now
+      })
+    );
+    
+    await Promise.all(promises);
+    
+    res.json({ 
+      success: true, 
+      count: pendingNotifications.length,
+      message: `Marked ${pendingNotifications.length} notifications as read`
+    });
   }));
   
   // Dashboard stats

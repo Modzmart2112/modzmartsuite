@@ -58,6 +58,7 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   updateNotification(id: number, notification: Partial<Notification>): Promise<Notification | undefined>;
   getPendingNotifications(): Promise<Notification[]>;
+  getNotifications(limit?: number, status?: string): Promise<Notification[]>;
   
   // Stats operations
   getStats(): Promise<Stats | undefined>;
@@ -521,6 +522,29 @@ export class MemStorage implements IStorage {
         const timeB = b.createdAt ? b.createdAt.getTime() : 0;
         return timeA - timeB;
       });
+  }
+  
+  async getNotifications(limit?: number, status?: string): Promise<Notification[]> {
+    let notifications = Array.from(this.notifications.values());
+    
+    // Filter by status if provided
+    if (status) {
+      notifications = notifications.filter(notification => notification.status === status);
+    }
+    
+    // Sort by creation date, newest first
+    notifications = notifications.sort((a, b) => {
+      const timeA = a.createdAt ? a.createdAt.getTime() : 0;
+      const timeB = b.createdAt ? b.createdAt.getTime() : 0;
+      return timeB - timeA; // Descending order
+    });
+    
+    // Apply limit if provided
+    if (limit && limit > 0) {
+      notifications = notifications.slice(0, limit);
+    }
+    
+    return notifications;
   }
 
   // Stats operations
@@ -1754,6 +1778,25 @@ export class DatabaseStorage implements IStorage {
       .from(notifications)
       .where(eq(notifications.status, 'pending'))
       .orderBy(asc(notifications.createdAt));
+  }
+  
+  async getNotifications(limit?: number, status?: string): Promise<Notification[]> {
+    let query = db.select().from(notifications);
+    
+    // Filter by status if provided
+    if (status) {
+      query = query.where(eq(notifications.status, status));
+    }
+    
+    // Order by creation date, newest first
+    query = query.orderBy(desc(notifications.createdAt));
+    
+    // Apply limit if provided
+    if (limit && limit > 0) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
   }
 
   // Stats operations
