@@ -10,8 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { EyeIcon, EyeOffIcon, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 
-// Import new background image
-const backgroundImageUrl = "/images/MODZ-new.png";
+// Import background image directly
+import backgroundImage from "@assets/MODZ.png";
 
 // Form validation schema
 const loginSchema = z.object({
@@ -71,10 +71,12 @@ export default function LoginPage() {
     <div className="relative h-screen w-full overflow-hidden bg-black">
       {/* Background Image with Full Bleed */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center"
+        className="absolute inset-0 z-0" 
         style={{ 
-          backgroundImage: `url("${backgroundImageUrl}")`, 
-          filter: "brightness(1)" 
+          backgroundImage: `url(${backgroundImage})`, 
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          filter: "brightness(0.8)" 
         }}
       />
       
@@ -93,7 +95,7 @@ export default function LoginPage() {
       </div>
       
       {/* Content Container */}
-      <div className="relative z-20 flex h-full w-full items-center justify-center px-4">
+      <div className="relative z-20 flex h-full w-full items-center justify-center px-4 mt-28 sm:mt-32 md:mt-36">
         <div className="w-full max-w-md">
           {/* Brand Logo/Name */}
           <div className="mb-8 text-center">
