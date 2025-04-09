@@ -142,13 +142,29 @@ export default function Settings() {
   // Profile update mutation
   const profileMutation = useMutation({
     mutationFn: async (data: AccountSettings) => {
-      const res = await apiRequest("POST", "/api/user/profile", data);
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
+      try {
+        console.log("Submitting profile data:", JSON.stringify(data));
+        const res = await fetch('/api/user/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+        
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(`API error: ${res.status} - ${errorText}`);
+        }
+        
+        return res.json();
+      } catch (err) {
+        console.error("Profile update fetch error:", err);
+        throw err;
       }
-      return res.json();
     },
     onSuccess: (data) => {
+      console.log("Profile update success:", data);
       // Update local state
       setAccountInfo({
         username: data.user.username,
@@ -165,7 +181,7 @@ export default function Settings() {
         description: "Your account details have been successfully updated.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Profile update error:", error);
       toast({
         title: "Update Failed",
@@ -249,7 +265,15 @@ export default function Settings() {
   // Handle account form submission
   const handleAccountSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    profileMutation.mutate(accountInfo);
+    console.log("Submitting account form with data:", accountInfo);
+    
+    // Ensure we're sending complete data
+    const updatedAccountInfo = {
+      ...accountInfo,
+      username: accountInfo.username || profileQuery.data?.username || 'admin',
+    };
+    
+    profileMutation.mutate(updatedAccountInfo);
   };
   
   // Handle profile picture upload
