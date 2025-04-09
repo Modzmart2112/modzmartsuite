@@ -55,6 +55,7 @@ type SearchResult = {
 type ConnectionStatus = {
   connected: boolean;
   shopName: string;
+  shopifyStoreUrl: string;
   lastSync: string | null;
 };
 
@@ -722,7 +723,12 @@ export default function Navbar() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <a href="https://modz-mart.myshopify.com/admin" target="_blank" rel="noopener noreferrer" className="flex items-center w-full">
+                  <a 
+                    href={`https://${shopifyConnection?.shopifyStoreUrl || ''}/admin`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center w-full"
+                  >
                     <Store className="mr-2 h-4 w-4" />
                     <span>Open Shopify</span>
                     <ExternalLink className="ml-auto h-3 w-3" />

@@ -1327,6 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         connected,
         shopName,
+        shopifyStoreUrl: user?.shopifyStoreUrl || '',
         lastSync: stats?.lastShopifySync ? stats.lastShopifySync.toISOString() : null
       });
     } catch (error) {
@@ -1334,6 +1335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         connected: false, 
         shopName: "Modz Mart", 
+        shopifyStoreUrl: '',
         lastSync: null,
         error: "Failed to get connection status" 
       });
