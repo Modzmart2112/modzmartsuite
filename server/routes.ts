@@ -1545,15 +1545,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Scheduler routes
   app.get("/api/scheduler/status", asyncHandler(async (req, res) => {
-    const activeJobs = Array.from(scheduler["timers"].keys());
+    const jobStatus = scheduler.getJobStatus();
     const stats = await storage.getStats();
     
+    // Calculate next midnight AEST for 'daily-price-check' job
+    const now = new Date();
+    const aestOffset = 10 * 60 * 60 * 1000; // 10 hours in milliseconds
+    const aestNow = new Date(now.getTime() + aestOffset);
+    const aestMidnight = new Date(aestNow);
+    aestMidnight.setHours(0, 0, 0, 0);
+    
+    // If it's already past midnight AEST, set to next day
+    if (aestNow > aestMidnight) {
+      aestMidnight.setDate(aestMidnight.getDate() + 1);
+    }
+    
+    const nextScheduledRun = jobStatus.scheduledJobs['daily-price-check']?.nextRun || aestMidnight.toISOString();
+    
     res.json({
-      activeJobs,
+      ...jobStatus, // Include all job status info
       lastPriceCheck: stats?.lastPriceCheck || null,
       lastShopifySync: stats?.lastShopifySync || null,
       totalPriceChecks: stats?.totalPriceChecks || 0,
-      totalDiscrepanciesFound: stats?.totalDiscrepanciesFound || 0
+      totalDiscrepanciesFound: stats?.totalDiscrepanciesFound || 0,
+      nextScheduledRun
     });
   }));
   

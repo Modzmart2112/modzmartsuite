@@ -9,6 +9,8 @@ import { log } from './vite';
  */
 export class Scheduler {
   private timers: Map<string, NodeJS.Timeout> = new Map();
+  // Track which jobs are scheduled but not actively running yet
+  private scheduledJobs: Map<string, { nextRun: Date, isActive: boolean }> = new Map();
   
   /**
    * Start a job with a specified interval
@@ -25,16 +27,42 @@ export class Scheduler {
       // Calculate time until next midnight AEST
       const msUntilMidnightAEST = this.calculateMsUntilMidnightAEST();
       
+      // Calculate the next run time 
+      const nextRunDate = new Date(Date.now() + msUntilMidnightAEST);
+      
       log(`Starting scheduled job: ${name} at midnight AEST (in ${Math.round(msUntilMidnightAEST/1000/60)} minutes)`, 'scheduler');
+      
+      // Add to scheduled jobs map with isActive=false since it's not running yet
+      this.scheduledJobs.set(name, { 
+        nextRun: nextRunDate, 
+        isActive: false 
+      });
       
       // Don't run immediately, wait until the scheduled time
       const timer = setTimeout(() => {
         // Run at midnight
         log(`Running scheduled job: ${name} (midnight AEST triggered)`, 'scheduler');
+        
+        // Update the status to active
+        this.scheduledJobs.set(name, { 
+          nextRun: new Date(nextRunDate.getTime() + 24 * 60 * 60 * 1000), // Next run is tomorrow
+          isActive: true 
+        });
+        
         job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
         
         // Then set up the recurring daily interval
         const dailyTimer = setInterval(() => {
+          // Update the next run time when the job runs
+          const nextMidnight = new Date();
+          nextMidnight.setDate(nextMidnight.getDate() + 1);
+          nextMidnight.setHours(0, 0, 0, 0);
+          
+          this.scheduledJobs.set(name, { 
+            nextRun: nextMidnight,
+            isActive: true 
+          });
+          
           log(`Running scheduled job: ${name} (daily midnight AEST)`, 'scheduler');
           job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
         }, 24 * 60 * 60 * 1000); // 24 hours in milliseconds
@@ -47,11 +75,24 @@ export class Scheduler {
       // For other jobs, use the standard interval approach
       log(`Starting scheduled job: ${name} (interval: ${intervalMs}ms)`, 'scheduler');
       
+      // Mark job as active immediately
+      this.scheduledJobs.set(name, { 
+        nextRun: new Date(), // It's running right now
+        isActive: true 
+      });
+      
       // Execute job immediately
       job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
       
       // Schedule periodic execution
       const timer = setInterval(() => {
+        // Update the next run time
+        const nextRun = new Date(Date.now() + intervalMs);
+        this.scheduledJobs.set(name, { 
+          nextRun,
+          isActive: true 
+        });
+        
         log(`Running scheduled job: ${name}`, 'scheduler');
         job().catch(err => log(`Error in job ${name}: ${err}`, 'scheduler'));
       }, intervalMs);
@@ -98,6 +139,10 @@ export class Scheduler {
       clearInterval(timer);
       clearTimeout(timer);
       this.timers.delete(name);
+      
+      // Also remove from scheduled jobs
+      this.scheduledJobs.delete(name);
+      
       log(`Stopped job: ${name}`, 'scheduler');
     }
   }
@@ -106,13 +151,47 @@ export class Scheduler {
    * Stop all running jobs
    */
   stopAll() {
-    for (const [name, timer] of this.timers.entries()) {
+    // Using Array.from to avoid iterator issues
+    Array.from(this.timers.entries()).forEach(([name, timer]) => {
       // Clear both types of timers to be safe
       clearInterval(timer);
       clearTimeout(timer);
       log(`Stopped job: ${name}`, 'scheduler');
-    }
+    });
+    
     this.timers.clear();
+    this.scheduledJobs.clear();
+  }
+  
+  /**
+   * Get job status information
+   * @returns Object with job statuses
+   */
+  getJobStatus() {
+    const now = new Date();
+    const result: {
+      activeJobs: string[];
+      scheduledJobs: { [key: string]: { nextRun: string, isActive: boolean } };
+      runningJobs: string[];
+    } = {
+      activeJobs: Array.from(this.timers.keys()),
+      scheduledJobs: {},
+      runningJobs: []
+    };
+    
+    // Add details about scheduled jobs
+    this.scheduledJobs.forEach((status, name) => {
+      result.scheduledJobs[name] = {
+        nextRun: status.nextRun.toISOString(),
+        isActive: status.isActive
+      };
+      
+      if (status.isActive) {
+        result.runningJobs.push(name);
+      }
+    });
+    
+    return result;
   }
 }
 

@@ -32,6 +32,13 @@ import { useToast } from "@/hooks/use-toast";
 
 interface SchedulerStatus {
   activeJobs: string[];
+  runningJobs: string[];
+  scheduledJobs: { 
+    [key: string]: { 
+      nextRun: string; 
+      isActive: boolean 
+    } 
+  };
   lastPriceCheck: string | null;
   totalPriceChecks: number;
   totalDiscrepanciesFound: number;
@@ -48,7 +55,10 @@ export function SchedulerStatus() {
     refetchInterval: 5000, // Refresh every 5 seconds
   });
   
-  const isSchedulerActive = !loading && status?.activeJobs?.includes('daily-price-check');
+  // Two states: scheduled but not running yet, and actively running
+  const isSchedulerScheduled = !loading && status?.activeJobs?.includes('daily-price-check');
+  const isSchedulerRunning = !loading && status?.runningJobs?.includes('daily-price-check');
+  const isSchedulerActive = isSchedulerScheduled; // for backward compatibility with existing code
   
   const startSchedulerMutation = useMutation({
     mutationFn: async () => {
@@ -204,8 +214,10 @@ export function SchedulerStatus() {
             <Badge variant="outline" className="animate-pulse px-3 py-0.5">
               Loading...
             </Badge>
-          ) : isSchedulerActive ? (
-            <Badge variant="default" className="bg-green-600 hover:bg-green-700 px-4 py-0.5">Active</Badge>
+          ) : isSchedulerRunning ? (
+            <Badge variant="default" className="bg-green-600 hover:bg-green-700 px-4 py-0.5">Running</Badge>
+          ) : isSchedulerScheduled ? (
+            <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 px-4 py-0.5">Scheduled</Badge>
           ) : (
             <Badge variant="destructive" className="px-3 py-0.5">Inactive</Badge>
           )}
@@ -214,10 +226,10 @@ export function SchedulerStatus() {
       <CardContent className="pt-6">
         <div className="space-y-6">
           {/* Enhanced status banner with detailed scheduling information */}
-          <div className={`p-5 rounded-lg ${isSchedulerActive 
+          <div className={`p-5 rounded-lg ${isSchedulerScheduled 
             ? 'bg-gradient-to-br from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-100 dark:border-blue-800/50' 
             : 'bg-gradient-to-br from-red-50/80 to-orange-50/80 dark:from-red-900/20 dark:to-orange-900/20 border border-red-100 dark:border-red-800/50'}`}>
-            {isSchedulerActive ? (
+            {isSchedulerScheduled ? (
               <div className="flex items-start gap-4">
                 <div className="bg-blue-100 dark:bg-blue-800/30 rounded-full p-2.5 mt-1">
                   <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
@@ -283,11 +295,15 @@ export function SchedulerStatus() {
                   </div>
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Last Check</span>
                 </div>
-                {isSchedulerActive && (
-                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/50">
-                    Active
+                {isSchedulerRunning ? (
+                  <Badge variant="outline" className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800/50">
+                    Running
                   </Badge>
-                )}
+                ) : isSchedulerScheduled ? (
+                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/50">
+                    Scheduled
+                  </Badge>
+                ) : null}
               </div>
               <div className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-3">{formatTime(status?.lastPriceCheck || null)}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -381,7 +397,7 @@ export function SchedulerStatus() {
       <CardFooter className="pt-2 pb-6 px-6">
         <div className="flex w-full flex-col space-y-4">
           <div className="flex justify-between gap-4">
-            {isSchedulerActive ? (
+            {isSchedulerScheduled ? (
               <Button 
                 variant="destructive" 
                 onClick={stopScheduler} 
@@ -462,9 +478,11 @@ export function SchedulerStatus() {
             </Button>
             
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              {isSchedulerActive
-                ? 'Scheduler will run automatically every 24 hours'
-                : 'Manual mode - Scheduler is not running automatically'}
+              {isSchedulerRunning
+                ? 'Price check is currently running'
+                : isSchedulerScheduled
+                  ? 'Scheduled for midnight AEST - will run automatically every 24 hours'
+                  : 'Manual mode - Scheduler is not running automatically'}
             </div>
           </div>
         </div>
