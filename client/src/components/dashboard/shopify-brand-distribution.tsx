@@ -126,7 +126,7 @@ export function ShopifyBrandDistribution() {
   if (isConnectionLoading || isBrandsLoading || (isProductsLoading && !brandData)) {
     return (
       <Card className="shadow-md">
-        <CardHeader className="pb-0">
+        <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
           <div className="flex items-center justify-between">
             <div>
               <Skeleton className="h-6 w-48" />
@@ -167,9 +167,14 @@ export function ShopifyBrandDistribution() {
   if (!isConnected) {
     return (
       <Card className="shadow-md overflow-hidden border-0">
-        <CardHeader>
-          <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
-          <CardDescription>Connect to Shopify to view your brand distribution</CardDescription>
+        <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+          <div className="flex items-center">
+            <BarChart3 className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+            <div>
+              <CardTitle className="text-lg">Products by Brand</CardTitle>
+              <CardDescription>Connect to Shopify to view your brand distribution</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         
         <CardContent className="flex flex-col items-center justify-center h-[400px]">
@@ -192,11 +197,14 @@ export function ShopifyBrandDistribution() {
   
   return (
     <Card className="shadow-md overflow-hidden border-0">
-      <CardHeader className="pb-0">
+      <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
-            <CardDescription>Distribution of products across manufacturers in your Shopify store</CardDescription>
+          <div className="flex items-center">
+            <BarChart3 className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+            <div>
+              <CardTitle className="text-lg">Products by Brand</CardTitle>
+              <CardDescription>Distribution of products across manufacturers in your Shopify store</CardDescription>
+            </div>
           </div>
           
           <div className="flex items-center gap-2">

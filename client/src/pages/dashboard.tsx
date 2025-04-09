@@ -5,8 +5,9 @@ import { StatsRow } from "@/components/dashboard/stats-row";
 import { SchedulerStatus } from "@/components/dashboard/scheduler-status";
 import { ShopifySyncStatus } from "@/components/dashboard/shopify-sync-status";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Upload, PlusCircle } from "lucide-react";
+import { Upload, PlusCircle, Clock } from "lucide-react";
 
 export default function Dashboard() {
   const handleOpenUploadModal = () => {
@@ -57,31 +58,38 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         <SchedulerStatus />
         <ShopifySyncStatus />
-        <div className="card-container">
-          <h3 className="mobile-subheading text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-3 sm:space-y-4">
-            <div className="flex items-start">
-              <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <Upload className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+            <div className="flex items-center">
+              <Clock className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+              <CardTitle className="text-lg">Recent Activity</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Upload className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900 line-clamp-1">CSV uploaded: processed_APR Performance BAI 6.csv</p>
+                  <p className="text-xs text-gray-500">58 products updated • Today at 7:18 AM</p>
+                </div>
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900 line-clamp-1">CSV uploaded: processed_APR Performance BAI 6.csv</p>
-                <p className="text-xs text-gray-500">58 products updated • Today at 7:18 AM</p>
+              <div className="flex items-start">
+                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">Price check completed</p>
+                  <p className="text-xs text-gray-500">558 products checked, 319 updated • Today at 7:24 AM</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-start">
-              <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-green-100 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Price check completed</p>
-                <p className="text-xs text-gray-500">558 products checked, 319 updated • Today at 7:24 AM</p>
-              </div>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

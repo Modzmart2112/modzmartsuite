@@ -226,14 +226,16 @@ export function SchedulerStatus() {
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarClock className="h-5 w-5" />
-          Scheduled Price Checks
-        </CardTitle>
-        <CardDescription>
-          Automatically check all products with supplier URLs for price discrepancies
-        </CardDescription>
+      <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+        <div className="flex items-center">
+          <CalendarClock className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+          <div>
+            <CardTitle className="text-lg">Scheduled Price Checks</CardTitle>
+            <CardDescription>
+              Automatically check all products with supplier URLs for price discrepancies
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">

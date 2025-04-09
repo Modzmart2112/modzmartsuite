@@ -73,11 +73,11 @@ export function BrandDistributionChart() {
   
   return (
     <Card className="shadow-md">
-      <CardHeader className="pb-0">
+      <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
         <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-xl font-semibold text-gray-800">Products by Brand</CardTitle>
-            <CardDescription>Distribution of products across manufacturers</CardDescription>
+          <div className="flex items-center">
+            <CardTitle className="text-lg">Products by Brand</CardTitle>
+            <CardDescription className="ml-2">Distribution of products across manufacturers</CardDescription>
           </div>
           
           <div className="flex items-center">

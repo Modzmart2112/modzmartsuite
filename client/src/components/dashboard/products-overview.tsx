@@ -21,9 +21,11 @@ export function ProductsOverview() {
   return (
     <div className="w-full">
       <Card className="shadow-md border border-gray-100 w-full">
-        <CardHeader className="pb-0">
-          <CardTitle className="text-xl font-semibold text-gray-800">Products Overview</CardTitle>
-          <CardDescription>Summary of product listings and status</CardDescription>
+        <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+          <div className="flex items-center">
+            <CardTitle className="text-lg">Products Overview</CardTitle>
+            <CardDescription className="ml-2">Summary of product listings and status</CardDescription>
+          </div>
         </CardHeader>
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-stretch gap-8">

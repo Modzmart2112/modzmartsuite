@@ -63,7 +63,8 @@ export function ProductList({
     vendor: null,
     productType: null,
   });
-  const [selected, setSelected] = useState<number[]>(selectedProductIds);
+  // Initialize with empty array and sync with props in useEffect
+  const [selected, setSelected] = useState<number[]>([]);
   const limit = 50; // Number of products per page
   
   // Debounce search query input to avoid too many requests

@@ -454,8 +454,10 @@ const SaleManagementPage: React.FC = () => {
             const productsResponse = await apiRequest('GET', `/api/products?${queryParams}`);
             
             if (productsResponse.products) {
-              // Add product targets using Shopify IDs
-              targetPromises = productsResponse.products.map((product: any) => {
+              console.log(`Found ${productsResponse.products.length} products to target`);
+              // Process one product at a time instead of using map to ensure reliable sequential processing
+              targetPromises = [];
+              for (const product of productsResponse.products) {
                 const targetData = {
                   targetType: 'product',
                   targetId: null,
@@ -463,8 +465,8 @@ const SaleManagementPage: React.FC = () => {
                 };
                 // Log the targeting information to help with debugging
                 console.log(`Adding target for Shopify ID: ${product.shopifyId} (Product: ${product.title})`);
-                return apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData);
-              });
+                targetPromises.push(apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData));
+              }
             }
           } else if (selectedVendor) {
             // Add vendor target
