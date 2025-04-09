@@ -60,7 +60,6 @@ export function RecentActivityCard() {
           <Clock className="h-5 w-5 mr-2 text-amber-600 dark:text-amber-400" />
           <div>
             <CardTitle className="text-lg">Recent Activity</CardTitle>
-            <CardDescription>Latest actions and system events</CardDescription>
           </div>
         </div>
       </CardHeader>
