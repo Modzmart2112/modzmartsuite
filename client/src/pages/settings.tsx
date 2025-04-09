@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,13 +6,21 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { ShopifyConnectionInfo, TelegramConnectionInfo } from "@shared/types";
+import { ShopifyConnectionInfo, TelegramConnectionInfo, AccountSettings } from "@shared/types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ThemeSelector } from "@/components/ui/theme-selector";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function Settings() {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [profilePicture, setProfilePicture] = useState<string>("");
+  const [accountInfo, setAccountInfo] = useState<AccountSettings>({
+    username: "admin",
+    displayName: "Administrator",
+    email: "",
+  });
   const [shopifyInfo, setShopifyInfo] = useState<ShopifyConnectionInfo>({
     shopifyApiKey: "",
     shopifyApiSecret: "",
@@ -23,6 +31,26 @@ export default function Settings() {
 
   const [telegramInfo, setTelegramInfo] = useState<TelegramConnectionInfo>({
     telegramChatId: "",
+  });
+  
+  // Query to get the user profile
+  const profileQuery = useQuery({
+    queryKey: ['/api/user/profile'],
+    queryFn: async () => {
+      const response = await fetch('/api/user/profile');
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAccountInfo({
+        username: data.username,
+        displayName: data.displayName || data.username,
+        email: data.email || '',
+      });
+      setProfilePicture(data.profilePicture || '');
+    }
   });
   
   // Query to check the connection status
@@ -104,6 +132,66 @@ export default function Settings() {
       });
     },
   });
+  
+  // Profile update mutation
+  const profileMutation = useMutation({
+    mutationFn: async (data: AccountSettings) => {
+      const res = await apiRequest("POST", "/api/user/profile", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setAccountInfo({
+        username: data.user.username,
+        displayName: data.user.displayName,
+        email: data.user.email || '',
+      });
+      
+      toast({
+        title: "Profile Updated",
+        description: "Your account details have been successfully updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update your profile.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Profile picture upload mutation
+  const profilePictureMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const res = await fetch('/api/user/profile-picture', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to upload profile picture');
+      }
+      
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setProfilePicture(data.profilePicture);
+      toast({
+        title: "Profile Picture Updated",
+        description: "Your profile picture has been successfully updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload profile picture.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleShopifyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -127,6 +215,33 @@ export default function Settings() {
   
   const handleSyncProducts = () => {
     syncProductsMutation.mutate();
+  };
+  
+  // Handle account form changes
+  const handleAccountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setAccountInfo((prev) => ({ ...prev, [name]: value }));
+  };
+  
+  // Handle account form submission
+  const handleAccountSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    profileMutation.mutate(accountInfo);
+  };
+  
+  // Handle profile picture upload
+  const handleProfilePictureClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+  
+  // Handle file selection
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      profilePictureMutation.mutate(file);
+    }
   };
 
   return (
@@ -512,25 +627,72 @@ export default function Settings() {
             <CardHeader>
               <CardTitle>Account Settings</CardTitle>
               <CardDescription>
-                Manage your account details and password.
+                Manage your account details and profile picture.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                toast({
-                  title: "Account Updated",
-                  description: "Your account details have been saved."
-                });
-              }}>
+              <form onSubmit={handleAccountSubmit}>
                 <div className="space-y-6">
+                  {/* Profile Picture Section */}
+                  <div className="flex flex-col items-center md:flex-row md:items-start gap-6 pb-6 border-b">
+                    <div className="relative">
+                      <Avatar className="w-32 h-32 cursor-pointer" onClick={handleProfilePictureClick}>
+                        {profilePicture ? (
+                          <AvatarImage src={profilePicture} alt="Profile" />
+                        ) : (
+                          <AvatarFallback className="text-3xl bg-primary/10">
+                            {accountInfo.displayName?.charAt(0) || accountInfo.username.charAt(0)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div 
+                        className="absolute bottom-0 right-0 p-1 bg-primary text-white rounded-full cursor-pointer"
+                        onClick={handleProfilePictureClick}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M16 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1"></path>
+                          <polygon points="12 2 15 5 8 12 5 12 5 9"></polygon>
+                          <line x1="12" y1="5" x2="19" y2="12"></line>
+                        </svg>
+                      </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        id="profilePicture"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2 text-center md:text-left">
+                      <h3 className="text-lg font-medium">Profile Picture</h3>
+                      <p className="text-sm text-gray-500">
+                        Click on the avatar to upload a new profile picture. 
+                        Recommended size is at least 300x300 pixels.
+                      </p>
+                      {profilePictureMutation.isPending && (
+                        <div className="flex items-center space-x-2 text-sm text-blue-600">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          <span>Uploading image...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Account Details */}
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="username">Username</Label>
                       <Input
                         id="username"
-                        defaultValue="admin"
+                        name="username"
+                        value={accountInfo.username}
+                        onChange={handleAccountChange}
                         className="mt-1"
+                        required
                       />
                     </div>
                     
@@ -538,7 +700,9 @@ export default function Settings() {
                       <Label htmlFor="displayName">Display Name</Label>
                       <Input
                         id="displayName"
-                        defaultValue="Administrator"
+                        name="displayName"
+                        value={accountInfo.displayName || ''}
+                        onChange={handleAccountChange}
                         className="mt-1"
                       />
                     </div>
@@ -547,13 +711,17 @@ export default function Settings() {
                       <Label htmlFor="email">Email Address</Label>
                       <Input
                         id="email"
+                        name="email"
                         type="email"
                         placeholder="you@example.com"
+                        value={accountInfo.email || ''}
+                        onChange={handleAccountChange}
                         className="mt-1"
                       />
                     </div>
                   </div>
                   
+                  {/* Password Section */}
                   <div>
                     <h3 className="text-lg font-medium mb-3">Change Password</h3>
                     <div className="space-y-4">
@@ -587,10 +755,30 @@ export default function Settings() {
                   </div>
                   
                   <div className="pt-2 flex flex-col sm:flex-row gap-2">
-                    <Button type="submit">
-                      Save Account Details
+                    <Button 
+                      type="submit"
+                      disabled={profileMutation.isPending}
+                    >
+                      {profileMutation.isPending ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Saving...
+                        </span>
+                      ) : "Save Account Details"}
                     </Button>
                     <Button variant="outline" type="button" onClick={() => {
+                      // Reset form to the original values from the profileQuery
+                      if (profileQuery.data) {
+                        setAccountInfo({
+                          username: profileQuery.data.username,
+                          displayName: profileQuery.data.displayName || profileQuery.data.username,
+                          email: profileQuery.data.email || '',
+                        });
+                      }
+                      
                       toast({
                         title: "Changes Discarded",
                         description: "Your changes have been discarded."

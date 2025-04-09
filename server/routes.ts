@@ -21,6 +21,7 @@ import multer from "multer";
 import * as fs from "fs";
 import path from "path";
 import os from "os";
+import { AccountSettings } from "@shared/types";
 import { processCsvFile } from "./csv-handler";
 import { scheduler, checkAllPrices } from "./scheduler";
 import { scheduledSyncShopifyProducts } from "./scheduler";
@@ -87,7 +88,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // In a real app, we'd use a secure authentication method
-    res.json({ id: user.id, username: user.username });
+    res.json({ 
+      id: user.id, 
+      username: user.username,
+      displayName: user.displayName || user.username,
+      email: user.email || '',
+      profilePicture: user.profilePicture || ''
+    });
+  }));
+  
+  // Get user profile data
+  app.get("/api/user/profile", asyncHandler(async (req, res) => {
+    // In a real app, we'd get the user ID from the session or token
+    // For now, we'll use a hardcoded user ID of 1
+    const userId = 1;
+    const user = await storage.getUser(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    res.json({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      email: user.email || '',
+      profilePicture: user.profilePicture || ''
+    });
+  }));
+  
+  // Update user profile data
+  app.post("/api/user/profile", asyncHandler(async (req, res) => {
+    // In a real app, we'd get the user ID from the session or token
+    const userId = 1;
+    const { displayName, email } = req.body as AccountSettings;
+    
+    // For password change, we'd need additional validation and hashing
+    
+    const updatedUser = await storage.updateUser(userId, {
+      displayName,
+      email
+    });
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        displayName: updatedUser.displayName || updatedUser.username,
+        email: updatedUser.email || '',
+        profilePicture: updatedUser.profilePicture || ''
+      }
+    });
+  }));
+  
+  // Handle profile picture upload
+  app.post("/api/user/profile-picture", upload.single('image'), asyncHandler(async (req, res) => {
+    // In a real app, we'd get the user ID from the session or token
+    const userId = 1;
+    
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided" });
+    }
+    
+    try {
+      // Create public directory if it doesn't exist
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      // Generate a unique filename
+      const filename = `profile-${userId}-${Date.now()}${path.extname(req.file.originalname)}`;
+      const destPath = path.join(uploadsDir, filename);
+      
+      // Copy the file from the temp location to our uploads directory
+      fs.copyFileSync(req.file.path, destPath);
+      
+      // Save the profile picture path in the database
+      const profilePicturePath = `/uploads/${filename}`;
+      const updatedUser = await storage.updateUser(userId, {
+        profilePicture: profilePicturePath
+      });
+      
+      // Delete the temp file
+      fs.unlinkSync(req.file.path);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({ 
+        success: true,
+        profilePicture: profilePicturePath
+      });
+    } catch (error) {
+      console.error("Error uploading profile picture:", error);
+      res.status(500).json({ message: "Failed to upload profile picture" });
+    }
   }));
   
   // Notifications endpoints
