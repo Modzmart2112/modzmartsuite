@@ -43,17 +43,21 @@ export default function Settings() {
         throw new Error('Failed to fetch user profile');
       }
       return response.json();
-    },
-    onSuccess: (data) => {
-      setAccountInfo({
-        username: data.username,
-        firstName: data.firstName || '',
-        lastName: data.lastName || '',
-        email: data.email || '',
-      });
-      setProfilePicture(data.profilePicture || '');
     }
   });
+  
+  // Update account info when profile data changes
+  useEffect(() => {
+    if (profileQuery.data) {
+      setAccountInfo({
+        username: profileQuery.data.username,
+        firstName: profileQuery.data.firstName || '',
+        lastName: profileQuery.data.lastName || '',
+        email: profileQuery.data.email || '',
+      });
+      setProfilePicture(profileQuery.data.profilePicture || '');
+    }
+  }, [profileQuery.data]);
   
   // Query to check the connection status
   const connectionStatusQuery = useQuery({
@@ -139,9 +143,13 @@ export default function Settings() {
   const profileMutation = useMutation({
     mutationFn: async (data: AccountSettings) => {
       const res = await apiRequest("POST", "/api/user/profile", data);
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
       return res.json();
     },
     onSuccess: (data) => {
+      // Update local state
       setAccountInfo({
         username: data.user.username,
         firstName: data.user.firstName || '',
@@ -149,12 +157,16 @@ export default function Settings() {
         email: data.user.email || '',
       });
       
+      // Force refetch profile data
+      profileQuery.refetch();
+      
       toast({
         title: "Profile Updated",
         description: "Your account details have been successfully updated.",
       });
     },
     onError: (error) => {
+      console.error("Profile update error:", error);
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update your profile.",
@@ -181,13 +193,21 @@ export default function Settings() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Set the profile picture path directly - our enhanced avatar component handles caching
       setProfilePicture(data.profilePicture);
+      
+      // Also force refetch to ensure UI is consistent
+      profileQuery.refetch();
+      
+      console.log("Profile picture updated:", data.profilePicture);
+      
       toast({
         title: "Profile Picture Updated",
         description: "Your profile picture has been successfully updated.",
       });
     },
     onError: (error) => {
+      console.error("Profile picture upload error:", error);
       toast({
         title: "Upload Failed",
         description: error.message || "Failed to upload profile picture.",
@@ -641,21 +661,14 @@ export default function Settings() {
                     <div className="relative">
                       <Avatar className="w-32 h-32 cursor-pointer" onClick={handleProfilePictureClick}>
                         {profilePicture ? (
-                          <>
-                            <AvatarImage 
-                              src={`${profilePicture}?v=${Date.now()}`} 
-                              alt="Profile" 
-                              onError={() => console.error("Failed to load image:", profilePicture)} 
-                            />
-                            {console.log("Rendering profile picture with cache busting:", `${profilePicture}?v=${Date.now()}`)}
-                          </>
+                          <AvatarImage 
+                            src={profilePicture} 
+                            alt="Profile"
+                          />
                         ) : (
-                          <>
-                            <AvatarFallback className="text-3xl bg-primary/10">
-                              {accountInfo.firstName?.charAt(0) || accountInfo.username.charAt(0)}
-                            </AvatarFallback>
-                            {console.log("Using fallback, no profile picture available")}
-                          </>
+                          <AvatarFallback className="text-3xl bg-primary/10">
+                            {accountInfo.firstName?.charAt(0) || accountInfo.username.charAt(0)}
+                          </AvatarFallback>
                         )}
                       </Avatar>
                       <div 

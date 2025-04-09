@@ -124,15 +124,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/user/profile", asyncHandler(async (req, res) => {
     // In a real app, we'd get the user ID from the session or token
     const userId = 1;
-    const { firstName, lastName, email } = req.body as AccountSettings;
+    let { firstName, lastName, email } = req.body as AccountSettings;
     
-    console.log("Updating user profile with data:", JSON.stringify({ firstName, lastName, email }));
+    console.log("Updating user profile with raw data:", JSON.stringify({ firstName, lastName, email }));
+    
+    // Prevent empty strings, maintain existing values if not provided
+    const existingUser = await storage.getUser(userId);
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Use existing values if fields are empty
+    firstName = firstName?.trim() || existingUser.firstName || '';
+    lastName = lastName?.trim() || existingUser.lastName || '';
+    email = email?.trim() || existingUser.email || '';
+    
+    console.log("Updating user profile with validated data:", JSON.stringify({ firstName, lastName, email }));
     
     // For password change, we'd need additional validation and hashing
     
     const updatedUser = await storage.updateUser(userId, {
       firstName,
-      lastName,
+      lastName, 
       email
     });
     

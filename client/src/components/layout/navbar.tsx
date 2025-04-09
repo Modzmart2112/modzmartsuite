@@ -333,9 +333,8 @@ export default function Navbar() {
                       <Avatar>
                         {userData?.profilePicture ? (
                           <AvatarImage 
-                            src={`${userData.profilePicture}?v=${Date.now()}`} 
+                            src={userData.profilePicture} 
                             alt={userData.firstName || 'User'} 
-                            onError={() => console.error("Failed to load mobile menu profile image:", userData.profilePicture)}
                           />
                         ) : (
                           <AvatarFallback>
@@ -676,9 +675,8 @@ export default function Navbar() {
                   <Avatar>
                     {userData?.profilePicture ? (
                       <AvatarImage 
-                        src={`${userData.profilePicture}?v=${Date.now()}`} 
+                        src={userData.profilePicture} 
                         alt={userData.firstName || 'User'} 
-                        onError={() => console.error("Failed to load navbar profile image:", userData.profilePicture)}
                       />
                     ) : (
                       <AvatarFallback>
