@@ -207,7 +207,7 @@ export default function LoginPage() {
               </Form>
 
               <div className="mt-6 text-center text-xs text-gray-500">
-                <p>Use admin/admin for demo access</p>
+                <p>Secure Management Platform</p>
               </div>
             </div>
             

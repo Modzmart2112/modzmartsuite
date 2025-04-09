@@ -31,9 +31,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // For demo purposes, we'll accept specific credentials
-    // In a real application, you'd validate against your backend
-    if (username === 'admin' && password === 'admin') {
+    // For security purposes, we'll accept specific credentials
+    // In a real application, you'd validate against your backend with proper hashing
+    if (username === 'Admin' && password === 'Ttiinnyy1') {
       setIsAuthenticated(true);
       const userData = { username };
       setUser(userData);
