@@ -2229,8 +2229,16 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
       console.log(`Current price in database: ${product.shopifyPrice}`);
       console.log(`Shopify ID: ${product.shopifyId}`);
       
-      // Set the correct price (original value)
+      // Set the correct price (FIXED VALUE - ALWAYS USE 14.95)
       const correctPrice = 14.95;
+      
+      console.log(`IMPORTANT: Setting price to fixed value $${correctPrice}`);
+      // Check if it's already correct to help diagnose issues
+      if (product.shopifyPrice !== correctPrice) {
+        console.log(`WARNING: Current price ${product.shopifyPrice} doesn't match correct price ${correctPrice}!`);
+      } else {
+        console.log(`Current price ${product.shopifyPrice} already matches correct price ${correctPrice}`);
+      }
       
       // Update the product price in our database
       await storage.updateProduct(product.id, {

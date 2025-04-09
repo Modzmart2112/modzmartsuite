@@ -262,4 +262,62 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
 }
 
 // Create a singleton instance
+/**
+ * Special job that periodically checks and fixes the price for product SIL-RP-016
+ * This ensures the price always remains at $14.95 both in our database and Shopify
+ */
+export async function fixSilRp016Price(): Promise<void> {
+  try {
+    // Get the product
+    const product = await storage.getProductBySku('SIL-RP-016');
+    if (!product) {
+      log(`Special product SIL-RP-016 not found in database`, 'price-fixer');
+      return;
+    }
+    
+    // Check if price is correct
+    const correctPrice = 14.95;
+    
+    if (product.shopifyPrice !== correctPrice) {
+      log(`Found incorrect price for SIL-RP-016: ${product.shopifyPrice} instead of ${correctPrice}. Fixing...`, 'price-fixer');
+      
+      // 1. Update our database
+      await storage.updateProduct(product.id, {
+        shopifyPrice: correctPrice,
+        onSale: false,
+        originalPrice: null,
+        saleEndDate: null,
+        saleId: null
+      });
+      
+      log(`Updated database price for SIL-RP-016 to ${correctPrice}`, 'price-fixer');
+      
+      // 2. Update Shopify if we have credentials
+      const user = await storage.getUser(1); // Using first user for Shopify credentials
+      
+      if (user?.shopifyApiKey && user?.shopifyApiSecret && user?.shopifyStoreUrl) {
+        try {
+          log(`Updating Shopify price for SIL-RP-016 (variant ${product.shopifyId})`, 'price-fixer');
+          
+          await shopifyClient.updateProductPrice(
+            product.shopifyId,
+            correctPrice,
+            null // Set compare-at-price to null to clear any sale indicators
+          );
+          
+          log(`Successfully updated Shopify price for SIL-RP-016`, 'price-fixer');
+        } catch (error) {
+          log(`Error updating Shopify price for SIL-RP-016: ${error}`, 'price-fixer');
+        }
+      } else {
+        log(`Cannot update Shopify price for SIL-RP-016: Missing Shopify credentials`, 'price-fixer');
+      }
+    } else {
+      log(`SIL-RP-016 price is correct: ${product.shopifyPrice}`, 'price-fixer');
+    }
+  } catch (error) {
+    log(`Error in SIL-RP-016 price fix: ${error}`, 'price-fixer');
+  }
+}
+
 export const scheduler = new Scheduler();

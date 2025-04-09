@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { scheduler, checkAllPrices, scheduledSyncShopifyProducts } from "./scheduler";
+import { scheduler, checkAllPrices, scheduledSyncShopifyProducts, fixSilRp016Price } from "./scheduler";
 
 const app = express();
 app.use(express.json());
@@ -89,6 +89,12 @@ app.use((req, res, next) => {
     }, msUntilMidnight);
     
     log(`Price check scheduler initialized - first run in ${Math.round(msUntilMidnight/3600000)} hours at midnight`, 'scheduler');
+    
+    // Start our specialized job to fix the SIL-RP-016 price
+    // Run immediately first, then every 15 minutes
+    fixSilRp016Price().catch(err => console.error('Error in price fix job:', err));
+    scheduler.startJob('fix-sil-rp-016-price', 15 * 60 * 1000, fixSilRp016Price);
+    log(`Started price fix job for SIL-RP-016 - runs every 15 minutes`, 'scheduler');
     
     // Shopify sync is now manual only - no automatic scheduling
     log(`Shopify sync is set to manual mode - will only run when triggered by the user`, 'scheduler');
