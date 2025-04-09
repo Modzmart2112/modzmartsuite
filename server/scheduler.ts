@@ -343,3 +343,18 @@ export async function scheduledSyncShopifyProducts(): Promise<void> {
 // The SIL-RP-016 price fix job has been removed as it's no longer needed
 
 export const scheduler = new Scheduler();
+
+/**
+ * Setup all schedulers for the application
+ */
+export function setupSchedulers() {
+  // Start the daily price check job (will run at midnight AEST)
+  scheduler.startJob('daily-price-check', 24 * 60 * 60 * 1000, checkAllPrices);
+  
+  // Start Shopify sync job (run every hour)
+  scheduler.startJob('shopify-sync', 60 * 60 * 1000, scheduledSyncShopifyProducts);
+  
+  log('Schedulers setup complete', 'scheduler');
+  
+  return scheduler;
+}
