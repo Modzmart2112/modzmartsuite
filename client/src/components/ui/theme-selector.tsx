@@ -152,21 +152,41 @@ export function ThemeSelector() {
   // Mutation to update the theme
   const themeMutation = useMutation({
     mutationFn: async (themeConfig: ThemePreset['config']) => {
-      const res = await apiRequest("POST", "/api/theme/update", themeConfig);
-      return res.json();
+      try {
+        const res = await fetch('/api/theme/update', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(themeConfig),
+        });
+        
+        if (!res.ok) {
+          throw new Error(`Failed to update theme: ${res.status}`);
+        }
+        
+        return await res.json();
+      } catch (err) {
+        console.error("Theme update error:", err);
+        throw err;
+      }
     },
     onSuccess: () => {
-      toast({
-        title: "Theme Updated",
-        description: "Your theme has been updated. Refresh the page to see all changes.",
-      });
-      
-      // Reload the page after a short delay to apply the new theme
-      setTimeout(() => {
+      // Prevent error popup by using a cleaner approach
+      const applyTheme = () => {
+        toast({
+          title: "Theme Updated",
+          description: "Your theme has been updated.",
+        });
+        
+        // Use a manual reload instead of setTimeout
         window.location.reload();
-      }, 1000);
+      };
+      
+      // Small delay to allow the toast to appear before reload
+      setTimeout(applyTheme, 500);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Update Failed",
         description: error.message || "Failed to update theme.",
@@ -177,7 +197,13 @@ export function ThemeSelector() {
 
   // Function to apply a theme preset
   const applyTheme = (preset: ThemePreset) => {
-    themeMutation.mutate(preset.config);
+    // Prevent multiple clicks and re-renders
+    if (themeMutation.isPending) return;
+    
+    // Add a small delay before mutation to prevent React re-render issues 
+    requestAnimationFrame(() => {
+      themeMutation.mutate(preset.config);
+    });
   };
 
   return (

@@ -1620,7 +1620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const timeBased = currentSyncLogs.length === 0 && syncProgress.startedAt
           ? shopifyLogs.filter(log => {
               const logDate = new Date(log.createdAt);
-              const syncStartDate = new Date(syncProgress.startedAt);
+              // Handle nullable startedAt by providing a fallback
+              const syncStartDate = syncProgress.startedAt ? new Date(syncProgress.startedAt) : new Date(0);
               const tenMinutesBeforeNow = new Date(Date.now() - 10 * 60 * 1000);
               
               // Make sure log is after sync started AND within the last 10 minutes
