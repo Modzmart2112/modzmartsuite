@@ -18,7 +18,7 @@ import { scrapePriceFromUrl } from "./scraper";
 import { sendTelegramNotification } from "./telegram";
 import { ZodError } from "zod";
 import multer from "multer";
-import fs from "fs";
+import * as fs from "fs";
 import path from "path";
 import os from "os";
 import { processCsvFile } from "./csv-handler";
@@ -46,6 +46,28 @@ const asyncHandler = (fn: (req: Request, res: Response) => Promise<any>) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Theme endpoint
+  app.post('/api/theme/update', asyncHandler(async (req, res) => {
+    const { primary, appearance, variant, radius } = req.body;
+    
+    try {
+      // Save the theme configuration to the theme.json file
+      const themeConfig = {
+        primary,
+        appearance,
+        variant,
+        radius
+      };
+      
+      fs.writeFileSync('theme.json', JSON.stringify(themeConfig, null, 2));
+      
+      res.json({ success: true, message: 'Theme updated successfully' });
+    } catch (error) {
+      console.error('Error updating theme:', error);
+      res.status(500).json({ success: false, message: 'Failed to update theme' });
+    }
+  }));
+  
   const upload = multer({ dest: os.tmpdir() });
   
   // API Routes

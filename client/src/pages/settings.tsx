@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ShopifyConnectionInfo, TelegramConnectionInfo } from "@shared/types";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { ThemeSelector } from "@/components/ui/theme-selector";
 
 export default function Settings() {
   const { toast } = useToast();
@@ -302,6 +303,21 @@ export default function Settings() {
         </TabsContent>
         
         <TabsContent value="preferences">
+          {/* Theme Preferences Card */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Theme Preferences</CardTitle>
+              <CardDescription>
+                Customize the appearance of the application.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Import the ThemeSelector component */}
+              <ThemeSelector />
+            </CardContent>
+          </Card>
+
+          {/* Notification Preferences Card */}
           <Card>
             <CardHeader>
               <CardTitle>Notification Preferences</CardTitle>
