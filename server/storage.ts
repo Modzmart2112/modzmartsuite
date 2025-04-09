@@ -1797,11 +1797,32 @@ export class DatabaseStorage implements IStorage {
 
   async applySaleCampaign(campaignId: number): Promise<number> {
     try {
+      console.log(`Starting to apply sale campaign ID ${campaignId}`);
       const campaign = await this.getSaleCampaignById(campaignId);
-      if (!campaign) return 0;
+      if (!campaign) {
+        console.log(`Campaign ${campaignId} not found`);
+        return 0;
+      }
       
+      console.log(`Processing campaign: "${campaign.name}" (ID: ${campaignId})`);
       const targets = await this.getSaleCampaignTargets(campaignId);
+      
+      console.log(`Found ${targets.length} targets for campaign ${campaignId}`);
       if (targets.length === 0) return 0;
+      
+      // Log all targets for debugging
+      for (const target of targets) {
+        console.log(`Target: type=${target.targetType}, value="${target.targetValue || ''}"`);
+      }
+      
+      // For debugging, get sample Shopify IDs from the database
+      try {
+        const sampleShopifyIds = await db.select({ id: products.id, sku: products.sku, shopifyId: products.shopifyId })
+          .from(products)
+          .limit(10);
+        console.log('Sample Shopify IDs from database for reference:', 
+          sampleShopifyIds.map(p => ({ id: p.id, sku: p.sku, shopifyId: p.shopifyId })));
+      }
       
       let affectedProductCount = 0;
       const now = new Date();
@@ -1810,39 +1831,150 @@ export class DatabaseStorage implements IStorage {
       for (const target of targets) {
         let targetProducts: Product[] = [];
         
+        console.log(`Processing target type: ${target.targetType}, value: "${target.targetValue || ''}"`);
+        
         if (target.targetType === 'sku') {
           // Single product by SKU
-          const product = await this.getProductBySku(target.targetValue);
-          if (product) targetProducts = [product];
+          console.log(`Looking for product with SKU: "${target.targetValue || ''}"`);
+          const sku = target.targetValue || '';
+          console.log(`Attempting to find product with SKU: "${sku}"`);
+          const product = await this.getProductBySku(sku);
+          if (product) {
+            targetProducts = [product];
+            console.log(`Found product with SKU ${target.targetValue}: ${product.title} (ID: ${product.id})`);
+          } else {
+            console.log(`No product found with SKU ${target.targetValue}`);
+          }
         } else if (target.targetType === 'vendor') {
           // All products by vendor
+          const vendorName = target.targetValue || '';
+          console.log(`Looking for products from vendor: "${vendorName}"`);
+          
+          // For debugging, log available vendors
+          try {
+            const allVendors = await db.selectDistinct({ vendor: products.vendor }).from(products);
+            console.log(`Available vendors (first 5): ${allVendors.slice(0, 5).map(v => v.vendor).join(', ')}`);
+          } catch (error) {
+            console.error('Error fetching vendors for debugging:', error);
+          }
+          
           targetProducts = await db.select()
             .from(products)
-            .where(eq(products.vendor, target.targetValue));
+            .where(eq(products.vendor, vendorName));
+          console.log(`Found ${targetProducts.length} products from vendor "${vendorName}"`);
+          
+          // If no products found, try case-insensitive search as a fallback
+          if (targetProducts.length === 0 && vendorName) {
+            console.log(`Trying case-insensitive search for vendor: "${vendorName}"`);
+            try {
+              targetProducts = await db.select()
+                .from(products)
+                .where(sql`LOWER(${products.vendor}) = LOWER(${vendorName})`);
+              console.log(`Found ${targetProducts.length} products with case-insensitive vendor match`);
+            } catch (error) {
+              console.error('Error during case-insensitive vendor search:', error);
+            }
+          }
         } else if (target.targetType === 'product_type') {
           // All products by product type
+          const productType = target.targetValue || '';
+          console.log(`Looking for products with type: "${productType}"`);
+          
+          // For debugging, log available product types
+          try {
+            const allProductTypes = await db.selectDistinct({ productType: products.productType }).from(products);
+            console.log(`Available product types (first 5): ${allProductTypes.slice(0, 5).map(p => p.productType).join(', ')}`);
+          } catch (error) {
+            console.error('Error fetching product types for debugging:', error);
+          }
+          
           targetProducts = await db.select()
             .from(products)
-            .where(eq(products.productType, target.targetValue));
+            .where(eq(products.productType, productType));
+          console.log(`Found ${targetProducts.length} products of type "${productType}"`);
+          
+          // If no products found, try case-insensitive search as a fallback
+          if (targetProducts.length === 0 && productType) {
+            console.log(`Trying case-insensitive search for product type: "${productType}"`);
+            try {
+              targetProducts = await db.select()
+                .from(products)
+                .where(sql`LOWER(${products.productType}) = LOWER(${productType})`);
+              console.log(`Found ${targetProducts.length} products with case-insensitive product type match`);
+            } catch (error) {
+              console.error('Error during case-insensitive product type search:', error);
+            }
+          }
         } else if (target.targetType === 'product') {
           // Product by Shopify Product ID
           try {
             // Make sure targetValue is a string
-            const shopifyId = target.targetValue;
+            const shopifyId = target.targetValue || '';
+            console.log(`Looking for product with Shopify ID: "${shopifyId}"`);
+            
             if (shopifyId) {
-              // Find products with matching Shopify ID
+              // For debugging, get all shopify IDs to see what we're dealing with
+              const allShopifyIds = await db.select({ id: products.id, sku: products.sku, shopifyId: products.shopifyId })
+                .from(products)
+                .limit(5);
+              console.log('First 5 Shopify IDs for reference:');
+              allShopifyIds.forEach(p => console.log(`- ID: ${p.id}, SKU: ${p.sku}, ShopifyID: "${p.shopifyId}"`));
+              
+              // Log the exact shopifyId we're looking for
+              console.log(`Searching for exact Shopify ID: "${shopifyId}" (length: ${shopifyId.length})`);
+              
+              // Find products with matching Shopify ID (exact match)
               targetProducts = await db.select()
                 .from(products)
                 .where(eq(products.shopifyId, shopifyId));
               
-              // Log for debugging
-              console.log(`Targeting product with Shopify ID ${shopifyId}, found ${targetProducts.length} products`);
+              if (targetProducts.length === 0) {
+                console.log(`No products found with exact Shopify ID match "${shopifyId}"`);
+                
+                // Try a more lenient approach as fallback only
+                try {
+                  // First, try with a trimmed version in case there are whitespace issues
+                  const trimmedId = shopifyId.trim();
+                  if (trimmedId !== shopifyId) {
+                    console.log(`Trying with trimmed Shopify ID: "${trimmedId}"`);
+                    targetProducts = await db.select()
+                      .from(products)
+                      .where(eq(products.shopifyId, trimmedId));
+                      
+                    if (targetProducts.length > 0) {
+                      console.log(`Found ${targetProducts.length} products with trimmed Shopify ID`);
+                    }
+                  }
+                  
+                  // If still no results, try with LIKE query
+                  if (targetProducts.length === 0) {
+                    console.log(`Trying partial match with LIKE query for Shopify ID: "%${shopifyId}%"`);
+                    const allProducts = await db.select()
+                      .from(products)
+                      .where(sql`${products.shopifyId} LIKE ${`%${shopifyId}%`}`)
+                      .limit(5);
+                    
+                    if (allProducts.length > 0) {
+                      console.log(`Found ${allProducts.length} products with partial Shopify ID match:`);
+                      allProducts.forEach(p => console.log(`- ID: ${p.id}, SKU: ${p.sku}, ShopifyID: "${p.shopifyId}" (length: ${p.shopifyId.length})`));
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error during shopify ID fuzzy search:', error);
+                }
+              } else {
+                console.log(`Found ${targetProducts.length} products with Shopify ID "${shopifyId}":`);
+                targetProducts.forEach(p => console.log(`- SKU: ${p.sku}, Title: "${p.title}", ID: ${p.id}, ShopifyID: "${p.shopifyId}"`));
+              }
+            } else {
+              console.log('No Shopify ID provided in target value');
             }
           } catch (error) {
             console.error(`Error targeting product with ID ${target.targetValue}:`, error);
           }
         } else if (target.targetType === 'tag') {
           // Handle tags if implemented
+          console.log(`Tag targeting not yet implemented: ${target.targetValue}`);
           continue;
         }
         

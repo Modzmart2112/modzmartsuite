@@ -2008,11 +2008,31 @@ Found ${productsWithCostPrice.length} products with cost price, total: ${product
         return res.status(404).json({ error: "Sale campaign not found" });
       }
       
+      console.log(`Starting to apply sale campaign ID ${campaignId} from API route`);
+      
+      // Get the targets before applying to log them for debugging
+      const targets = await storage.getSaleCampaignTargets(campaignId);
+      console.log(`Found ${targets.length} targets for campaign ${campaignId}:`);
+      targets.forEach(target => {
+        console.log(`Target: type=${target.targetType}, value=${target.targetValue}`);
+      });
+      
+      // Apply the campaign and get affected product count
       const affectedProductsCount = await storage.applySaleCampaign(campaignId);
+      
+      console.log(`Sale campaign ${campaignId} applied, affected ${affectedProductsCount} products`);
       
       res.json({ 
         success: true, 
-        affectedProductsCount 
+        affectedProductsCount,
+        debug: {
+          campaignId,
+          targetCount: targets.length,
+          targets: targets.map(t => ({ 
+            type: t.targetType, 
+            value: t.targetValue 
+          }))
+        }
       });
     } catch (error) {
       console.error(`Error applying sale campaign:`, error);

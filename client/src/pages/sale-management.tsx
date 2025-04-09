@@ -287,9 +287,65 @@ const SaleManagementPage: React.FC = () => {
       return;
     }
     
+    // If we're adding a product by SKU, we need to get its Shopify ID first
+    if (newTarget.targetType === 'sku' && newTarget.targetValue) {
+      // First, fetch the product details to get its Shopify ID
+      const fetchProductDetails = async () => {
+        try {
+          // Get the product by SKU
+          const productResponse = await fetch(`/api/products?search=${encodeURIComponent(newTarget.targetValue)}`);
+          const productData = await productResponse.json();
+          
+          if (productData.products && productData.products.length > 0) {
+            const product = productData.products[0];
+            
+            // Ensure we have a valid Shopify ID
+            if (product.shopifyId) {
+              console.log(`Found product with SKU ${newTarget.targetValue}, using Shopify ID: ${product.shopifyId}`);
+              
+              // Create target with product type and Shopify ID
+              const targetData = {
+                targetType: 'product', // Override to product type for Shopify ID targeting
+                targetId: null,
+                targetValue: product.shopifyId.toString() // Use Shopify ID as targetValue
+              };
+              
+              addTargetMutation.mutate({ 
+                campaignId: selectedCampaign.id, 
+                targetData 
+              });
+            } else {
+              toast({
+                title: "Missing Shopify ID",
+                description: `The product with SKU ${newTarget.targetValue} does not have a Shopify ID.`,
+                variant: "destructive"
+              });
+            }
+          } else {
+            toast({
+              title: "Product Not Found",
+              description: `No product found with SKU ${newTarget.targetValue}`,
+              variant: "destructive"
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching product details:", error);
+          toast({
+            title: "Error",
+            description: "Failed to fetch product details",
+            variant: "destructive"
+          });
+        }
+      };
+      
+      fetchProductDetails();
+      return; // Don't proceed to normal submission
+    }
+    
+    // For non-SKU targets, use the normal approach
     const targetData = {
       targetType: newTarget.targetType,
-      targetId: null, // Not used anymore - using targetValue for Shopify ID
+      targetId: null,
       targetValue: newTarget.targetValue, // Store the value for all target types
     };
     
@@ -405,6 +461,8 @@ const SaleManagementPage: React.FC = () => {
                   targetId: null,
                   targetValue: product.shopifyId.toString() // Use Shopify ID as targetValue
                 };
+                // Log the targeting information to help with debugging
+                console.log(`Adding target for Shopify ID: ${product.shopifyId} (Product: ${product.title})`);
                 return apiRequest('POST', `/api/sales/campaigns/${newCampaignId}/targets`, targetData);
               });
             }
