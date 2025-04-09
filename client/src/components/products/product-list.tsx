@@ -336,15 +336,15 @@ export function ProductList({
               <ProductFilter onFilterChange={handleFilterChange} />
             </div>
             
-            <div className="flex items-center w-full max-w-3xl mx-auto">
-              <div className="relative flex-1 mr-2">
+            <div className="flex items-center w-full mx-auto mb-4">
+              <div className="relative flex-1 mr-3">
                 <Input
                   placeholder="Search products by SKU or title across all pages..."
                   value={searchQuery}
                   onChange={handleSearchChange}
-                  className="pl-10 h-12"
+                  className="pl-10 h-12 text-base shadow-sm border-2 focus-visible:ring-2 focus-visible:ring-offset-1"
                 />
-                <Search className="absolute left-3 top-4 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-4 h-5 w-5 text-gray-500" />
               </div>
               
               <Button 
@@ -352,7 +352,7 @@ export function ProductList({
                 onClick={() => {
                   refetch();
                 }}
-                className="flex items-center gap-1 h-12 px-4"
+                className="flex items-center gap-2 h-12 px-5 font-medium shadow-sm border-2"
               >
                 <RefreshCw className="h-4 w-4" />
                 Refresh
