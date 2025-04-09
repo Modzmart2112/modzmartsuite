@@ -63,7 +63,7 @@ export function RecentActivityCard() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-4">
         {isLoading ? (
           <div className="space-y-4">
             {Array(5).fill(0).map((_, index) => (
