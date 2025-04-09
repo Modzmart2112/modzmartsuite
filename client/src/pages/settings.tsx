@@ -641,11 +641,17 @@ export default function Settings() {
                     <div className="relative">
                       <Avatar className="w-32 h-32 cursor-pointer" onClick={handleProfilePictureClick}>
                         {profilePicture ? (
-                          <AvatarImage src={profilePicture} alt="Profile" />
+                          <>
+                            <AvatarImage src={profilePicture} alt="Profile" onError={() => console.error("Failed to load image:", profilePicture)} />
+                            {console.log("Rendering profile picture:", profilePicture)}
+                          </>
                         ) : (
-                          <AvatarFallback className="text-3xl bg-primary/10">
-                            {accountInfo.firstName?.charAt(0) || accountInfo.username.charAt(0)}
-                          </AvatarFallback>
+                          <>
+                            <AvatarFallback className="text-3xl bg-primary/10">
+                              {accountInfo.firstName?.charAt(0) || accountInfo.username.charAt(0)}
+                            </AvatarFallback>
+                            {console.log("Using fallback, no profile picture available")}
+                          </>
                         )}
                       </Avatar>
                       <div 

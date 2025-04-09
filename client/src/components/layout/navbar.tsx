@@ -86,6 +86,18 @@ export default function Navbar() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  
+  // Add user profile query
+  const { data: userData } = useQuery({
+    queryKey: ['/api/user/profile'],
+    queryFn: async () => {
+      const res = await fetch('/api/user/profile');
+      if (!res.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      return res.json();
+    }
+  });
   const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -319,12 +331,19 @@ export default function Navbar() {
                   <div className="absolute bottom-0 left-0 right-0 border-t border-gray-200 py-4 px-6">
                     <div className="flex items-center">
                       <Avatar>
-                        <AvatarImage src="https://github.com/shadcn.png" alt="User" />
-                        <AvatarFallback>JD</AvatarFallback>
+                        {userData?.profilePicture ? (
+                          <AvatarImage src={userData.profilePicture} alt={userData.firstName || 'User'} />
+                        ) : (
+                          <AvatarFallback>
+                            {userData?.firstName?.charAt(0) || userData?.username?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        )}
                       </Avatar>
                       <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">John Doe</p>
-                        <p className="text-xs text-gray-500">admin@modz-mart.com</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {userData ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.username : 'Loading...'}
+                        </p>
+                        <p className="text-xs text-gray-500">{userData?.email || 'admin@example.com'}</p>
                       </div>
                       <div className="ml-auto">
                         <Button 
@@ -651,10 +670,21 @@ export default function Navbar() {
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center">
                   <Avatar>
-                    <AvatarImage src="https://github.com/shadcn.png" alt="User" />
-                    <AvatarFallback>JD</AvatarFallback>
+                    {userData?.profilePicture ? (
+                      <AvatarImage 
+                        src={userData.profilePicture} 
+                        alt={userData.firstName || 'User'} 
+                        onError={() => console.error("Failed to load navbar profile image:", userData.profilePicture)}
+                      />
+                    ) : (
+                      <AvatarFallback>
+                        {userData?.firstName?.charAt(0) || userData?.username?.charAt(0) || 'U'}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
-                  <span className="ml-2 hidden md:block">John Doe</span>
+                  <span className="ml-2 hidden md:block">
+                    {userData ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.username : 'Loading...'}
+                  </span>
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1 hidden md:block" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
@@ -662,8 +692,10 @@ export default function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">John Doe</p>
-                  <p className="text-xs text-gray-500">admin@modz-mart.com</p>
+                  <p className="text-sm font-medium">
+                    {userData ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.username : 'Loading...'}
+                  </p>
+                  <p className="text-xs text-gray-500">{userData?.email || 'admin@example.com'}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Shopify Store</DropdownMenuLabel>
