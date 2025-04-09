@@ -11,7 +11,7 @@ import {
 } from "@shared/schema";
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
-import { eq, desc, and, asc, isNotNull, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, asc, isNotNull, sql, inArray, type SQL } from "drizzle-orm";
 
 // Define the storage interface
 export interface IStorage {
@@ -909,7 +909,7 @@ export class DatabaseStorage implements IStorage {
 
   // Helper method to exclude products with placeholder local IDs
   private buildExcludeLocalIdsCondition(): string {
-    return "shopify_id IS NOT NULL AND shopify_id NOT LIKE 'local-%'";
+    return "shopify_id NOT LIKE 'local-%'";
   }
 
   // Product operations
@@ -1000,10 +1000,7 @@ export class DatabaseStorage implements IStorage {
     })
     .from(products)
     .where(
-      and(
-        isNotNull(products.shopifyId),
-        sql`${products.shopifyId} NOT LIKE 'local-%'`
-      )
+      sql`${products.shopifyId} NOT LIKE 'local-%'`
     );
     return Number(result[0].count);
   }
@@ -1779,7 +1776,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(products.hasPriceDiscrepancy, true),
         isNotNull(products.supplierPrice),
-        sql`${this.buildExcludeLocalIdsCondition()}`
+        sql`${products.shopifyId} NOT LIKE 'local-%'`
       ));
     
     for (const product of discrepancyProducts) {
@@ -1814,7 +1811,7 @@ export class DatabaseStorage implements IStorage {
         .from(products)
         .where(and(
           eq(products.hasPriceDiscrepancy, true),
-          sql`${this.buildExcludeLocalIdsCondition()}`
+          sql`${products.shopifyId} NOT LIKE 'local-%'`
         ));
         
       const discrepancyIds = discrepancyProducts.map(p => p.id);
@@ -1833,7 +1830,7 @@ export class DatabaseStorage implements IStorage {
         })
         .where(and(
           eq(products.hasPriceDiscrepancy, true),
-          sql`${this.buildExcludeLocalIdsCondition()}`
+          sql`${products.shopifyId} NOT LIKE 'local-%'`
         ))
         .returning({ id: products.id });
       
@@ -2197,7 +2194,7 @@ export class DatabaseStorage implements IStorage {
           and(
             eq(products.onSale, true),
             eq(products.saleId, campaignId),
-            sql`${this.buildExcludeLocalIdsCondition()}`
+            sql`${products.shopifyId} NOT LIKE 'local-%'`
           )
         );
       
