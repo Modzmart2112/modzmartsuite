@@ -18,7 +18,8 @@ export default function Settings() {
   const [profilePicture, setProfilePicture] = useState<string>("");
   const [accountInfo, setAccountInfo] = useState<AccountSettings>({
     username: "admin",
-    displayName: "Administrator",
+    firstName: "",
+    lastName: "",
     email: "",
   });
   const [shopifyInfo, setShopifyInfo] = useState<ShopifyConnectionInfo>({
@@ -46,7 +47,8 @@ export default function Settings() {
     onSuccess: (data) => {
       setAccountInfo({
         username: data.username,
-        displayName: data.displayName || data.username,
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
         email: data.email || '',
       });
       setProfilePicture(data.profilePicture || '');
@@ -142,7 +144,8 @@ export default function Settings() {
     onSuccess: (data) => {
       setAccountInfo({
         username: data.user.username,
-        displayName: data.user.displayName,
+        firstName: data.user.firstName || '',
+        lastName: data.user.lastName || '',
         email: data.user.email || '',
       });
       
@@ -641,7 +644,7 @@ export default function Settings() {
                           <AvatarImage src={profilePicture} alt="Profile" />
                         ) : (
                           <AvatarFallback className="text-3xl bg-primary/10">
-                            {accountInfo.displayName?.charAt(0) || accountInfo.username.charAt(0)}
+                            {accountInfo.firstName?.charAt(0) || accountInfo.username.charAt(0)}
                           </AvatarFallback>
                         )}
                       </Avatar>
@@ -697,11 +700,22 @@ export default function Settings() {
                     </div>
                     
                     <div>
-                      <Label htmlFor="displayName">Display Name</Label>
+                      <Label htmlFor="firstName">First Name</Label>
                       <Input
-                        id="displayName"
-                        name="displayName"
-                        value={accountInfo.displayName || ''}
+                        id="firstName"
+                        name="firstName"
+                        value={accountInfo.firstName || ''}
+                        onChange={handleAccountChange}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        name="lastName"
+                        value={accountInfo.lastName || ''}
                         onChange={handleAccountChange}
                         className="mt-1"
                       />
@@ -774,7 +788,8 @@ export default function Settings() {
                       if (profileQuery.data) {
                         setAccountInfo({
                           username: profileQuery.data.username,
-                          displayName: profileQuery.data.displayName || profileQuery.data.username,
+                          firstName: profileQuery.data.firstName || '',
+                          lastName: profileQuery.data.lastName || '',
                           email: profileQuery.data.email || '',
                         });
                       }

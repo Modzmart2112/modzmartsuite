@@ -7,7 +7,11 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  // Old field, keeping for compatibility but will phase out
   displayName: text("display_name"),
+  // New fields to replace displayName
+  firstName: text("first_name"),
+  lastName: text("last_name"),
   email: text("email"),
   profilePicture: text("profile_picture"),
   telegramChatId: text("telegram_chat_id"),

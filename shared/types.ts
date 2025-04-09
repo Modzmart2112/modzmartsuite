@@ -101,5 +101,6 @@ export interface AccountSettings {
   newPassword?: string;
   confirmPassword?: string;
   email?: string;
-  displayName?: string;
+  firstName?: string;
+  lastName?: string;
 }

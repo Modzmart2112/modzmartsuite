@@ -111,7 +111,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       id: user.id,
       username: user.username,
-      displayName: user.displayName || user.username,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
       email: user.email || '',
       profilePicture: user.profilePicture || ''
     });
@@ -121,12 +122,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/user/profile", asyncHandler(async (req, res) => {
     // In a real app, we'd get the user ID from the session or token
     const userId = 1;
-    const { displayName, email } = req.body as AccountSettings;
+    const { firstName, lastName, email } = req.body as AccountSettings;
     
     // For password change, we'd need additional validation and hashing
     
     const updatedUser = await storage.updateUser(userId, {
-      displayName,
+      firstName,
+      lastName,
       email
     });
     
@@ -139,7 +141,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       user: {
         id: updatedUser.id,
         username: updatedUser.username,
-        displayName: updatedUser.displayName || updatedUser.username,
+        firstName: updatedUser.firstName || '',
+        lastName: updatedUser.lastName || '',
         email: updatedUser.email || '',
         profilePicture: updatedUser.profilePicture || ''
       }
