@@ -69,12 +69,13 @@ export default function LoginPage() {
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-black">
-      {/* Dark Background with Diagonal Split */}
+      {/* Background Image */}
       <div 
         className="absolute inset-0 z-0" 
         style={{ 
-          background: "linear-gradient(135deg, #121212 60%, #0a0a0a 60%)",
+          backgroundImage: "url('/modz-bg-2.png')",
           backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       />
       
