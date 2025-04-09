@@ -10,8 +10,8 @@ import { toast } from "@/hooks/use-toast";
 import { EyeIcon, EyeOffIcon, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "@/lib/authContext";
 
-// Import background image directly
-import backgroundImage from "@assets/MODZ.png";
+// Define the background path directly
+const backgroundImage = "/assets/MODZ-new.png";
 
 // Form validation schema
 const loginSchema = z.object({
