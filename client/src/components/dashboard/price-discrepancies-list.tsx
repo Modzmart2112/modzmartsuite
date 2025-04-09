@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { AlertTriangle, Trash2, RefreshCw, ArrowRight, Redo } from "lucide-react";
+import { AlertTriangle, Trash2, RefreshCw, ArrowRight, Redo, AlertCircle, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import type { PriceDiscrepancy } from "@shared/types";
+import { cn } from "@/lib/utils";
 
 export function PriceDiscrepancyList() {
   const { toast } = useToast();
@@ -207,39 +208,61 @@ export function PriceDiscrepancyList() {
   
   return (
     <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-yellow-500" />
-            <CardTitle>Price Discrepancies</CardTitle>
+      <CardHeader className="pb-2 bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/50 dark:to-slate-950/50 border-b">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />
+            <CardTitle className="text-lg">Price Discrepancies</CardTitle>
           </div>
-          {discrepancies.length > 0 && (
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1 text-sm font-medium" 
-                onClick={() => handleReCheckAll()}
-                disabled={reCheckAllMutation.isPending}
-              >
-                <Redo size={14} />
-                Re-check Discrepancies
-                {reCheckAllMutation.isPending && "..."}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-1 text-sm font-medium" 
-                onClick={() => clearAllDiscrepanciesMutation.mutate()}
-                disabled={clearAllDiscrepanciesMutation.isPending}
-              >
-                <Trash2 size={14} />
-                Clear All
-                {clearAllDiscrepanciesMutation.isPending && "..."}
-              </Button>
-            </div>
-          )}
+          
+          {/* Status Badge */}
+          <Badge 
+            variant={discrepancies.length > 0 ? "default" : "outline"}
+            className={cn(
+              "ml-2 px-2 py-0.5",
+              discrepancies.length > 0 ? "bg-yellow-500 hover:bg-yellow-500/90" : "border-green-500 text-green-600 dark:text-green-500"
+            )}
+          >
+            {discrepancies.length > 0 ? (
+              <div className="flex items-center">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                <span>{discrepancies.length} Issues</span>
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                <span>All Prices Aligned</span>
+              </div>
+            )}
+          </Badge>
         </div>
+        
+        {discrepancies.length > 0 && (
+          <div className="flex items-center space-x-2 mt-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1 text-xs font-medium" 
+              onClick={() => handleReCheckAll()}
+              disabled={reCheckAllMutation.isPending}
+            >
+              <Redo size={12} />
+              Re-check All
+              {reCheckAllMutation.isPending && "..."}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1 text-xs font-medium" 
+              onClick={() => clearAllDiscrepanciesMutation.mutate()}
+              disabled={clearAllDiscrepanciesMutation.isPending}
+            >
+              <Trash2 size={12} />
+              Clear All
+              {clearAllDiscrepanciesMutation.isPending && "..."}
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
