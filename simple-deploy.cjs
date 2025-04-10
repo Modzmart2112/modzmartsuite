@@ -57,15 +57,13 @@ async function requestShopify(endpoint, method = 'GET', data = null) {
     // Use the URL without embedding credentials
     const url = `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2022-10/${endpoint}`;
     
-    // Create a basic auth string from the API key and password
-    const authString = Buffer.from(`${process.env.SHOPIFY_API_KEY}:${process.env.SHOPIFY_API_SECRET}`).toString('base64');
-    
+    // Use X-Shopify-Access-Token header for authentication, consistent with our main API code
     const options = {
       method,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Authorization': `Basic ${authString}`
+        'X-Shopify-Access-Token': process.env.SHOPIFY_API_SECRET
       }
     };
     
