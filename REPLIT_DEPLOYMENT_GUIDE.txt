@@ -19,7 +19,7 @@ Make sure you have these secrets set in your Replit environment:
    
    node replit-deploy.cjs
 
-2. Once this is running successfully, click the \"Deploy\" button in your Replit interface.
+2. Once this is running successfully, click the "Deploy" button in your Replit interface.
 
 3. Replit will use the deployment script to:
    - Verify your Shopify credentials
@@ -50,9 +50,9 @@ If you encounter any issues with the automated deployment, you can try these man
 
 --- 401 Unauthorized errors with Shopify ---
 
-This is usually caused by credential confusion. The application expects the access token in SHOPIFY_API_SECRET but sometimes it is stored in SHOPIFY_ACCESS_TOKEN.
+This is usually caused by credential confusion. The application expects the access token in SHOPIFY_API_SECRET but sometimes it's stored in SHOPIFY_ACCESS_TOKEN.
 
-Our fixed deployment script handles this automatically, but if you are deploying manually, make sure:
+Our fixed deployment script handles this automatically, but if you're deploying manually, make sure:
 
 SHOPIFY_API_SECRET = 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
 

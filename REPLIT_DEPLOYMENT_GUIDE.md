@@ -1,0 +1,80 @@
+# DEPLOYMENT GUIDE FOR REPLIT
+
+This guide provides simple instructions for deploying your Shopify Integration application on Replit.
+
+## Prerequisites
+
+Make sure you have these secrets set in your Replit environment:
+
+1. **DATABASE_URL** - Connection string for the PostgreSQL database
+2. **SHOPIFY_API_KEY** - Your Shopify API key
+3. **SHOPIFY_ACCESS_TOKEN** - Your Shopify access token (starts with shpat_)
+4. **SHOPIFY_STORE_URL** - Your myshopify.com URL
+
+## Deployment Steps
+
+### Method 1: Replit Production Deploy (Recommended)
+
+1. Run the fixed deployment script:
+   ```
+   node replit-deploy.cjs
+   ```
+
+2. Once this is running successfully, click the "Deploy" button in your Replit interface.
+
+3. Replit will use the deployment script to:
+   - Verify your Shopify credentials
+   - Check/fix database schema issues
+   - Start the application with proper health checks
+
+### Method 2: Manual Deployment
+
+If you encounter any issues with the automated deployment, you can try these manual steps:
+
+1. Verify your database connection:
+   ```
+   node check-db.js
+   ```
+
+2. Verify Shopify credentials:
+   ```
+   node auth-test.js
+   ```
+
+3. Fix any schema issues:
+   ```
+   node fix-database-on-replit.cjs
+   ```
+
+4. Deploy the application:
+   ```
+   node index.js
+   ```
+
+## Troubleshooting
+
+### 401 Unauthorized errors with Shopify
+
+This is usually caused by credential confusion. The application expects the access token in `SHOPIFY_API_SECRET` but sometimes it's stored in `SHOPIFY_ACCESS_TOKEN`.
+
+Our fixed deployment script handles this automatically, but if you're deploying manually, make sure:
+```
+SHOPIFY_API_SECRET = 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
+```
+
+### Missing sync_id column error
+
+This happens when the database schema is missing the `sync_id` column in the `shopify_logs` table. Fix it with:
+```sql
+ALTER TABLE shopify_logs ADD COLUMN sync_id INTEGER;
+```
+
+Our deployment scripts handle this automatically.
+
+### ESM vs CommonJS import errors
+
+If you see errors about `require()` not being defined or issues with ES modules, use the `.cjs` extension for scripts instead of `.js`. Our deployment scripts are already configured correctly.
+
+## Support
+
+If you encounter any issues during deployment, please contact the development team for assistance.
