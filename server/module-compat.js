@@ -1,43 +1,42 @@
 /**
  * Module Compatibility Helper
  * 
- * This module provides compatibility helpers for mixing ES Modules and CommonJS code.
- * Import this in any file that needs to use both module systems.
+ * This file provides compatibility functions for working with both
+ * ES Modules and CommonJS code in the same project.
  */
 
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
-// Create a require function that works within ES modules
-export const compatRequire = createRequire(import.meta.url);
+// Create a require function that can be used in ES modules
+export const moduleRequire = createRequire(import.meta.url);
 
-// Helper function to dynamically import a module in either format
-export async function dynamicImport(modulePath) {
-  try {
-    // Try ES module import first
-    return await import(modulePath);
-  } catch (esError) {
-    try {
-      // Fall back to CommonJS require if ES import fails
-      return compatRequire(modulePath);
-    } catch (cjsError) {
-      throw new Error(
-        `Failed to import module '${modulePath}': ` +
-        `ES Module error: ${esError.message}, ` +
-        `CommonJS error: ${cjsError.message}`
-      );
-    }
+// Create __filename and __dirname for ES modules
+export const __filename = fileURLToPath(import.meta.url);
+export const __dirname = path.dirname(__filename);
+
+// Export to global scope for legacy code
+if (typeof global !== 'undefined') {
+  // Only set require in global scope if it doesn't exist
+  if (!global.require) {
+    global.require = moduleRequire;
+  }
+  
+  // Set __filename and __dirname if they don't exist
+  if (!global.__filename) {
+    global.__filename = __filename;
+  }
+  
+  if (!global.__dirname) {
+    global.__dirname = __dirname;
   }
 }
 
-// Check if we're in production mode
-export const isProduction = process.env.NODE_ENV === 'production';
-
-// A safe require that falls back to null if module not found
-export function safeRequire(modulePath) {
-  try {
-    return compatRequire(modulePath);
-  } catch (error) {
-    console.warn(`Warning: Failed to require '${modulePath}': ${error.message}`);
-    return null;
+// Helper to handle both types of exports
+export function normalizeExports(module) {
+  if (module && module.default) {
+    return module.default;
   }
+  return module;
 }
