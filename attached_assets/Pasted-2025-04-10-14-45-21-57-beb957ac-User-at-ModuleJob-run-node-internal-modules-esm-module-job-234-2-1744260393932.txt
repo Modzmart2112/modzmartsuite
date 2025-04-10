@@ -1,0 +1,177 @@
+2025-04-10 14:45:21.57
+beb957ac
+User
+at ModuleJob.run (node:internal/modules/esm/module_job:234:25)
+2025-04-10 14:45:21.57
+beb957ac
+User
+at async ModuleLoader.import (node:internal/modules/esm/loader:473:24)
+2025-04-10 14:45:21.57
+beb957ac
+User
+at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:122:5)
+2025-04-10 14:45:21.57
+beb957ac
+User
+2025-04-10 14:45:21.57
+beb957ac
+User
+Node.js v20.18.1
+2025-04-10 14:45:21.58
+beb957ac
+System
+command finished with error [sh -c node deploy.js]: exit status 1
+2025-04-10 14:45:27.26
+beb957ac
+User
+file:///home/runner/workspace/deploy.js:19
+2025-04-10 14:45:27.26
+beb957ac
+User
+require('./index.js');
+2025-04-10 14:45:27.26
+beb957ac
+User
+^
+2025-04-10 14:45:27.26
+beb957ac
+User
+2025-04-10 14:45:27.26
+beb957ac
+User
+ReferenceError: require is not defined in ES module scope, you can use import instead
+2025-04-10 14:45:27.26
+beb957ac
+User
+This file is being treated as an ES module because it has a '.js' file extension and '/home/runner/workspace/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+2025-04-10 14:45:27.26
+beb957ac
+User
+at file:///home/runner/workspace/deploy.js:19:1
+2025-04-10 14:45:27.26
+beb957ac
+User
+at ModuleJob.run (node:internal/modules/esm/module_job:234:25)
+2025-04-10 14:45:27.26
+beb957ac
+User
+at async ModuleLoader.import (node:internal/modules/esm/loader:473:24)
+2025-04-10 14:45:27.26
+beb957ac
+User
+at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:122:5)
+2025-04-10 14:45:27.26
+beb957ac
+User
+2025-04-10 14:45:27.26
+beb957ac
+User
+Node.js v20.18.1
+2025-04-10 14:45:27.27
+beb957ac
+System
+command finished with error [sh -c node deploy.js]: exit status 1
+2025-04-10 14:45:35.85
+beb957ac
+User
+file:///home/runner/workspace/deploy.js:19
+2025-04-10 14:45:35.85
+beb957ac
+User
+require('./index.js');
+2025-04-10 14:45:35.85
+beb957ac
+User
+^
+2025-04-10 14:45:35.85
+beb957ac
+User
+2025-04-10 14:45:35.85
+beb957ac
+User
+ReferenceError: require is not defined in ES module scope, you can use import instead
+2025-04-10 14:45:35.85
+beb957ac
+User
+This file is being treated as an ES module because it has a '.js' file extension and '/home/runner/workspace/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+2025-04-10 14:45:35.85
+beb957ac
+User
+at file:///home/runner/workspace/deploy.js:19:1
+2025-04-10 14:45:35.85
+beb957ac
+User
+at ModuleJob.run (node:internal/modules/esm/module_job:234:25)
+2025-04-10 14:45:35.85
+beb957ac
+User
+at async ModuleLoader.import (node:internal/modules/esm/loader:473:24)
+2025-04-10 14:45:35.85
+beb957ac
+User
+at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:122:5)
+2025-04-10 14:45:35.85
+beb957ac
+User
+2025-04-10 14:45:35.85
+beb957ac
+User
+Node.js v20.18.1
+2025-04-10 14:45:35.86
+beb957ac
+System
+command finished with error [sh -c node deploy.js]: exit status 1
+2025-04-10 14:45:40.85
+beb957ac
+User
+file:///home/runner/workspace/deploy.js:19
+2025-04-10 14:45:40.85
+beb957ac
+User
+require('./index.js');
+2025-04-10 14:45:40.85
+beb957ac
+User
+^
+2025-04-10 14:45:40.85
+beb957ac
+User
+2025-04-10 14:45:40.85
+beb957ac
+User
+ReferenceError: require is not defined in ES module scope, you can use import instead
+2025-04-10 14:45:40.85
+beb957ac
+User
+This file is being treated as an ES module because it has a '.js' file extension and '/home/runner/workspace/package.json' contains "type": "module". To treat it as a CommonJS script, rename it to use the '.cjs' file extension.
+2025-04-10 14:45:40.85
+beb957ac
+User
+at file:///home/runner/workspace/deploy.js:19:1
+2025-04-10 14:45:40.85
+beb957ac
+User
+at ModuleJob.run (node:internal/modules/esm/module_job:234:25)
+2025-04-10 14:45:40.85
+beb957ac
+User
+at async ModuleLoader.import (node:internal/modules/esm/loader:473:24)
+2025-04-10 14:45:40.85
+beb957ac
+User
+at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:122:5)
+2025-04-10 14:45:40.85
+beb957ac
+User
+2025-04-10 14:45:40.85
+beb957ac
+User
+Node.js v20.18.1
+2025-04-10 14:45:40.86
+beb957ac
+System
+command finished with error [sh -c node deploy.js]: exit status 1
+2025-04-10 14:45:40.96
+beb957ac
+System
+crash loop detected
