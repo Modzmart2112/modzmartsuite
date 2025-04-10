@@ -57,6 +57,47 @@ function normalizeShopifyUrl(url) {
   return normalized;
 }
 
+// Function to make a request to the Shopify API
+async function requestShopify(endpoint, method = 'GET', data = null) {
+  try {
+    // Use the URL without embedding credentials
+    const url = `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2022-10/${endpoint}`;
+    
+    // Create a basic auth string from the API key and password
+    const authString = Buffer.from(`${process.env.SHOPIFY_API_KEY}:${process.env.SHOPIFY_API_SECRET}`).toString('base64');
+    
+    const options = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': `Basic ${authString}`
+      }
+    };
+    
+    if (data && (method === 'POST' || method === 'PUT')) {
+      options.body = JSON.stringify(data);
+    }
+    
+    console.log(`Making Shopify API request to: ${endpoint}`);
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      console.error(`Shopify API error: ${response.status} ${response.statusText}`);
+      if (response.status === 401) {
+        console.error('Authentication failed. Please check your Shopify API credentials.');
+      }
+      return null;
+    }
+    
+    console.log(`Shopify API request to ${endpoint} successful`);
+    return await response.json();
+  } catch (error) {
+    console.error('Error making Shopify API request:', error.message);
+    return null;
+  }
+}
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'dist', 'public')));
 
@@ -91,21 +132,42 @@ app.get('/api/database/status', async (req, res) => {
   }
 });
 
-// Shopify status endpoint
-app.get('/api/shopify/status', (req, res) => {
+// Shopify status endpoint - with actual connection test
+app.get('/api/shopify/status', async (req, res) => {
   try {
-    // Just return a status based on environment variables
+    // Check if environment variables are set
     const isConfigured = process.env.SHOPIFY_API_KEY && 
                          process.env.SHOPIFY_API_SECRET && 
                          process.env.SHOPIFY_STORE_URL;
                       
+    if (!isConfigured) {
+      return res.json({
+        connected: false,
+        storeUrl: '(not configured)',
+        error: 'Missing Shopify configuration'
+      });
+    }
+    
+    // Test the actual connection
+    const shopData = await requestShopify('shop.json');
     const normalizedUrl = normalizeShopifyUrl(process.env.SHOPIFY_STORE_URL);
     
-    res.json({
-      connected: !!isConfigured,
-      storeUrl: normalizedUrl || '(not configured)'
-    });
+    if (shopData && shopData.shop) {
+      res.json({
+        connected: true,
+        storeUrl: normalizedUrl,
+        shopName: shopData.shop.name,
+        shopEmail: shopData.shop.email
+      });
+    } else {
+      res.json({
+        connected: false,
+        storeUrl: normalizedUrl,
+        error: 'Failed to connect to Shopify API'
+      });
+    }
   } catch (error) {
+    console.error('Shopify connection error:', error);
     res.status(500).json({
       connected: false,
       error: error.message
@@ -162,6 +224,60 @@ function requireAuth(req, res, next) {
   }
   res.status(401).json({ error: 'Unauthorized' });
 }
+
+// Shopify connection test endpoint
+app.get('/api/shopify/connection-test', requireAuth, async (req, res) => {
+  try {
+    console.log('Testing Shopify connection...');
+    
+    // Step 1: Check if environment variables are set
+    if (!process.env.SHOPIFY_API_KEY) {
+      return res.status(400).json({ error: 'SHOPIFY_API_KEY is not set' });
+    }
+    
+    if (!process.env.SHOPIFY_API_SECRET) {
+      return res.status(400).json({ error: 'SHOPIFY_API_SECRET is not set' });
+    }
+    
+    if (!process.env.SHOPIFY_STORE_URL) {
+      return res.status(400).json({ error: 'SHOPIFY_STORE_URL is not set' });
+    }
+    
+    // Step 2: Test the connection
+    try {
+      const shopData = await requestShopify('shop.json');
+      
+      if (!shopData || !shopData.shop) {
+        return res.status(500).json({ 
+          error: 'Failed to connect to Shopify API', 
+          details: 'Could not retrieve shop data'
+        });
+      }
+      
+      // Success
+      return res.json({
+        success: true,
+        shop: {
+          name: shopData.shop.name,
+          email: shopData.shop.email,
+          domain: shopData.shop.domain,
+          country: shopData.shop.country_name,
+          created_at: shopData.shop.created_at
+        },
+        message: 'Successfully connected to Shopify API'
+      });
+    } catch (connectionError) {
+      console.error('Shopify connection test error:', connectionError);
+      return res.status(500).json({ 
+        error: 'Failed to connect to Shopify API', 
+        details: connectionError.message 
+      });
+    }
+  } catch (error) {
+    console.error('Shopify connection test error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Dashboard stats endpoint
 app.get('/api/dashboard/stats', requireAuth, async (req, res) => {
