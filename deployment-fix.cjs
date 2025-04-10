@@ -7,11 +7,102 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
+const https = require('https');
+
+// Function to verify Shopify credentials
+async function verifyShopifyCredentials() {
+  console.log('Verifying Shopify credentials...');
+  
+  // Check if all required variables are set
+  const shopifyApiKey = process.env.SHOPIFY_API_KEY;
+  const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
+  const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
+  
+  if (!shopifyApiKey || !shopifyApiSecret || !shopifyStoreUrl) {
+    console.error('ERROR: Shopify credentials not properly set!');
+    console.error('Please make sure these secrets are set in your Replit Secrets:');
+    console.error('- SHOPIFY_API_KEY');
+    console.error('- SHOPIFY_API_SECRET');
+    console.error('- SHOPIFY_STORE_URL');
+    
+    // We'll proceed, but warn the user
+    console.error('Proceeding with deployment, but Shopify sync will not work correctly.');
+    return false;
+  }
+  
+  // Try to make a simple request to Shopify to verify credentials
+  return new Promise((resolve) => {
+    console.log(`Testing connection to Shopify store: ${shopifyStoreUrl}`);
+    
+    // Format URL properly - remove any protocol and trailing slashes
+    const normalizedUrl = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    // Create auth string for basic auth
+    const auth = Buffer.from(`${shopifyApiKey}:${shopifyApiSecret}`).toString('base64');
+    
+    const options = {
+      hostname: normalizedUrl,
+      path: '/admin/api/2022-10/shop.json',
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    console.log('Sending test request to Shopify API...');
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          console.log('✓ Shopify credentials verified successfully!');
+          
+          try {
+            const shopInfo = JSON.parse(data);
+            console.log(`Connected to shop: ${shopInfo.shop.name}`);
+          } catch (e) {
+            console.log('Connected to Shopify but could not parse shop info.');
+          }
+          
+          resolve(true);
+        } else {
+          console.error(`✘ Shopify API error: ${res.statusCode} ${res.statusMessage}`);
+          console.error('Please check your Shopify credentials and try again.');
+          
+          try {
+            const errorInfo = JSON.parse(data);
+            console.error('Error details:', JSON.stringify(errorInfo, null, 2));
+          } catch (e) {
+            console.error('Raw response:', data);
+          }
+          
+          resolve(false);
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      console.error('Error connecting to Shopify:', error.message);
+      resolve(false);
+    });
+    
+    req.end();
+  });
+}
 
 async function deploymentFix() {
   console.log('\n========================================');
   console.log('REPLIT DEPLOYMENT FIX');
   console.log('========================================\n');
+  
+  // Verify shopify credentials first
+  await verifyShopifyCredentials();
   
   // Make sure we have the DATABASE_URL
   if (!process.env.DATABASE_URL) {
