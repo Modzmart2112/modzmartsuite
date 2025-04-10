@@ -41,13 +41,13 @@ async function verifyShopifyCredentials() {
   // If it's only in SHOPIFY_ACCESS_TOKEN, copy it to where the code is looking
   if (shopifyAccessToken && !shopifyApiSecret) {
     console.log('NOTICE: Copying SHOPIFY_ACCESS_TOKEN to SHOPIFY_API_SECRET (required by code architecture)');
-    process.env.SHOPIFY_API_SECRET = shopifyAccessToken;
+    process.env.SHOPIFY_API_SECRET = shopifyApiSecret;
   }
   
   // Check if we need to do the reverse - copy from API_SECRET to ACCESS_TOKEN
   if (!shopifyAccessToken && shopifyApiSecret && shopifyApiSecret.startsWith('shpat_')) {
     console.log('NOTICE: Copying SHOPIFY_API_SECRET to SHOPIFY_ACCESS_TOKEN (for logical consistency)');
-    process.env.SHOPIFY_ACCESS_TOKEN = shopifyApiSecret;
+    process.env.SHOPIFY_ACCESS_TOKEN = shopifyAccessToken;
   }
   
   // Verify that our access token is valid (whether it's in the right place or not)
