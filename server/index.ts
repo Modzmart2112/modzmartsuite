@@ -8,26 +8,20 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Dedicated minimal health check endpoint - highest priority, no middleware
-app.get('/', (req, res, next) => {
-  if (req.headers['x-forwarded-proto'] === 'https') {
-    res.set({
-      'Cache-Control': 'no-store',
-      'Content-Type': 'text/plain'
-    }).status(200).send('OK');
-  } else {
-    next();
-  }
-});
-
-// Handle web requests after health check
+// Health check endpoint - highest priority, before any middleware
 app.get('/', (req, res) => {
-  res.redirect('/dashboard');
+  // Simple 200 OK response for health checks
+  res.status(200).send('OK');
 });
 
-// HTML/Browser requests fallback
+// All other routes come after
 app.get('/index.html', (req, res) => {
   res.redirect('/dashboard');
+});
+
+app.get('/dashboard', (req, res, next) => {
+  // Handle dashboard route
+  next();
 });
 
 // Serve the uploads directory directly to fix profile picture loading issues
