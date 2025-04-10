@@ -87,6 +87,25 @@ async function requestShopify(endpoint, method = 'GET', data = null) {
   }
 }
 
+// Build the frontend
+async function buildFrontend() {
+  try {
+    console.log('\nBuilding frontend...');
+    // Check if the dist directory exists
+    if (!fs.existsSync(path.join(__dirname, 'dist'))) {
+      console.log('Building frontend with npm run build...');
+      require('child_process').execSync('npm run build', { stdio: 'inherit' });
+      console.log('Frontend built successfully');
+    } else {
+      console.log('Frontend already built (dist directory exists)');
+    }
+    return true;
+  } catch (error) {
+    console.error('Error building frontend:', error.message);
+    return false;
+  }
+}
+
 // Initialize and start the server
 async function startServer() {
   try {
@@ -363,6 +382,190 @@ async function startServer() {
       }
     });
     
+    // Products list endpoint
+    app.get('/api/products', requireAuth, async (req, res) => {
+      try {
+        const { page = 1, limit = 50, search = '', sort = 'id', order = 'asc' } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        
+        let queryParams = [];
+        let searchCondition = '';
+        
+        if (search) {
+          searchCondition = 'WHERE sku ILIKE $1 OR title ILIKE $1';
+          queryParams.push(`%${search}%`);
+        }
+        
+        // Make sure sort field exists to prevent SQL injection
+        const validSortFields = ['id', 'sku', 'title', 'cost_price', 'shopify_price', 'created_at', 'updated_at'];
+        const sortField = validSortFields.includes(sort) ? sort : 'id';
+        
+        // Make sure order is valid
+        const sortOrder = order.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+        
+        // Add additional parameters for pagination
+        const limitParam = parseInt(limit);
+        const offsetParam = parseInt(offset);
+        
+        queryParams.push(limitParam, offsetParam);
+        
+        const queryText = `
+          SELECT * FROM products 
+          ${searchCondition}
+          ORDER BY ${sortField} ${sortOrder}
+          LIMIT $${queryParams.length - 1} 
+          OFFSET $${queryParams.length}
+        `;
+        
+        const countText = `
+          SELECT COUNT(*) FROM products ${searchCondition}
+        `;
+        
+        const productsResult = await pool.query(queryText, queryParams);
+        const countResult = await pool.query(countText, search ? [`%${search}%`] : []);
+        
+        const totalCount = parseInt(countResult.rows[0].count);
+        const totalPages = Math.ceil(totalCount / limitParam);
+        
+        res.json({
+          products: productsResult.rows.map(product => ({
+            id: product.id,
+            sku: product.sku,
+            title: product.title,
+            description: product.description,
+            shopifyId: product.shopify_id,
+            shopifyPrice: parseFloat(product.shopify_price) || 0,
+            costPrice: parseFloat(product.cost_price) || 0,
+            supplierUrl: product.supplier_url,
+            supplierPrice: parseFloat(product.supplier_price) || 0,
+            lastScraped: product.last_scraped,
+            lastChecked: product.last_checked,
+            hasPriceDiscrepancy: product.has_price_discrepancy,
+            createdAt: product.created_at,
+            updatedAt: product.updated_at,
+            status: product.status,
+            images: product.images,
+            vendor: product.vendor,
+            productType: product.product_type,
+            onSale: product.on_sale,
+            originalPrice: parseFloat(product.original_price) || 0,
+            saleEndDate: product.sale_end_date,
+            saleId: product.sale_id
+          })),
+          pagination: {
+            totalItems: totalCount,
+            totalPages,
+            currentPage: parseInt(page),
+            pageSize: limitParam
+          }
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to fetch products',
+          message: error.message
+        });
+      }
+    });
+    
+    // Shopify sync status endpoint
+    app.get('/api/shopify/sync/status', requireAuth, async (req, res) => {
+      try {
+        // Get the most recent sync ID
+        const syncIdResult = await pool.query(`
+          SELECT MAX(sync_id) as current_sync_id 
+          FROM shopify_logs
+        `);
+        
+        const currentSyncId = syncIdResult.rows[0].current_sync_id || 0;
+        
+        // Get latest log entries for this sync
+        const logsResult = await pool.query(`
+          SELECT * FROM shopify_logs 
+          WHERE sync_id = $1 
+          ORDER BY created_at DESC 
+          LIMIT 20
+        `, [currentSyncId]);
+        
+        // Get syncing products count from stats
+        const statsResult = await pool.query(`
+          SELECT value FROM stats WHERE key = 'syncing'
+        `);
+        
+        const isSyncing = statsResult.rows.length > 0 && statsResult.rows[0].value === 'true';
+        
+        res.json({
+          status: isSyncing ? 'syncing' : 'idle',
+          currentSyncId,
+          recentLogs: logsResult.rows.map(log => ({
+            id: log.id,
+            syncId: log.sync_id,
+            sku: log.sku,
+            message: log.message,
+            createdAt: log.created_at
+          })),
+          progress: {
+            current: 0,
+            total: 0,
+            percentage: 0
+          }
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to fetch sync status',
+          message: error.message
+        });
+      }
+    });
+    
+    // Single product endpoint
+    app.get('/api/products/:id', requireAuth, async (req, res) => {
+      try {
+        const productId = parseInt(req.params.id);
+        
+        if (isNaN(productId)) {
+          return res.status(400).json({ error: 'Invalid product ID' });
+        }
+        
+        const result = await pool.query('SELECT * FROM products WHERE id = $1', [productId]);
+        
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'Product not found' });
+        }
+        
+        const product = result.rows[0];
+        
+        res.json({
+          id: product.id,
+          sku: product.sku,
+          title: product.title,
+          description: product.description,
+          shopifyId: product.shopify_id,
+          shopifyPrice: parseFloat(product.shopify_price) || 0,
+          costPrice: parseFloat(product.cost_price) || 0,
+          supplierUrl: product.supplier_url,
+          supplierPrice: parseFloat(product.supplier_price) || 0,
+          lastScraped: product.last_scraped,
+          lastChecked: product.last_checked,
+          hasPriceDiscrepancy: product.has_price_discrepancy,
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          status: product.status,
+          images: product.images,
+          vendor: product.vendor,
+          productType: product.product_type,
+          onSale: product.on_sale,
+          originalPrice: parseFloat(product.original_price) || 0,
+          saleEndDate: product.sale_end_date,
+          saleId: product.sale_id
+        });
+      } catch (error) {
+        res.status(500).json({
+          error: 'Failed to fetch product',
+          message: error.message
+        });
+      }
+    });
+    
     // All other routes serve the index.html for the SPA
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, 'dist', 'public', 'index.html'));
@@ -408,5 +611,19 @@ async function startServer() {
   }
 }
 
-// Start the server
-startServer();
+// Build the frontend and start the server
+async function deploy() {
+  try {
+    // First build the frontend
+    await buildFrontend();
+    
+    // Then start the server
+    await startServer();
+  } catch (error) {
+    console.error('Deployment failed:', error);
+    process.exit(1);
+  }
+}
+
+// Run the deployment
+deploy();
