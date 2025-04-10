@@ -1,1 +1,1 @@
-node replit-production-deploy.cjs
+node reliable-deploy.js
