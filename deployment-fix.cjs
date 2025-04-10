@@ -13,21 +13,35 @@ const https = require('https');
 async function verifyShopifyCredentials() {
   console.log('Verifying Shopify credentials...');
   
+  // IMPORTANT: Our code architecture has a naming mismatch:
+  // - The code uses SHOPIFY_API_SECRET for what should be called SHOPIFY_ACCESS_TOKEN
+  
   // Check if all required variables are set
   const shopifyApiKey = process.env.SHOPIFY_API_KEY;
   const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
   const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
   
-  if (!shopifyApiKey || !shopifyApiSecret || !shopifyStoreUrl) {
+  // Also check for the access token (which might be stored separately)
+  const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  
+  if (!shopifyApiKey || (!shopifyApiSecret && !shopifyAccessToken) || !shopifyStoreUrl) {
     console.error('ERROR: Shopify credentials not properly set!');
     console.error('Please make sure these secrets are set in your Replit Secrets:');
     console.error('- SHOPIFY_API_KEY');
-    console.error('- SHOPIFY_API_SECRET');
+    console.error('- SHOPIFY_API_SECRET or SHOPIFY_ACCESS_TOKEN');
     console.error('- SHOPIFY_STORE_URL');
     
     // We'll proceed, but warn the user
     console.error('Proceeding with deployment, but Shopify sync will not work correctly.');
     return false;
+  }
+  
+  // If SHOPIFY_ACCESS_TOKEN is set but SHOPIFY_API_SECRET is not, use the access token
+  // This fixes the confusion in our code where SHOPIFY_API_SECRET is expected to be the access token
+  if (shopifyAccessToken && !shopifyApiSecret) {
+    console.log('Using SHOPIFY_ACCESS_TOKEN as SHOPIFY_API_SECRET (adapting to code architecture)');
+    process.env.SHOPIFY_API_SECRET = shopifyAccessToken;
+  }
   }
   
   // Try to make a simple request to Shopify to verify credentials
