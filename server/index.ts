@@ -8,23 +8,17 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check endpoint - only in production
-if (process.env.NODE_ENV === 'production') {
-  app.get('/', (req, res) => {
-    // Normal browser requests get redirected to dashboard
-    const acceptHeader = req.headers.accept || '';
-    if (acceptHeader.includes('text/html')) {
-      return res.redirect('/dashboard');
-    }
-    
-    // API health checks get the JSON response
-    res.status(200).json({
-      status: 'healthy',
-      message: 'Shopify Integration Service is running',
-      timestamp: new Date().toISOString()
-    });
-  });
-}
+// Health check endpoint - always enabled and responds quickly
+app.get('/', (req, res) => {
+  // Normal browser requests get redirected to dashboard
+  const acceptHeader = req.headers.accept || '';
+  if (acceptHeader.includes('text/html')) {
+    return res.redirect('/dashboard');
+  }
+  
+  // API health checks get a simple 200 OK
+  res.status(200).send('OK');
+});
 
 // Serve the uploads directory directly to fix profile picture loading issues
 app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
