@@ -82,19 +82,22 @@ async function setupApp() {
   return server;
 }
 
-// Development mode
-// Always start the server regardless of environment
-// This ensures that both development and production will work
-setupApp().then(server => {
-  const port = process.env.PORT || 3000;
-  server.listen({ port, host: "0.0.0.0" }, () => {
-    log(`Server running on port ${port}`);
+// Only start the server in development mode
+// In production, we'll export the setup function and let the production entrypoint handle it
+if (process.env.NODE_ENV !== 'production') {
+  setupApp().then(server => {
+    const port = process.env.PORT || 3000;
+    server.listen({ port, host: "0.0.0.0" }, () => {
+      log(`Server running on port ${port}`);
+    });
+  }).catch(err => {
+    console.error('Failed to start server:', err);
+    console.error(err.stack); // Print stack trace for better debugging
+    process.exit(1);
   });
-}).catch(err => {
-  console.error('Failed to start server:', err);
-  console.error(err.stack); // Print stack trace for better debugging
-  process.exit(1);
-});
+}
 
 // Export for production
 export default setupApp;
+// Also export the app for direct access if needed
+export { app };
