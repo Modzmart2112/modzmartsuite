@@ -1,71 +1,106 @@
-# Deployment Guide for Replit
+# Deployment Guide for Shopify Integration Platform
 
-## Problem: Missing Data in Deployed App
+## Pre-Deployment Checklist
+1. Ensure all environment secrets are set on Replit:
+   - `SHOPIFY_STORE_URL` - Your Shopify store URL
+   - `SHOPIFY_API_KEY` - Your Shopify API key
+   - `SHOPIFY_API_SECRET` - Your Shopify API secret
+   - `SHOPIFY_ACCESS_TOKEN` - Your Shopify access token
+   - `DATABASE_URL` - Your PostgreSQL database URL
 
-If your data shows up in the local Replit editor but not in the deployed app (https://modzmartsuite.replit.app/), 
-this is because the deployed app is using a different database than your local environment.
+2. Make sure the application is working locally
+   - Test the login functionality
+   - Check that product syncing works
+   - Verify price tracking is functional
 
-## Solution: Run the Database Fix Script
+## Deployment Process
 
-1. Make sure all environment variables are correctly set in Replit Secrets:
-   - `DATABASE_URL` (this is critical!)
-   - `SHOPIFY_API_KEY`
-   - `SHOPIFY_API_SECRET`
-   - `SHOPIFY_STORE_URL`
+### Option 1: Using the Simplified Script (Recommended)
+This is the easiest way to deploy the application:
 
-2. Run the special database fix script:
-   ```
-   node fix-database-on-replit.cjs
-   ```
+```bash
+node deploy.js
+```
 
-3. This script will:
-   - Connect to the database using the DATABASE_URL from Replit Secrets
-   - Create tables if they don't exist
-   - Import all 1,681 products from database-export.json
-   - Import the stats, shopify_logs, and notifications
-   - Verify that the data was imported successfully
+This script:
+- Sets the NODE_ENV to production
+- Runs the main application
+- Provides a health check endpoint at the root URL
 
-4. After running this script, restart your application and the data should appear
-   in the deployed app.
+### Option 2: Using the Enhanced Script
+For more diagnostics and setup validation:
 
-## Step-by-Step Instructions
+```bash
+node fixed-deploy.cjs
+```
 
-1. Open Replit and access your project
-2. Click on the "Secrets" icon (lock symbol) in the left sidebar
-3. Make sure DATABASE_URL is set correctly:
-   - If it's not set, add a new secret named DATABASE_URL
-   - The value should be the full PostgreSQL connection string
-4. Open a terminal (Shell) in Replit
-5. Run the fix script:
-   ```
-   node fix-database-on-replit.cjs
-   ```
-6. Wait for the script to complete (it will show a success message)
-7. Restart your app using the "Run" button
-8. Go to https://modzmartsuite.replit.app/ and log in
+This script:
+- Verifies database connection
+- Validates Shopify credentials
+- Adds any missing database columns
+- Sets up proper routing
 
-## Authentication
+### Option 3: Using the Original Replit Script
+If you need compatibility with Replit's deployment system:
 
-Your app uses these hardcoded credentials:
-- Username: Admin
-- Password: Ttiinnyy1
+```bash
+node replit-deploy.cjs
+```
+
+## Post-Deployment Verification
+
+1. **Health Check**
+   - Visit the root URL (e.g., https://modzmartsuite.replit.app/)
+   - You should see a JSON response: `{"status":"healthy","message":"Shopify Integration Service is running","timestamp":"..."}`
+
+2. **Application Access**
+   - The main application is available at:
+     - /dashboard - Main dashboard 
+     - /login - Login page
+     - /products - Products page
+
+3. **Login Credentials**
+   - Username: Admin
+   - Password: Ttiinnyy1
 
 ## Troubleshooting
 
-If you're still having trouble after running the fix script:
+### API Connection Issues
+If you're having issues with the Shopify API:
+- Make sure the `SHOPIFY_API_SECRET` environment variable matches your Shopify admin access token
+- If you're using a different variable name, set both `SHOPIFY_API_SECRET` and `SHOPIFY_ACCESS_TOKEN` to the same value
 
-1. Check the console output of the fix script for any errors
-2. Make sure you're using the correct login credentials
-3. Ensure the database-export.json file exists and contains all your product data
-4. Try running the simple-deploy.cjs script instead:
-   ```
-   node simple-deploy.cjs
-   ```
+### Database Issues
+If you encounter database errors:
+- Check your `DATABASE_URL` environment variable
+- Make sure the database schema is up to date by running: `node fix-database-on-replit.cjs`
 
-## Explanation of the Issue
+### Replit-Specific Issues
+If you encounter issues specific to Replit:
+- Try clearing browser cache and cookies
+- Check the console for errors
+- Verify that the application server is running
+- Check that the health check endpoint is responding
 
-The issue occurs because Replit has two databases:
-1. A local database used while developing in the editor
-2. A separate database used by the deployed app
+## Production Maintenance
 
-The fix script ensures your product data is imported into the deployment database.
+### Updating the Application
+When making updates:
+1. Make your changes
+2. Test locally
+3. Deploy using one of the scripts above
+4. Verify the deployment
+
+### Database Backups
+To backup your database:
+```bash
+node export-data.cjs
+```
+
+To restore from a backup:
+```bash
+node import-data.cjs
+```
+
+## Support
+If you encounter any issues or have questions, please contact the development team.

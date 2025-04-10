@@ -11,7 +11,18 @@ app.use(express.urlencoded({ extended: false }));
 // Health check endpoint - only in production
 if (process.env.NODE_ENV === 'production') {
   app.get('/', (req, res) => {
-    res.status(200).send('Health check OK');
+    // Normal browser requests get redirected to dashboard
+    const acceptHeader = req.headers.accept || '';
+    if (acceptHeader.includes('text/html')) {
+      return res.redirect('/dashboard');
+    }
+    
+    // API health checks get the JSON response
+    res.status(200).json({
+      status: 'healthy',
+      message: 'Shopify Integration Service is running',
+      timestamp: new Date().toISOString()
+    });
   });
 }
 
