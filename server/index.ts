@@ -86,7 +86,7 @@ async function setupApp() {
 // Always start the server regardless of environment
 // This ensures that both development and production will work
 setupApp().then(server => {
-  const port = process.env.PORT || 5000;
+  const port = process.env.PORT || 3000;
   server.listen({ port, host: "0.0.0.0" }, () => {
     log(`Server running on port ${port}`);
   });
