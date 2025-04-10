@@ -9,6 +9,17 @@ import {
   notifications, stats, saleCampaigns, saleCampaignTargets, syncProgress,
   shopifyLogs
 } from "@shared/schema";
+
+export async function getShopifyCredentials() {
+  const user = await getUser(1);
+  
+  return {
+    accessToken: process.env.SHOPIFY_ACCESS_TOKEN || user?.shopifyApiSecret,
+    apiKey: process.env.SHOPIFY_API_KEY || user?.shopifyApiKey,
+    storeUrl: process.env.SHOPIFY_STORE_URL || user?.shopifyStoreUrl
+  };
+}
+
 import { PriceDiscrepancy } from "@shared/types";
 import { db } from "./db";
 import { eq, desc, and, asc, isNotNull, sql, inArray, or, type SQL } from "drizzle-orm";
