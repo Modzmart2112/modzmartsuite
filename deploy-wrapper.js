@@ -20,10 +20,21 @@ try {
     process.exit(1);
   }
 
-  // Normalize Shopify store URL
-  if (!process.env.SHOPIFY_STORE_URL.startsWith('https://')) {
-    process.env.SHOPIFY_STORE_URL = `https://${process.env.SHOPIFY_STORE_URL}`;
+  // Validate access token format
+  if (!process.env.SHOPIFY_ACCESS_TOKEN.startsWith('shpat_')) {
+    console.error('Invalid Shopify access token format. Token should start with "shpat_"');
+    process.exit(1);
   }
+
+  // Normalize Shopify store URL
+  let storeUrl = process.env.SHOPIFY_STORE_URL;
+  if (!storeUrl.includes('myshopify.com')) {
+    storeUrl += '.myshopify.com';
+  }
+  if (!storeUrl.startsWith('https://')) {
+    storeUrl = `https://${storeUrl}`;
+  }
+  process.env.SHOPIFY_STORE_URL = storeUrl;
 
   // Import and setup app
   const { default: setupApp } = await import('./dist/index.js');
