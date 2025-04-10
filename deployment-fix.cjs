@@ -13,23 +13,23 @@ const https = require('https');
 async function verifyShopifyCredentials() {
   console.log('Verifying Shopify credentials...');
   
-  // IMPORTANT CORRECTION: 
-  // - The code expects SHOPIFY_API_SECRET env var to contain the Shopify Access Token (starting with shpat_)
-  // - This is misleading but needs to be maintained for compatibility
+  // IMPORTANT: There's a naming confusion in the codebase
+  // - Logically, SHOPIFY_ACCESS_TOKEN should contain the access token
+  // - However, the code is looking for it in SHOPIFY_API_SECRET instead
   
   // Check if all required variables are set
   const shopifyApiKey = process.env.SHOPIFY_API_KEY;
   const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
   const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
   
-  // Also check for the access token (which might be stored separately)
+  // Also check for the access token (which is the correct place it should be stored)
   const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN;
   
-  if (!shopifyApiKey || (!shopifyApiSecret && !shopifyAccessToken) || !shopifyStoreUrl) {
+  if (!shopifyApiKey || (!shopifyAccessToken && !shopifyApiSecret) || !shopifyStoreUrl) {
     console.error('ERROR: Shopify credentials not properly set!');
     console.error('Please make sure these secrets are set in your Replit Secrets:');
     console.error('- SHOPIFY_API_KEY: Your Shopify API Key');
-    console.error('- SHOPIFY_API_SECRET: Your Shopify Access Token (starts with shpat_)');
+    console.error('- SHOPIFY_ACCESS_TOKEN: Your Shopify Access Token (starts with shpat_)');
     console.error('- SHOPIFY_STORE_URL: Your myshopify.com URL');
     
     // We'll proceed, but warn the user
@@ -37,18 +37,25 @@ async function verifyShopifyCredentials() {
     return false;
   }
   
-  // If SHOPIFY_ACCESS_TOKEN is set but SHOPIFY_API_SECRET is not, use the access token
-  // This fixes the confusion in our code architecture where SHOPIFY_API_SECRET is expected to be the Access Token
+  // COMPATIBILITY FIX: The code expects to find the access token in SHOPIFY_API_SECRET
+  // If it's only in SHOPIFY_ACCESS_TOKEN, copy it to where the code is looking
   if (shopifyAccessToken && !shopifyApiSecret) {
-    console.log('Using SHOPIFY_ACCESS_TOKEN as SHOPIFY_API_SECRET (adapting to code architecture)');
+    console.log('NOTICE: Copying SHOPIFY_ACCESS_TOKEN to SHOPIFY_API_SECRET (required by code architecture)');
     process.env.SHOPIFY_API_SECRET = shopifyAccessToken;
   }
   
-  // Verify that SHOPIFY_API_SECRET starts with shpat_ which indicates it's an access token
-  if (!shopifyApiSecret || !shopifyApiSecret.startsWith('shpat_')) {
-    console.warn('WARNING: SHOPIFY_API_SECRET does not appear to be a valid Shopify Access Token!');
+  // Check if we need to do the reverse - copy from API_SECRET to ACCESS_TOKEN
+  if (!shopifyAccessToken && shopifyApiSecret && shopifyApiSecret.startsWith('shpat_')) {
+    console.log('NOTICE: Copying SHOPIFY_API_SECRET to SHOPIFY_ACCESS_TOKEN (for logical consistency)');
+    process.env.SHOPIFY_ACCESS_TOKEN = shopifyApiSecret;
+  }
+  
+  // Verify that our access token is valid (whether it's in the right place or not)
+  const tokenToUse = shopifyAccessToken || shopifyApiSecret;
+  if (!tokenToUse || !tokenToUse.startsWith('shpat_')) {
+    console.warn('WARNING: No valid Shopify Access Token found!');
     console.warn('A valid Shopify Access Token should start with "shpat_"');
-    console.warn('Current value may not work correctly with the Shopify API.');
+    console.warn('Current values may not work correctly with the Shopify API.');
   }
 
   
@@ -66,7 +73,7 @@ async function verifyShopifyCredentials() {
       path: '/admin/api/2022-10/shop.json',
       method: 'GET',
       headers: {
-        'X-Shopify-Access-Token': shopifyApiSecret,
+        'X-Shopify-Access-Token': shopifyAccessToken || shopifyApiSecret, // Use access token from either source
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
