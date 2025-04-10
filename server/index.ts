@@ -8,23 +8,26 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Dedicated health check endpoint - responds immediately
-app.get('/', (req, res) => {
-  res.set('Cache-Control', 'no-store');
-  res.status(200).send('OK');
+// Dedicated minimal health check endpoint - highest priority, no middleware
+app.get('/', (req, res, next) => {
+  if (req.headers['x-forwarded-proto'] === 'https') {
+    res.set({
+      'Cache-Control': 'no-store',
+      'Content-Type': 'text/plain'
+    }).status(200).send('OK');
+  } else {
+    next();
+  }
 });
 
-// HTML/Browser requests get redirected to dashboard
-app.get('/index.html', (req, res) => {
+// Handle web requests after health check
+app.get('/', (req, res) => {
   res.redirect('/dashboard');
 });
 
-// API health check endpoint with more details (optional)
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString()
-  });
+// HTML/Browser requests fallback
+app.get('/index.html', (req, res) => {
+  res.redirect('/dashboard');
 });
 
 // Serve the uploads directory directly to fix profile picture loading issues
