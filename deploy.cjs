@@ -4,18 +4,40 @@
  * Replit Deployment Script
  */
 
+// Set environment variables
 process.env.NODE_ENV = 'production';
-process.env.PORT = '3000';
+process.env.PORT = process.env.PORT || '3000';
+
+// Use child_process to run ES Module code from CommonJS
+const { spawn } = require('child_process');
 
 console.log('Starting server in production mode...');
 
-// Start the server
-import('./dist/index.js').catch(err => {
-  console.error('Error starting server:', err);
-  process.exit(1);
+// Use node directly to run the server
+const nodeProcess = spawn('node', ['index.js'], {
+  stdio: 'inherit', // Pass all IO through to the parent process
+  env: {
+    ...process.env,
+    NODE_ENV: 'production',
+    PORT: process.env.PORT || '3000'
+  }
 });
 
-// Log success (Preserved from original)
-console.log(`Server started in production mode on port ${process.env.PORT}`);
-console.log('Health check is available at / (root)');
-console.log('Application is available at /dashboard and /login');
+// Handle process exit
+nodeProcess.on('close', (code) => {
+  if (code !== 0) {
+    console.error(`Server process exited with code ${code}`);
+    process.exit(code);
+  }
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  nodeProcess.kill('SIGTERM');
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  nodeProcess.kill('SIGINT');
+});
