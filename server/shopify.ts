@@ -561,12 +561,12 @@ class ShopifyClient {
    */
   async getInventoryCostPrice(inventoryItemId: string): Promise<number | null> {
     try {
-      // Use Access Token directly since that's the proper way for private apps
-      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      // Use API Secret as the access token (that's what it is in Shopify)
+      const accessToken = process.env.SHOPIFY_API_SECRET;
       const storeUrl = process.env.SHOPIFY_STORE_URL;
       
       if (!accessToken || !storeUrl) {
-        log('No Shopify credentials found in environment variables', 'shopify-api');
+        log('No Shopify credentials found in environment variables (SHOPIFY_API_SECRET or SHOPIFY_STORE_URL)', 'shopify-api');
         return null;
       }
       
@@ -611,12 +611,12 @@ class ShopifyClient {
   async getBulkInventoryCostPrices(items: {inventoryItemId: string, sku: string}[]): Promise<Map<string, {costPrice: number, sku: string}>> {
     const costPrices = new Map<string, {costPrice: number, sku: string}>();
 
-    // Use Access Token directly since that's the proper way for private apps
-    const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+    // Use API Secret as the access token
+    const accessToken = process.env.SHOPIFY_API_SECRET;
     const storeUrl = process.env.SHOPIFY_STORE_URL;
     
     if (!accessToken || !storeUrl) {
-      log('No Shopify credentials found in environment variables', 'shopify-api');
+      log('No Shopify credentials found in environment variables (SHOPIFY_API_SECRET or SHOPIFY_STORE_URL)', 'shopify-api');
       return costPrices;
     }
     
@@ -723,12 +723,12 @@ class ShopifyClient {
     productId: string
   ): Promise<{ inventoryItemId: string | null }> {
     try {
-      // Use Access Token directly since that's the proper way for private apps
-      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      // Use API Secret as the access token
+      const accessToken = process.env.SHOPIFY_API_SECRET;
       const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
       
       if (!accessToken || !shopifyStoreUrl) {
-        log('No Shopify credentials found in environment variables', 'shopify-api');
+        log('No Shopify credentials found in environment variables (SHOPIFY_API_SECRET or SHOPIFY_STORE_URL)', 'shopify-api');
         return { inventoryItemId: null };
       }
       
