@@ -5,6 +5,7 @@
 
 import { log } from './vite';
 import { storage } from './storage';
+import pg from 'pg';
 
 /**
  * Log a cost price event to the database for real-time UI display
@@ -61,7 +62,7 @@ export async function logCostPrice(
         
         // Fallback: Direct SQL update to ensure the cost price is properly stored
         try {
-          const { Pool } = require('pg');
+          const { Pool } = pg;
           const pool = new Pool({ connectionString: process.env.DATABASE_URL });
           await pool.query('UPDATE products SET cost_price = $1 WHERE sku = $2', [price, sku]);
           log(`Direct SQL update for cost_price: ${sku} = $${price.toFixed(2)}`, 'shopify-api');
