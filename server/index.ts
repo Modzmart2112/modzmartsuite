@@ -8,16 +8,15 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check endpoint - always enabled and responds quickly
+// Health check endpoint - always responds quickly with 200 OK
 app.get('/', (req, res) => {
-  // Normal browser requests get redirected to dashboard
-  const acceptHeader = req.headers.accept || '';
-  if (acceptHeader.includes('text/html')) {
-    return res.redirect('/dashboard');
-  }
-  
-  // API health checks get a simple 200 OK
-  res.status(200).send('OK');
+  // Send immediate 200 OK for health checks
+  res.status(200).json({ status: 'healthy' });
+});
+
+// Dashboard redirect for browser requests
+app.get('/index.html', (req, res) => {
+  res.redirect('/dashboard');
 });
 
 // Serve the uploads directory directly to fix profile picture loading issues
