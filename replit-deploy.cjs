@@ -1,131 +1,436 @@
-// Ultra-reliable production deployment script for Replit (CommonJS version)
-// This combines both frontend and backend in the simplest way possible
+#!/usr/bin/env node
 
-// Set to production mode
-process.env.NODE_ENV = 'production';
+/**
+ * REPLIT DEPLOYMENT SCRIPT (FIXED VERSION)
+ * 
+ * This script handles deployment on Replit with proper handling of:
+ * 1. Shopify credentials (both SHOPIFY_API_SECRET and SHOPIFY_ACCESS_TOKEN)
+ * 2. CommonJS compatibility (no ESM import issues)
+ * 3. Database initialization if needed
+ */
 
-// Import required modules
-const express = require('express');
-const path = require('path');
 const fs = require('fs');
-
-// Connect to database
+const https = require('https');
 const { Pool } = require('pg');
 
-console.log('Starting application in production mode via replit-deploy.cjs');
-console.log('Node version:', process.version);
-console.log('Environment variables present:', Object.keys(process.env).filter(k => !k.startsWith('npm_')).join(', '));
-
-// Database connection
-let pool;
-try {
-  console.log('Connecting to database...');
-  pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  console.log('Database connection successful');
-} catch (error) {
-  console.error('Database connection error:', error.message);
-}
-
-// Create Express app
-const app = express();
-app.use(express.json());
-
-// Serve static files from the frontend build
-app.use(express.static(path.join(__dirname, 'dist', 'public')));
-
-// Basic API health endpoint
-app.get('/api/status', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    version: '1.0.0', 
-    mode: 'production',
-    serverTime: new Date().toISOString(),
-    database: process.env.DATABASE_URL ? 'configured' : 'not configured',
-    shopify: process.env.SHOPIFY_API_KEY ? 'configured' : 'not configured'
-  });
-});
-
-// Database status endpoint
-app.get('/api/database/status', async (req, res) => {
-  try {
-    if (!pool) {
-      return res.status(500).json({ error: 'Database not connected' });
-    }
-
-    const result = await pool.query('SELECT NOW() as time');
-    res.json({ 
-      status: 'connected', 
-      time: result.rows[0].time,
-      connectionString: process.env.DATABASE_URL ? '(configured)' : '(missing)'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'error', 
-      message: error.message 
-    });
-  }
-});
-
-// Simple dashboard stats endpoint
-app.get('/api/dashboard/stats', async (req, res) => {
-  try {
-    if (!pool) {
-      return res.json({ 
-        totalProducts: 0,
-        productsWithCostPrice: 0,
-        totalOrders: 0,
-        todayOrders: 0,
-        averageOrderValue: 0,
-        message: "Database not connected"
-      });
-    }
-
-    // Get some basic stats from the database
-    const result = await pool.query(`
-      SELECT 
-        (SELECT COUNT(*) FROM products) as total_products,
-        (SELECT COUNT(*) FROM products WHERE cost_price > 0) as products_with_cost_price,
-        (SELECT COUNT(*) FROM stats WHERE key = 'product_count') as stat_count
-    `);
+// Function to verify Shopify credentials
+async function verifyShopifyCredentials() {
+  console.log('Verifying Shopify credentials...');
+  
+  // IMPORTANT: There's a naming confusion in the codebase
+  // - Logically, SHOPIFY_ACCESS_TOKEN should contain the access token
+  // - However, the code is looking for it in SHOPIFY_API_SECRET instead
+  
+  // Check if all required variables are set
+  const shopifyApiKey = process.env.SHOPIFY_API_KEY;
+  const shopifyApiSecret = process.env.SHOPIFY_API_SECRET;
+  const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
+  
+  // Also check for the access token (which is the correct place it should be stored)
+  const shopifyAccessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+  
+  if (!shopifyApiKey || (!shopifyAccessToken && !shopifyApiSecret) || !shopifyStoreUrl) {
+    console.error('ERROR: Shopify credentials not properly set!');
+    console.error('Please make sure these secrets are set in your Replit Secrets:');
+    console.error('- SHOPIFY_API_KEY: Your Shopify API Key');
+    console.error('- SHOPIFY_ACCESS_TOKEN: Your Shopify Access Token (starts with shpat_)');
+    console.error('- SHOPIFY_STORE_URL: Your myshopify.com URL');
     
-    res.json({
-      totalProducts: parseInt(result.rows[0].total_products) || 0,
-      productsWithCostPrice: parseInt(result.rows[0].products_with_cost_price) || 0,
-      totalOrders: 0,
-      todayOrders: 0,
-      averageOrderValue: 0,
-      statCount: parseInt(result.rows[0].stat_count) || 0
-    });
-  } catch (error) {
-    console.error('Error fetching stats:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch stats',
-      message: error.message 
-    });
-  }
-});
-
-// Serve frontend for all other non-API routes (SPA support)
-app.get('*', (req, res, next) => {
-  // Skip API routes
-  if (req.path.startsWith('/api/')) {
-    return next();
+    // We'll proceed, but warn the user
+    console.error('Proceeding with deployment, but Shopify sync will not work correctly.');
+    return false;
   }
   
-  // Serve the SPA
-  res.sendFile(path.join(__dirname, 'dist', 'public', 'index.html'));
-});
+  // COMPATIBILITY FIX: The code expects to find the access token in SHOPIFY_API_SECRET
+  // If it's only in SHOPIFY_ACCESS_TOKEN, copy it to where the code is looking
+  if (shopifyAccessToken && !shopifyApiSecret) {
+    console.log('NOTICE: Copying SHOPIFY_ACCESS_TOKEN to SHOPIFY_API_SECRET (required by code architecture)');
+    process.env.SHOPIFY_API_SECRET = shopifyAccessToken;
+  }
+  
+  // Check if we need to do the reverse - copy from API_SECRET to ACCESS_TOKEN
+  if (!shopifyAccessToken && shopifyApiSecret && shopifyApiSecret.startsWith('shpat_')) {
+    console.log('NOTICE: Copying SHOPIFY_API_SECRET to SHOPIFY_ACCESS_TOKEN (for logical consistency)');
+    process.env.SHOPIFY_ACCESS_TOKEN = shopifyApiSecret;
+  }
+  
+  // Verify that our access token is valid (whether it's in the right place or not)
+  const tokenToUse = shopifyAccessToken || shopifyApiSecret;
+  if (!tokenToUse || !tokenToUse.startsWith('shpat_')) {
+    console.warn('WARNING: No valid Shopify Access Token found!');
+    console.warn('A valid Shopify Access Token should start with "shpat_"');
+    console.warn('Current values may not work correctly with the Shopify API.');
+  }
 
-// Simple 404 handler for API routes that weren't matched
-app.use('/api/', (req, res) => {
-  res.status(404).json({
-    error: 'Not Found',
-    message: `API endpoint ${req.method} ${req.path} not found`
+  
+  // Try to make a simple request to Shopify to verify credentials
+  return new Promise((resolve) => {
+    console.log(`Testing connection to Shopify store: ${shopifyStoreUrl}`);
+    
+    // Format URL properly - remove any protocol and trailing slashes
+    const normalizedUrl = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+    
+    // Use X-Shopify-Access-Token authentication which is the recommended approach for private apps
+    // This matches how the main application authenticates in shopify.ts
+    const options = {
+      hostname: normalizedUrl,
+      path: '/admin/api/2022-10/shop.json',
+      method: 'GET',
+      headers: {
+        'X-Shopify-Access-Token': shopifyAccessToken || shopifyApiSecret, // Use access token from either source
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    };
+
+    console.log('Sending test request to Shopify API...');
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          console.log('✓ Shopify credentials verified successfully!');
+          
+          try {
+            const shopInfo = JSON.parse(data);
+            console.log(`Connected to shop: ${shopInfo.shop.name}`);
+          } catch (e) {
+            console.log('Connected to Shopify but could not parse shop info.');
+          }
+          
+          resolve(true);
+        } else {
+          console.error(`✘ Shopify API error: ${res.statusCode} ${res.statusMessage}`);
+          console.error('Please check your Shopify credentials and try again.');
+          
+          try {
+            const errorInfo = JSON.parse(data);
+            console.error('Error details:', JSON.stringify(errorInfo, null, 2));
+          } catch (e) {
+            console.error('Raw response:', data);
+          }
+          
+          resolve(false);
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      console.error('Error connecting to Shopify:', error.message);
+      resolve(false);
+    });
+    
+    req.end();
   });
-});
+}
 
-// Start the server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+async function createDatabaseSchema(client) {
+  console.log('Creating database schema...');
+  
+  // Schema creation with proper sync_id column
+  const createSchemaQueries = [
+    `CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      sku TEXT,
+      title TEXT,
+      description TEXT,
+      shopify_id TEXT,
+      shopify_price DECIMAL,
+      cost_price DECIMAL,
+      supplier_url TEXT,
+      supplier_price DECIMAL,
+      last_scraped TIMESTAMP,
+      last_checked TIMESTAMP,
+      has_price_discrepancy BOOLEAN,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      status TEXT,
+      images JSONB,
+      vendor TEXT,
+      product_type TEXT,
+      on_sale BOOLEAN DEFAULT FALSE,
+      original_price DECIMAL,
+      sale_end_date TIMESTAMP,
+      sale_id INTEGER
+    )`,
+    
+    `CREATE TABLE IF NOT EXISTS stats (
+      id SERIAL PRIMARY KEY,
+      key TEXT,
+      value TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`,
+    
+    `CREATE TABLE IF NOT EXISTS shopify_logs (
+      id SERIAL PRIMARY KEY,
+      sync_id INTEGER,
+      sku TEXT,
+      message TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`,
+    
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      type TEXT,
+      message TEXT,
+      read BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`
+  ];
+  
+  for (const query of createSchemaQueries) {
+    await client.query(query);
+  }
+  
+  console.log('Database schema created successfully!');
+}
+
+async function deploymentFix() {
+  console.log('\n========================================');
+  console.log('REPLIT DEPLOYMENT FIX (FIXED VERSION)');
+  console.log('========================================\n');
+  
+  // Verify shopify credentials first
+  await verifyShopifyCredentials();
+  
+  // Make sure we have the DATABASE_URL
+  if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL environment variable is not set!');
+    console.error('Please set DATABASE_URL in Replit Secrets');
+    process.exit(1);
+  }
+  
+  console.log('Database URL is set, continuing with deployment...');
+  
+  // First import data from database-export.json if needed
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL
+  });
+  
+  try {
+    const client = await pool.connect();
+    console.log('Connected to database!');
+    
+    // Check if products table exists
+    const tableCheck = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'products'
+      );
+    `);
+    
+    if (!tableCheck.rows[0].exists) {
+      console.log('Products table does not exist, creating schema...');
+      await createDatabaseSchema(client);
+    }
+    
+    // Check if we have products
+    const result = await client.query('SELECT COUNT(*) FROM products');
+    const productCount = parseInt(result.rows[0].count);
+    
+    console.log(`Found ${productCount} products in the database`);
+    
+    // If we don't have any products, import them
+    if (productCount === 0 && fs.existsSync('./database-export.json')) {
+      console.log('No products found, importing from database-export.json...');
+      
+      const importData = JSON.parse(fs.readFileSync('./database-export.json', 'utf8'));
+      
+      // Import products
+      if (importData.products && importData.products.length > 0) {
+        console.log(`Importing ${importData.products.length} products...`);
+        
+        await client.query('BEGIN');
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const product of importData.products) {
+          try {
+            await client.query(
+              `INSERT INTO products(
+                id, sku, title, description, shopify_id, shopify_price, cost_price, 
+                supplier_url, supplier_price, last_scraped, last_checked, 
+                has_price_discrepancy, created_at, updated_at, status, images,
+                vendor, product_type, on_sale, original_price, sale_end_date, sale_id
+              ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+              ON CONFLICT (id) DO NOTHING`,
+              [
+                product.id, 
+                product.sku, 
+                product.title, 
+                product.description, 
+                product.shopify_id, 
+                product.shopify_price,
+                product.cost_price, 
+                product.supplier_url, 
+                product.supplier_price, 
+                product.last_scraped ? new Date(product.last_scraped) : null,
+                product.last_checked ? new Date(product.last_checked) : null, 
+                product.has_price_discrepancy,
+                product.created_at ? new Date(product.created_at) : new Date(), 
+                product.updated_at ? new Date(product.updated_at) : new Date(),
+                product.status, 
+                product.images ? JSON.stringify(product.images) : null,
+                product.vendor, 
+                product.product_type,
+                product.on_sale || false,
+                product.original_price || null,
+                product.sale_end_date ? new Date(product.sale_end_date) : null,
+                product.sale_id || null
+              ]
+            );
+            successCount++;
+            
+            if (successCount % 100 === 0) {
+              console.log(`Imported ${successCount} products so far...`);
+            }
+          } catch (error) {
+            console.error(`Error importing product ${product.id}: ${error.message}`);
+            errorCount++;
+          }
+        }
+        
+        await client.query('COMMIT');
+        console.log(`Products imported successfully! (${successCount} success, ${errorCount} errors)`);
+      }
+      
+      // Import stats
+      if (importData.stats && importData.stats.length > 0) {
+        console.log(`Importing ${importData.stats.length} stats...`);
+        
+        await client.query('BEGIN');
+        
+        for (const stat of importData.stats) {
+          try {
+            await client.query(
+              `INSERT INTO stats(id, key, value, created_at, updated_at) 
+               VALUES($1, $2, $3, $4, $5)
+               ON CONFLICT (id) DO NOTHING`,
+              [
+                stat.id,
+                stat.key,
+                stat.value,
+                stat.created_at ? new Date(stat.created_at) : new Date(),
+                stat.updated_at ? new Date(stat.updated_at) : new Date()
+              ]
+            );
+          } catch (error) {
+            console.error(`Error importing stat ${stat.id}: ${error.message}`);
+          }
+        }
+        
+        await client.query('COMMIT');
+        console.log('Stats import completed!');
+      }
+      
+      // Import shopify_logs
+      if (importData.shopify_logs && importData.shopify_logs.length > 0) {
+        console.log(`Importing ${importData.shopify_logs.length} shopify logs...`);
+        
+        await client.query('BEGIN');
+        
+        for (const log of importData.shopify_logs) {
+          try {
+            await client.query(
+              `INSERT INTO shopify_logs(id, sync_id, sku, message, created_at) 
+               VALUES($1, $2, $3, $4, $5)
+               ON CONFLICT (id) DO NOTHING`,
+              [
+                log.id,
+                log.sync_id,
+                log.sku,
+                log.message,
+                log.created_at ? new Date(log.created_at) : new Date()
+              ]
+            );
+          } catch (error) {
+            console.error(`Error importing shopify log ${log.id}: ${error.message}`);
+          }
+        }
+        
+        await client.query('COMMIT');
+        console.log('Shopify logs import completed!');
+      }
+      
+      // Import notifications
+      if (importData.notifications && importData.notifications.length > 0) {
+        console.log(`Importing ${importData.notifications.length} notifications...`);
+        
+        await client.query('BEGIN');
+        
+        for (const notification of importData.notifications) {
+          try {
+            await client.query(
+              `INSERT INTO notifications(id, type, message, read, created_at) 
+               VALUES($1, $2, $3, $4, $5)
+               ON CONFLICT (id) DO NOTHING`,
+              [
+                notification.id,
+                notification.type,
+                notification.message,
+                notification.read,
+                notification.created_at ? new Date(notification.created_at) : new Date()
+              ]
+            );
+          } catch (error) {
+            console.error(`Error importing notification ${notification.id}: ${error.message}`);
+          }
+        }
+        
+        await client.query('COMMIT');
+        console.log('Notifications import completed!');
+      }
+      
+      console.log('All data imported successfully!');
+    }
+    
+    // Verify data after import
+    const verifyCount = await client.query('SELECT COUNT(*) FROM products');
+    console.log(`Database now has ${verifyCount.rows[0].count} products`);
+    
+    client.release();
+    await pool.end();
+    
+    // Start the server using simple-deploy.cjs
+    console.log('\n========================================');
+    console.log('Starting server...');
+    console.log('========================================\n');
+    
+    // Instead of importing directly, spawn a child process
+    const { spawn } = require('child_process');
+    const server = spawn('node', ['index.js'], {
+      stdio: 'inherit',
+      env: process.env
+    });
+    
+    server.on('error', (err) => {
+      console.error('Failed to start server:', err);
+      process.exit(1);
+    });
+    
+    // This keeps the script running while the server is running
+    process.on('SIGINT', () => {
+      console.log('Stopping server...');
+      server.kill('SIGINT');
+      process.exit(0);
+    });
+    
+  } catch (error) {
+    console.error('Error during deployment fix:', error);
+    process.exit(1);
+  }
+}
+
+// Run the deployment fix
+deploymentFix().catch(error => {
+  console.error('Unhandled error during deployment:', error);
+  process.exit(1);
 });

@@ -1,0 +1,176 @@
+2025-04-10 14:18:52.50
+0ca069e5
+User
+2025-04-10 14:18:52.50
+0ca069e5
+User
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/runner/workspace/node_modules/node-fetch/src/index.js from /home/runner/workspace/deployment-fix.cjs not supported.
+2025-04-10 14:18:52.50
+0ca069e5
+User
+Instead change the require of index.js in /home/runner/workspace/deployment-fix.cjs to a dynamic import() which is available in all CommonJS modules.
+2025-04-10 14:18:52.50
+0ca069e5
+User
+at Object. (/home/runner/workspace/deployment-fix.cjs:12:15) {
+2025-04-10 14:18:52.50
+0ca069e5
+User
+code: 'ERR_REQUIRE_ESM'
+2025-04-10 14:18:52.50
+0ca069e5
+User
+}
+2025-04-10 14:18:52.50
+0ca069e5
+User
+2025-04-10 14:18:52.50
+0ca069e5
+User
+Node.js v20.18.1
+2025-04-10 14:18:52.50
+0ca069e5
+System
+command finished with error [sh -c node deployment-fix.cjs]: exit status 1
+2025-04-10 14:18:54.95
+0ca069e5
+User
+/home/runner/workspace/deployment-fix.cjs:12
+2025-04-10 14:18:54.95
+0ca069e5
+User
+const fetch = require('node-fetch');
+2025-04-10 14:18:54.95
+0ca069e5
+User
+^
+2025-04-10 14:18:54.95
+0ca069e5
+User
+2025-04-10 14:18:54.95
+0ca069e5
+User
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/runner/workspace/node_modules/node-fetch/src/index.js from /home/runner/workspace/deployment-fix.cjs not supported.
+2025-04-10 14:18:54.95
+0ca069e5
+User
+Instead change the require of index.js in /home/runner/workspace/deployment-fix.cjs to a dynamic import() which is available in all CommonJS modules.
+2025-04-10 14:18:54.95
+0ca069e5
+User
+at Object. (/home/runner/workspace/deployment-fix.cjs:12:15) {
+2025-04-10 14:18:54.95
+0ca069e5
+User
+code: 'ERR_REQUIRE_ESM'
+2025-04-10 14:18:54.95
+0ca069e5
+User
+}
+2025-04-10 14:18:54.95
+0ca069e5
+User
+2025-04-10 14:18:54.95
+0ca069e5
+User
+Node.js v20.18.1
+2025-04-10 14:18:54.95
+0ca069e5
+System
+command finished with error [sh -c node deployment-fix.cjs]: exit status 1
+2025-04-10 14:18:59.37
+0ca069e5
+User
+/home/runner/workspace/deployment-fix.cjs:12
+2025-04-10 14:18:59.37
+0ca069e5
+User
+const fetch = require('node-fetch');
+2025-04-10 14:18:59.37
+0ca069e5
+User
+^
+2025-04-10 14:18:59.37
+0ca069e5
+User
+2025-04-10 14:18:59.37
+0ca069e5
+User
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/runner/workspace/node_modules/node-fetch/src/index.js from /home/runner/workspace/deployment-fix.cjs not supported.
+2025-04-10 14:18:59.37
+0ca069e5
+User
+Instead change the require of index.js in /home/runner/workspace/deployment-fix.cjs to a dynamic import() which is available in all CommonJS modules.
+2025-04-10 14:18:59.37
+0ca069e5
+User
+at Object. (/home/runner/workspace/deployment-fix.cjs:12:15) {
+2025-04-10 14:18:59.37
+0ca069e5
+User
+code: 'ERR_REQUIRE_ESM'
+2025-04-10 14:18:59.37
+0ca069e5
+User
+}
+2025-04-10 14:18:59.37
+0ca069e5
+User
+2025-04-10 14:18:59.37
+0ca069e5
+User
+Node.js v20.18.1
+2025-04-10 14:18:59.37
+0ca069e5
+System
+command finished with error [sh -c node deployment-fix.cjs]: exit status 1
+2025-04-10 14:19:04.30
+0ca069e5
+User
+/home/runner/workspace/deployment-fix.cjs:12
+2025-04-10 14:19:04.30
+0ca069e5
+User
+const fetch = require('node-fetch');
+2025-04-10 14:19:04.30
+0ca069e5
+User
+^
+2025-04-10 14:19:04.30
+0ca069e5
+User
+2025-04-10 14:19:04.30
+0ca069e5
+User
+Error [ERR_REQUIRE_ESM]: require() of ES Module /home/runner/workspace/node_modules/node-fetch/src/index.js from /home/runner/workspace/deployment-fix.cjs not supported.
+2025-04-10 14:19:04.30
+0ca069e5
+User
+Instead change the require of index.js in /home/runner/workspace/deployment-fix.cjs to a dynamic import() which is available in all CommonJS modules.
+2025-04-10 14:19:04.30
+0ca069e5
+User
+at Object. (/home/runner/workspace/deployment-fix.cjs:12:15) {
+2025-04-10 14:19:04.30
+0ca069e5
+User
+code: 'ERR_REQUIRE_ESM'
+2025-04-10 14:19:04.30
+0ca069e5
+User
+}
+2025-04-10 14:19:04.30
+0ca069e5
+User
+2025-04-10 14:19:04.30
+0ca069e5
+User
+Node.js v20.18.1
+2025-04-10 14:19:04.30
+0ca069e5
+System
+command finished with error [sh -c node deployment-fix.cjs]: exit status 1
+2025-04-10 14:19:14.22
+0ca069e5
+System
+crash loop detected
