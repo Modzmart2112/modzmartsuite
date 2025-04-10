@@ -8,7 +8,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "autoscale"
 build = ["sh", "-c", "npm run build"]
-run = ["sh", "-c", "node deploy.js"]
+run = ["sh", "-c", "node deploy.cjs"]
 
 [[ports]]
 localPort = 3000
