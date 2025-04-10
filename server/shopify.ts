@@ -735,8 +735,9 @@ class ShopifyClient {
     productId: string
   ): Promise<{ inventoryItemId: string | null }> {
     try {
-      // Use API Secret as the access token
+      // Use API Secret as the access token and API Key from parameters
       const accessToken = process.env.SHOPIFY_API_SECRET;
+      const shopifyApiKey = process.env.SHOPIFY_API_KEY;
       const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
       
       if (!accessToken || !shopifyStoreUrl) {
@@ -759,11 +760,7 @@ class ShopifyClient {
       log(`Fetching product by ID: ${url}`, 'shopify-api');
       
       const response = await this.rateLimit<{ product: any }>(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Shopify-Access-Token': accessToken
-        }
+        headers: this.buildHeaders(accessToken, shopifyApiKey)
       });
       
       // Extract the inventory item ID from the first variant
@@ -800,6 +797,7 @@ class ShopifyClient {
     try {
       // Use API Secret as the access token
       const accessToken = process.env.SHOPIFY_API_SECRET;
+      const shopifyApiKey = process.env.SHOPIFY_API_KEY;
       const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
       
       if (!accessToken || !shopifyStoreUrl) {
@@ -822,11 +820,7 @@ class ShopifyClient {
       log(`Fetching inventory items by IDs: ${url}`, 'shopify-api');
       
       const response = await this.rateLimit<{ inventory_items: any[] }>(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Shopify-Access-Token': accessToken
-        }
+        headers: this.buildHeaders(accessToken, shopifyApiKey)
       });
       
       return response;
