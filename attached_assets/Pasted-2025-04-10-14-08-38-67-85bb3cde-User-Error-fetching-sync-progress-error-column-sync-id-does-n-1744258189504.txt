@@ -1,0 +1,184 @@
+2025-04-10 14:08:38.67
+85bb3cde
+User
+Error fetching sync progress: error: column "sync_id" does not exist
+2025-04-10 14:08:38.67
+85bb3cde
+User
+at /home/runner/workspace/node_modules/pg-pool/index.js:45:11
+2025-04-10 14:08:38.67
+85bb3cde
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-04-10 14:08:38.67
+85bb3cde
+User
+at async /home/runner/workspace/complete-deploy.cjs:742:26 {
+2025-04-10 14:08:38.67
+85bb3cde
+User
+length: 107,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+severity: 'ERROR',
+2025-04-10 14:08:38.67
+85bb3cde
+User
+code: '42703',
+2025-04-10 14:08:38.67
+85bb3cde
+User
+detail: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+hint: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+position: '32',
+2025-04-10 14:08:38.67
+85bb3cde
+User
+internalPosition: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+internalQuery: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+where: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+schema: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+table: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+column: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+dataType: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+constraint: undefined,
+2025-04-10 14:08:38.67
+85bb3cde
+User
+file: 'parse_relation.c',
+2025-04-10 14:08:38.67
+85bb3cde
+User
+line: '3722',
+2025-04-10 14:08:38.67
+85bb3cde
+User
+routine: 'errorMissingColumn'
+2025-04-10 14:08:38.67
+85bb3cde
+User
+}
+2025-04-10 14:08:38.78
+85bb3cde
+User
+Shopify API error: 401 Unauthorized
+2025-04-10 14:08:38.78
+85bb3cde
+User
+Authentication failed. Please check your Shopify API credentials.
+2025-04-10 14:08:40.20
+85bb3cde
+User
+Error fetching sync progress: error: column "sync_id" does not exist
+2025-04-10 14:08:40.20
+85bb3cde
+User
+at /home/runner/workspace/node_modules/pg-pool/index.js:45:11
+2025-04-10 14:08:40.20
+85bb3cde
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-04-10 14:08:40.20
+85bb3cde
+User
+at async /home/runner/workspace/complete-deploy.cjs:742:26 {
+2025-04-10 14:08:40.20
+85bb3cde
+User
+length: 107,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+severity: 'ERROR',
+2025-04-10 14:08:40.20
+85bb3cde
+User
+code: '42703',
+2025-04-10 14:08:40.20
+85bb3cde
+User
+detail: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+hint: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+position: '32',
+2025-04-10 14:08:40.20
+85bb3cde
+User
+internalPosition: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+internalQuery: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+where: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+schema: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+table: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+column: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+dataType: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+constraint: undefined,
+2025-04-10 14:08:40.20
+85bb3cde
+User
+file: 'parse_relation.c',
+2025-04-10 14:08:40.20
+85bb3cde
+User
+line: '3722',
+2025-04-10 14:08:40.20
+85bb3cde
+User
+routine: 'errorMissingColumn'
+2025-04-10 14:08:40.20
+85bb3cde
+User
+}
