@@ -1,10 +1,24 @@
 
-import { createServer } from 'http';
 import express from 'express';
+import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 console.log('Starting application in production mode...');
 
 try {
+  // Verify required environment variables
+  const requiredEnvVars = [
+    'SHOPIFY_ACCESS_TOKEN',
+    'SHOPIFY_API_KEY',
+    'SHOPIFY_STORE_URL'
+  ];
+
+  const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+  if (missingVars.length > 0) {
+    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+
   const { default: setupApp } = await import('./dist/index.js');
   const app = await setupApp();
   
