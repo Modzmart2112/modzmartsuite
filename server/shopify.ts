@@ -542,7 +542,7 @@ class ShopifyClient {
     return `https://${normalizedUrl}/admin/api/2022-10`;
   }
   
-  // Shopify expects the Access Token as a bearer token
+  // Properly handle Shopify authentication using the most reliable method based on available credentials
   private buildHeaders(accessToken: string, apiKey?: string): { [key: string]: string } {
     // Validate accessToken to avoid API errors
     if (!accessToken || typeof accessToken !== 'string') {
@@ -555,24 +555,14 @@ class ShopifyClient {
       apiKey = process.env.SHOPIFY_API_KEY;
     }
     
-    if (apiKey) {
-      // If we have both API key and secret, use Basic Auth like in deployment script
-      log(`Using Basic Auth for Shopify API with key and secret`, 'shopify-api');
-      const auth = Buffer.from(`${apiKey}:${accessToken}`).toString('base64');
-      return {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
-    } else {
-      // Fallback to the previous method with Access Token directly
-      log(`Using X-Shopify-Access-Token header for Shopify API`, 'shopify-api');
-      return {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      };
-    }
+    // For Private Apps, the recommended authentication is X-Shopify-Access-Token
+    // Using this as primary method since it's more reliable with newer Shopify API versions
+    log(`Using X-Shopify-Access-Token header for Shopify API`, 'shopify-api');
+    return {
+      'X-Shopify-Access-Token': accessToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
   }
   /**
    * Get inventory cost price by ID

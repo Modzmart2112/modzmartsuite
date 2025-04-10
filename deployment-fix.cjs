@@ -37,16 +37,16 @@ async function verifyShopifyCredentials() {
     // Format URL properly - remove any protocol and trailing slashes
     const normalizedUrl = shopifyStoreUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
     
-    // Create auth string for basic auth
-    const auth = Buffer.from(`${shopifyApiKey}:${shopifyApiSecret}`).toString('base64');
-    
+    // Use X-Shopify-Access-Token authentication which is the recommended approach for private apps
+    // This matches how the main application authenticates in shopify.ts
     const options = {
       hostname: normalizedUrl,
       path: '/admin/api/2022-10/shop.json',
       method: 'GET',
       headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json'
+        'X-Shopify-Access-Token': shopifyApiSecret,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     };
 

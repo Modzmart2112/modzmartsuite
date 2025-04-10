@@ -1148,15 +1148,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createUser({
           username: "admin",
           password: "admin",
-          shopifyApiKey,
-          shopifyApiSecret,
-          shopifyStoreUrl
+          // Use the correct snake_case fields to match database schema
+          shopify_api_key: shopifyApiKey,
+          shopify_api_secret: shopifyApiSecret,
+          shopify_store_url: shopifyStoreUrl
         });
       } else {
         await storage.updateUser(user.id, {
-          shopifyApiKey,
-          shopifyApiSecret,
-          shopifyStoreUrl
+          // Use the correct snake_case fields to match database schema
+          shopify_api_key: shopifyApiKey,
+          shopify_api_secret: shopifyApiSecret,
+          shopify_store_url: shopifyStoreUrl
         });
       }
       
@@ -1176,7 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ connected: false });
       }
       
-      const isConnected = !!(user.shopifyApiKey && user.shopifyApiSecret && user.shopifyStoreUrl);
+      const isConnected = !!(user.shopify_api_key && user.shopify_api_secret && user.shopify_store_url);
       res.json({ connected: isConnected });
     } catch (error) {
       console.error("Error getting Shopify connection status:", error);
