@@ -1,0 +1,1 @@
+export SHOPIFY_API_SECRET=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
