@@ -543,18 +543,36 @@ class ShopifyClient {
   }
   
   // Shopify expects the Access Token as a bearer token
-  private buildHeaders(accessToken: string): { [key: string]: string } {
+  private buildHeaders(accessToken: string, apiKey?: string): { [key: string]: string } {
     // Validate accessToken to avoid API errors
     if (!accessToken || typeof accessToken !== 'string') {
       log(`ERROR: Invalid Shopify API token provided: ${accessToken}`, 'shopify-api');
       throw new Error('Invalid Shopify API token. Please check your Shopify configuration.');
     }
     
-    return {
-      'X-Shopify-Access-Token': accessToken,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    };
+    // Get API key from environment if not provided
+    if (!apiKey) {
+      apiKey = process.env.SHOPIFY_API_KEY;
+    }
+    
+    if (apiKey) {
+      // If we have both API key and secret, use Basic Auth like in deployment script
+      log(`Using Basic Auth for Shopify API with key and secret`, 'shopify-api');
+      const auth = Buffer.from(`${apiKey}:${accessToken}`).toString('base64');
+      return {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+    } else {
+      // Fallback to the previous method with Access Token directly
+      log(`Using X-Shopify-Access-Token header for Shopify API`, 'shopify-api');
+      return {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+    }
   }
   /**
    * Get inventory cost price by ID
@@ -563,6 +581,7 @@ class ShopifyClient {
     try {
       // Use API Secret as the access token (that's what it is in Shopify)
       const accessToken = process.env.SHOPIFY_API_SECRET;
+      const apiKey = process.env.SHOPIFY_API_KEY;
       const storeUrl = process.env.SHOPIFY_STORE_URL;
       
       if (!accessToken || !storeUrl) {
@@ -585,11 +604,7 @@ class ShopifyClient {
       log(`Fetching inventory item ${inventoryItemId}`, 'shopify-api');
       
       const response = await this.rateLimit<{ inventory_item: any }>(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Shopify-Access-Token': accessToken
-        }
+        headers: this.buildHeaders(accessToken, apiKey)
       });
       
       if (response && response.inventory_item && response.inventory_item.cost) {
@@ -613,6 +628,7 @@ class ShopifyClient {
 
     // Use API Secret as the access token
     const accessToken = process.env.SHOPIFY_API_SECRET;
+    const apiKey = process.env.SHOPIFY_API_KEY;
     const storeUrl = process.env.SHOPIFY_STORE_URL;
     
     if (!accessToken || !storeUrl) {
@@ -652,11 +668,7 @@ class ShopifyClient {
       
       try {
         const response = await this.rateLimit<{ inventory_items: any[] }>(url, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-Shopify-Access-Token': accessToken
-          }
+          headers: this.buildHeaders(accessToken, apiKey)
         });
         
         if (response && response.inventory_items && response.inventory_items.length > 0) {
@@ -786,12 +798,12 @@ class ShopifyClient {
     inventoryItemIds: string
   ): Promise<{ inventory_items: any[] }> {
     try {
-      // Use Access Token directly since that's the proper way for private apps
-      const accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+      // Use API Secret as the access token
+      const accessToken = process.env.SHOPIFY_API_SECRET;
       const shopifyStoreUrl = process.env.SHOPIFY_STORE_URL;
       
       if (!accessToken || !shopifyStoreUrl) {
-        log('No Shopify credentials found in environment variables', 'shopify-api');
+        log('No Shopify credentials found in environment variables (SHOPIFY_API_SECRET or SHOPIFY_STORE_URL)', 'shopify-api');
         return { inventory_items: [] };
       }
       
