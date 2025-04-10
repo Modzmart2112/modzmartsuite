@@ -1,0 +1,96 @@
+2025-04-10 13:37:56.58
+a315fa6a
+User
+Shopify API error: 401 Unauthorized
+2025-04-10 13:47:02.40
+5a9f019e
+System
+starting up user application
+2025-04-10 13:47:02.56
+5a9f019e
+System
+forwarding local port 5000 to external port 80
+2025-04-10 13:47:03.41
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:04.54
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:04.77
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:05.37
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:05.57
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:06.19
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:06.54
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:07.23
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:07.76
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:08.40
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:08.59
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:09.25
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:11.03
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:11.65
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:11.96
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:12.57
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:17.37
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:17.97
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:18.46
+5a9f019e
+User
+Starting application in production mode...
+2025-04-10 13:47:19.10
+5a9f019e
+System
+command finished with error [sh -c node deploy-wrapper.js]: exit status 13
+2025-04-10 13:47:28.62
+5a9f019e
+System
+crash loop detected
