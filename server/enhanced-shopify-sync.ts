@@ -21,7 +21,7 @@
 import { storage } from './storage';
 import { shopifyClient } from './shopify';
 import { logCostPrice } from './cost-logger';
-import fetch from 'node-fetch';
+import safeFetch from './fetch-wrapper';
 
 // Configuration
 const BATCH_SIZE = 50; // Increased batch size for better performance (was 10)
@@ -626,7 +626,12 @@ async function processBatch(products: any[]): Promise<{
         for (const chunk of inventoryChunks) {
           // Prepare bulk query param with comma-separated inventory IDs
           const inventoryItemIds = chunk.map(item => item.inventoryItemId).join(',');
-          const credentials = await storage.getShopifyCredentials();
+          // Use environment variables instead of direct DB call to get Shopify credentials
+          const credentials = {
+            apiKey: process.env.SHOPIFY_API_KEY || '',
+            apiSecret: process.env.SHOPIFY_API_SECRET || process.env.SHOPIFY_ACCESS_TOKEN || '',
+            storeUrl: process.env.SHOPIFY_STORE_URL || ''
+          };
           
           try {
             // Get current sync ID for logging

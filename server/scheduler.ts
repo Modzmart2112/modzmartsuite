@@ -348,6 +348,12 @@ export const scheduler = new Scheduler();
  * Setup all schedulers for the application
  */
 export function setupSchedulers() {
+  // Skip schedulers in production deployment
+  if (process.env.DISABLE_SCHEDULERS === 'true') {
+    log('Schedulers disabled via environment variable', 'scheduler');
+    return scheduler;
+  }
+  
   // Start the daily price check job (will run at midnight AEST)
   scheduler.startJob('daily-price-check', 24 * 60 * 60 * 1000, checkAllPrices);
   

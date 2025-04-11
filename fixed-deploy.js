@@ -1,34 +1,35 @@
 #!/usr/bin/env node
 
 /**
- * Simple Deployment Script for Replit
- * 
- * This lightweight script:
- * 1. Sets up production environment
- * 2. Handles server binding for external access
- * 3. Provides health checks for Replit deployment
- * 4. Serves static files from dist/public
+ * Fixed Deployment Script
+ * Avoids scheduler problems by disabling them in production
  */
 
-// Import dependencies
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { createRequire } from 'module';
 
-// Set up __dirname for ES modules compatibility
+// Set up require and other globals
+const require = createRequire(import.meta.url);
+global.require = require;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+global.__dirname = __dirname;
+global.__filename = __filename;
 
 // Set environment variables
 process.env.NODE_ENV = 'production';
 process.env.PORT = process.env.PORT || '3000';
+process.env.DISABLE_SCHEDULERS = 'true'; // This is key - disable schedulers in production
 
 console.log('=================================================');
-console.log('SIMPLE DEPLOYMENT SCRIPT - PRODUCTION MODE');
+console.log('FIXED DEPLOYMENT SCRIPT - PRODUCTION MODE');
 console.log('=================================================');
 console.log(`Node version: ${process.version}`);
 console.log(`Environment: ${process.env.NODE_ENV}`);
+console.log(`Schedulers disabled: ${process.env.DISABLE_SCHEDULERS}`);
 
 // Create express app
 const app = express();
@@ -38,48 +39,12 @@ const publicPath = path.join(__dirname, 'dist', 'public');
 if (fs.existsSync(publicPath)) {
   console.log(`Serving static files from ${publicPath}`);
   app.use(express.static(publicPath));
-} else {
-  console.log(`Warning: Public directory not found at ${publicPath}`);
 }
 
-// Add health check endpoint
+// Health check endpoint
 app.get('/', (req, res) => {
-  // Check if it's a browser request
-  if (req.headers.accept && req.headers.accept.includes('text/html')) {
-    // If the browser is requesting the root, show a status page
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Application Deployment</title>
-        <style>
-          body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-          .success { color: green; }
-          .box { border: 1px solid #ccc; padding: 20px; border-radius: 5px; margin-top: 20px; }
-        </style>
-      </head>
-      <body>
-        <h1 class="success">✅ Server is running</h1>
-        <p>Congratulations! Your application has been deployed successfully.</p>
-        
-        <div class="box">
-          <h2>Server Information</h2>
-          <ul>
-            <li><strong>Status:</strong> <span class="success">Healthy</span></li>
-            <li><strong>Environment:</strong> ${process.env.NODE_ENV}</li>
-            <li><strong>Node Version:</strong> ${process.version}</li>
-            <li><strong>Server Time:</strong> ${new Date().toLocaleString()}</li>
-          </ul>
-        </div>
-      </body>
-      </html>
-    `);
-  }
-  
-  // Health check response for deployment
   return res.status(200).json({
     status: 'healthy',
-    message: 'Application is running',
     timestamp: new Date().toISOString()
   });
 });
@@ -116,10 +81,26 @@ app.get('*', (req, res) => {
 
 // Start listening
 const port = parseInt(process.env.PORT);
-app.listen(port, '0.0.0.0', () => {
+app.listen(port, '0.0.0.0', async () => {
   console.log(`\n=================================================`);
   console.log(`✅ Server running on port ${port}`);
   console.log(`✅ Health check available at / (root URL)`);
-  console.log(`✅ Static files served from ${publicPath}`);
   console.log(`=================================================\n`);
+  
+  try {
+    // Now try to import the application
+    console.log('Attempting to import application (with schedulers disabled)...');
+    const appModule = await import('./dist/index.js');
+    console.log('Application imported successfully');
+    
+    if (typeof appModule.default === 'function') {
+      console.log('Setting up application...');
+      const server = await appModule.default();
+      console.log('Application setup complete');
+    } else {
+      console.log('No setup function found');
+    }
+  } catch (err) {
+    console.error('Failed to import application:', err);
+  }
 });

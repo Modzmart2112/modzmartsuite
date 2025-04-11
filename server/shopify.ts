@@ -1,7 +1,10 @@
-import fetch from "node-fetch";
 import { log } from './vite';
 import { storage } from './storage';
 import { logCostPrice } from './cost-logger';
+import safeFetch, { FetchResponse, FetchOptions } from './fetch-wrapper';
+
+// Use our FetchResponse type throughout the file
+type ResponseType = FetchResponse;
 
 // Simple Shopify client for interacting with the Shopify Admin API
 class ShopifyClient {
@@ -80,7 +83,7 @@ class ShopifyClient {
       this.lastRequestTime = Date.now();
 
       try {
-        const response = await fetch(url, options);
+        const response = await safeFetch(url, options);
 
         // If we hit rate limits (429), back off and retry
         if (response.status === 429) {
@@ -140,7 +143,7 @@ class ShopifyClient {
       log(`Fetching sample products from Shopify: ${url}`, 'shopify-api');
 
       // Use our rate-limited fetch
-      const response = await fetch(url, {
+      const response = await safeFetch(url, {
         headers: this.buildHeaders(apiSecret)
       });
 
@@ -167,7 +170,7 @@ class ShopifyClient {
               // Add delay between inventory requests
               await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
 
-              const inventoryResponse = await fetch(inventoryUrl, {
+              const inventoryResponse = await safeFetch(inventoryUrl, {
                 headers: this.buildHeaders(apiSecret)
               });
 
@@ -227,9 +230,9 @@ class ShopifyClient {
         log(`Fetching products from Shopify: ${baseUrl}/products.json${params}`, 'shopify-api');
 
         // Use our rate-limited fetch for the main product request
-        let response: Response;
+        let response: FetchResponse;
         try {
-          response = await fetch(`${baseUrl}/products.json${params}`, {
+          response = await safeFetch(`${baseUrl}/products.json${params}`, {
             headers: this.buildHeaders(apiSecret)
           });
 
@@ -276,9 +279,9 @@ class ShopifyClient {
                 // Add delay between inventory requests to avoid rate limiting
                 await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
 
-                let inventoryResponse: Response;
+                let inventoryResponse: FetchResponse;
                 try {
-                  inventoryResponse = await fetch(inventoryUrl, {
+                  inventoryResponse = await safeFetch(inventoryUrl, {
                     headers: this.buildHeaders(apiSecret)
                   });
 
@@ -357,10 +360,10 @@ class ShopifyClient {
       const baseUrl = this.buildApiUrl(storeUrl);
 
       // Use rate-limited fetch for the products request
-      let response: Response;
+      let response: FetchResponse;
       try {
         log(`Fetching products to find SKU ${sku}`, 'shopify-api');
-        response = await fetch(`${baseUrl}/products.json?limit=250`, {
+        response = await safeFetch(`${baseUrl}/products.json?limit=250`, {
           headers: this.buildHeaders(apiSecret)
         });
 
@@ -396,7 +399,7 @@ class ShopifyClient {
                 // Add delay between inventory requests to avoid rate limiting
                 await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY_MS));
 
-                const inventoryResponse = await fetch(inventoryUrl, {
+                const inventoryResponse = await safeFetch(inventoryUrl, {
                   headers: this.buildHeaders(apiSecret)
                 });
 
@@ -485,7 +488,7 @@ class ShopifyClient {
       }
 
       // Make the API call to update the variant
-      const response = await fetch(url, {
+      const response = await safeFetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

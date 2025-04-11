@@ -10,8 +10,19 @@ import {
   shopifyLogs
 } from "@shared/schema";
 
+/**
+ * Get Shopify credentials from environment variables or database
+ * Uses environment variables first, falls back to database
+ */
 export async function getShopifyCredentials() {
-  const user = await getUser(1);
+  // Create temporary storage to get user
+  const { db } = require('./db');
+  const { users } = require('../shared/schema');
+  const { eq } = require('drizzle-orm');
+  
+  // Get user ID 1 which has Shopify credentials
+  const usersResult = await db.select().from(users).where(eq(users.id, 1));
+  const user = usersResult[0];
   
   return {
     accessToken: process.env.SHOPIFY_ACCESS_TOKEN || user?.shopifyApiSecret,
@@ -932,6 +943,16 @@ export class MemStorage implements IStorage {
 // Database storage implementation
 export class DatabaseStorage implements IStorage {
   // User operations
+  async getShopifyCredentials() {
+    const user = await this.getUser(1);
+    
+    return {
+      accessToken: process.env.SHOPIFY_ACCESS_TOKEN || user?.shopifyApiSecret,
+      apiKey: process.env.SHOPIFY_API_KEY || user?.shopifyApiKey,
+      storeUrl: process.env.SHOPIFY_STORE_URL || user?.shopifyStoreUrl
+    };
+  }
+  
   async getUser(id: number): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id));
     return result[0];
