@@ -78,7 +78,7 @@ const formatRelativeTime = (date: Date): string => {
   } else if (diffDays < 7) {
     return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
   } else {
-    return date.toLocaleDateString();
+    return safeToLocaleDateString(date);
   }
 };
 
@@ -716,7 +716,7 @@ export default function Navbar() {
                   </div>
                   {shopifyConnection?.lastSync && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Last sync: {new Date(shopifyConnection.lastSync).toLocaleString()}
+                      Last sync: {safeToLocaleString(new Date(shopifyConnection.lastSync))}
                     </p>
                   )}
                 </div>
