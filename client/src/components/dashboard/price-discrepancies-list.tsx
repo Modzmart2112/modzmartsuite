@@ -204,7 +204,7 @@ export function PriceDiscrepancyList() {
   };
 
   // Get a limited list of discrepancies to show based on expanded state
-  const displayDiscrepancies = isExpanded ? discrepancies : discrepancies.slice(0, 5);
+  const displayDiscrepancies = isExpanded ? discrepancies : ((typeof discrepancies === 'string' || Array.isArray(discrepancies)) ? discrepancies.slice(0, 5) : '');
   
   return (
     <Card className="overflow-hidden">

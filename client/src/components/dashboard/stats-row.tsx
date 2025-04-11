@@ -70,7 +70,7 @@ export function StatsRow() {
               ) : (
                 <>
                   <div className={`text-3xl font-bold ${stat.color}`}>
-                    {stat.isMonetary ? `$${stat.value.toFixed(2)}` : safeToLocaleString(stat.value)}
+                    {stat.isMonetary ? `$${stat.value.toFixed(2)}` : stat.value.toLocaleString()}
                   </div>
                   
                   {stat.change && (

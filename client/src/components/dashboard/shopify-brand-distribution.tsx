@@ -410,7 +410,7 @@ export function ShopifyBrandDistribution() {
         
         <div className="flex items-center justify-between mt-6 bg-gray-50 p-3 rounded-lg">
           <div className="flex flex-wrap gap-2 items-center">
-            {chartData.slice(0, 5).map((brand, index) => (
+            {((typeof chartData === 'string' || Array.isArray(chartData)) ? chartData.slice(0, 5) : '').map((brand, index) => (
               <Badge 
                 key={index} 
                 variant="outline" 
