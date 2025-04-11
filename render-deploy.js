@@ -11,9 +11,14 @@ process.env.NODE_ENV = 'production';
 // Required - Render expects the server to bind to this port
 const PORT = process.env.PORT || 10000;
 
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+// Get current directory name (ES module equivalent of __dirname)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create a basic Express server
 const app = express();
