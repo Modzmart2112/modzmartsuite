@@ -178,7 +178,7 @@ const formatRelativeTime = (date: Date): string => {
   // Handle clicks outside search results to close the dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setShowSearchResults(false);
       }
     };
