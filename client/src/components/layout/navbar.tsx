@@ -219,10 +219,9 @@ const formatRelativeTime = (date: Date): string => {
         throw new Error('Failed to mark notification as read');
       }
       
-      // Update local state
-      const updatedNotifications = (Array.isArray(notifications) ? notifications.map(n => 
-        n.id === notification.id ? { ...n, status: "read" } : n
-      );
+const updatedNotifications = Array.isArray(notifications) 
+  ? notifications.map(n => n.id === notification.id ? { ...n, status: "read" } : n)
+  : [];
       setNotifications(updatedNotifications);
       
       // Show the notification details in a dialog
