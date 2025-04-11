@@ -1,0 +1,20 @@
+Using dist/public as client files location instead of dist/client
+Serving static files from /home/runner/workspace/dist/public
+Replit production server started on port 5000
+Health check endpoint available at /
+Loading application routes...
+Using dist/public as client files location instead of dist/client
+Client files found at /home/runner/workspace/dist/public
+Client directory contains: assets, index.html, logo.png
+Attempting to load server routes...
+Trying to load ./server/routes.cjs
+Could not load CJS schema, falling back to minimal schema definition: Cannot find module '../dist/shared/schema.cjs'
+Require stack:
+- /home/runner/workspace/server/routes.cjs
+- /home/runner/workspace/replit-production-deploy.cjs
+Database connection established successfully
+Successfully loaded routes.cjs
+Routes module loaded successfully
+API routes registered successfully
+Test endpoint added at /api/test
+Application initialization complete
