@@ -1,5 +1,6 @@
 /**
- * Minimal API Routes for Render Deployment with enhanced date handling
+ * Minimal API Routes for Render Deployment
+ * With enhanced date handling to prevent frontend crashes
  */
 
 import pkg from 'pg';
@@ -10,58 +11,79 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Helper function to ensure safe date formatting
-function safeDate(date) {
-  if (!date) return new Date().toISOString();
+/**
+ * This function ensures ALL date fields in an object are valid dates
+ * to prevent frontend crashes
+ */
+function ensureValidDates(obj) {
+  if (!obj) return {};
   
-  try {
-    // If it's already a string in ISO format, return it
-    if (typeof date === 'string' && date.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
-      return date;
+  // Make a copy to avoid modifying the original
+  const result = { ...obj };
+  
+  // Current timestamp as fallback
+  const fallbackDate = new Date().toISOString();
+  
+  // Process all properties of the object
+  Object.keys(result).forEach(key => {
+    // If property name suggests it's a date
+    if (key.toLowerCase().includes('date') || 
+        key.toLowerCase().includes('time') || 
+        key.toLowerCase().includes('at')) {
+      
+      // Ensure it's a valid date string
+      if (!result[key] || result[key] === null || result[key] === undefined) {
+        result[key] = fallbackDate;
+      } else if (typeof result[key] === 'string') {
+        try {
+          // Verify it's a valid date by parsing and reformatting
+          const testDate = new Date(result[key]);
+          if (isNaN(testDate.getTime())) {
+            // If invalid, replace with fallback
+            result[key] = fallbackDate;
+          }
+        } catch (e) {
+          // If there's any error parsing, use fallback
+          result[key] = fallbackDate;
+        }
+      } else {
+        // If not a string, replace with fallback
+        result[key] = fallbackDate;
+      }
     }
     
-    // Otherwise convert to ISO string
-    return new Date(date).toISOString();
-  } catch (e) {
-    console.error('Date conversion error:', e);
-    return new Date().toISOString();
-  }
-}
-
-// Function to ensure objects have all necessary properties
-function ensureCompleteObject(obj, defaults) {
-  const result = { ...defaults, ...obj };
-  
-  // Ensure all date fields are properly formatted
-  Object.keys(result).forEach(key => {
-    if (
-      key.toLowerCase().includes('date') || 
-      key.toLowerCase().includes('time') || 
-      key.toLowerCase().includes('at')
-    ) {
-      result[key] = safeDate(result[key]);
+    // Recursively process nested objects
+    if (result[key] && typeof result[key] === 'object' && !Array.isArray(result[key])) {
+      result[key] = ensureValidDates(result[key]);
+    }
+    
+    // Process arrays of objects
+    if (Array.isArray(result[key])) {
+      result[key] = result[key].map(item => 
+        typeof item === 'object' ? ensureValidDates(item) : item
+      );
     }
   });
   
   return result;
 }
 
-// This function configures API routes - exported as default
 export default function configureApiRoutes(app) {
-  console.log('Configuring minimal API routes with enhanced date handling');
+  console.log('Configuring API routes with enhanced date handling');
 
   // User Profile endpoint
   app.get('/api/user/profile', async (req, res) => {
     try {
-      const defaultUser = {
+      const user = {
         id: 1,
         name: 'Admin User',
         email: 'admin@example.com',
         role: 'admin',
-        createdAt: safeDate(null)
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
       
-      res.json(defaultUser);
+      res.json(ensureValidDates(user));
     } catch (err) {
       console.error('Error in user profile endpoint:', err);
       res.status(500).json({ error: err.message });
@@ -73,28 +95,25 @@ export default function configureApiRoutes(app) {
     try {
       const result = await pool.query('SELECT * FROM products LIMIT 100');
       
-      const defaultProduct = {
-        id: 0,
-        productId: 0,
-        title: 'Product',
-        price: 0,
-        costPrice: 0,
-        createdAt: safeDate(null),
-        updatedAt: safeDate(null),
-        shopifyId: null,
-        sku: '',
-        supplierUrl: '',
-        // Additional fields that might be required
-        vendor: '',
-        productType: '',
-        description: '',
-        status: 'active'
-      };
-      
-      // Make sure each product has all required fields
-      const products = result.rows.map(product => 
-        ensureCompleteObject(product, defaultProduct)
-      );
+      // Process each product to ensure all dates are valid
+      const products = result.rows.map(product => {
+        return ensureValidDates({
+          id: product.id || 0,
+          productId: product.product_id || product.id || 0,
+          title: product.title || 'Untitled Product',
+          price: parseFloat(product.price || 0),
+          costPrice: parseFloat(product.cost_price || 0),
+          createdAt: product.created_at || new Date().toISOString(),
+          updatedAt: product.updated_at || new Date().toISOString(),
+          shopifyId: product.shopify_id || null,
+          sku: product.sku || '',
+          vendor: product.vendor || '',
+          productType: product.product_type || '',
+          description: product.description || '',
+          supplierUrl: product.supplier_url || '',
+          status: product.status || 'active'
+        });
+      });
       
       res.json(products);
     } catch (err) {
@@ -110,49 +129,45 @@ export default function configureApiRoutes(app) {
       const products = await pool.query('SELECT COUNT(*) FROM products');
       const productCount = parseInt(products.rows[0].count) || 0;
       
-      const defaultStats = {
-        productCount: 0,
-        displayCount: 0,
-        syncedProducts: 0,
-        lastSync: safeDate(null),
-        updatedAt: safeDate(null),
-        storeUrl: process.env.SHOPIFY_STORE_URL || '',
-        syncInProgress: false
-      };
-      
-      const stats = ensureCompleteObject({
+      const stats = ensureValidDates({
         productCount: productCount,
         displayCount: productCount,
-        syncedProducts: productCount
-      }, defaultStats);
+        syncedProducts: productCount,
+        lastSync: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        storeUrl: process.env.SHOPIFY_STORE_URL || '',
+        syncInProgress: false
+      });
       
       res.json(stats);
     } catch (err) {
       console.error('Error fetching dashboard stats:', err);
       // Return default stats
-      res.json({
+      res.json(ensureValidDates({
         productCount: 0,
         displayCount: 0,
         syncedProducts: 0,
-        lastSync: safeDate(null),
-        updatedAt: safeDate(null),
+        lastSync: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         storeUrl: process.env.SHOPIFY_STORE_URL || '',
         syncInProgress: false
-      });
+      }));
     }
   });
 
   // Dashboard activity
   app.get('/api/dashboard/activity', async (req, res) => {
     try {
-      res.json([
-        {
+      const activities = [
+        ensureValidDates({
           id: 1,
           action: 'System started',
-          timestamp: safeDate(null),
+          timestamp: new Date().toISOString(),
           details: 'Application deployed on Render'
-        }
-      ]);
+        })
+      ];
+      
+      res.json(activities);
     } catch (err) {
       console.error('Error fetching activity:', err);
       res.json([]);
@@ -162,36 +177,36 @@ export default function configureApiRoutes(app) {
   // Shopify status
   app.get('/api/shopify/status', (req, res) => {
     try {
-      res.json({
+      res.json(ensureValidDates({
         connected: true,
         store: process.env.SHOPIFY_STORE_URL || 'Not configured',
-        lastSync: safeDate(null)
-      });
+        lastSync: new Date().toISOString()
+      }));
     } catch (err) {
       console.error('Error fetching Shopify status:', err);
-      res.json({
+      res.json(ensureValidDates({
         connected: false,
         store: '',
-        lastSync: safeDate(null)
-      });
+        lastSync: new Date().toISOString()
+      }));
     }
   });
 
   // Shopify connection status
   app.get('/api/shopify/connection-status', (req, res) => {
     try {
-      res.json({
+      res.json(ensureValidDates({
         connected: true,
         store: process.env.SHOPIFY_STORE_URL || 'Not configured',
-        lastSync: safeDate(null)
-      });
+        lastSync: new Date().toISOString()
+      }));
     } catch (err) {
       console.error('Error fetching Shopify connection status:', err);
-      res.json({
+      res.json(ensureValidDates({
         connected: false,
         store: '',
-        lastSync: safeDate(null)
-      });
+        lastSync: new Date().toISOString()
+      }));
     }
   });
 
@@ -199,7 +214,7 @@ export default function configureApiRoutes(app) {
   app.get('/api/shopify/brands', (req, res) => {
     try {
       res.json([
-        { id: 1, name: 'Default Brand' }
+        { id: 1, name: 'Default Brand', createdAt: new Date().toISOString() }
       ]);
     } catch (err) {
       console.error('Error fetching brands:', err);
@@ -223,12 +238,12 @@ export default function configureApiRoutes(app) {
       const limit = req.query.limit ? parseInt(req.query.limit) : 10;
       
       res.json([
-        {
+        ensureValidDates({
           id: 1,
           message: 'Application migrated to Render',
-          timestamp: safeDate(null),
+          timestamp: new Date().toISOString(),
           read: false
-        }
+        })
       ]);
     } catch (err) {
       console.error('Error fetching notifications:', err);
@@ -239,38 +254,38 @@ export default function configureApiRoutes(app) {
   // Scheduler status
   app.get('/api/scheduler/status', (req, res) => {
     try {
-      res.json({ 
+      res.json(ensureValidDates({ 
         isRunning: false,
-        lastRun: safeDate(null),
-        nextRun: safeDate(null)
-      });
+        lastRun: new Date().toISOString(),
+        nextRun: new Date().toISOString()
+      }));
     } catch (err) {
       console.error('Error fetching scheduler status:', err);
-      res.json({
+      res.json(ensureValidDates({
         isRunning: false,
-        lastRun: safeDate(null),
-        nextRun: safeDate(null)
-      });
+        lastRun: new Date().toISOString(),
+        nextRun: new Date().toISOString()
+      }));
     }
   });
 
   // Scheduler sync progress
   app.get('/api/scheduler/shopify-sync-progress', (req, res) => {
     try {
-      res.json({ 
+      res.json(ensureValidDates({ 
         inProgress: false,
         completed: 0,
         total: 0,
-        lastUpdated: safeDate(null)
-      });
+        lastUpdated: new Date().toISOString()
+      }));
     } catch (err) {
       console.error('Error fetching sync progress:', err);
-      res.json({
+      res.json(ensureValidDates({
         inProgress: false,
         completed: 0,
         total: 0,
-        lastUpdated: safeDate(null)
-      });
+        lastUpdated: new Date().toISOString()
+      }));
     }
   });
 
