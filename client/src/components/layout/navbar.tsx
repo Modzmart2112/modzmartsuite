@@ -61,9 +61,9 @@ type ConnectionStatus = {
 };
 
 // Format relative time (e.g., "2 hours ago", "5 minutes ago", etc.)
+export default function Navbar(): JSX.Element {
 const formatRelativeTime = (date: Date): string => {
 
-export default function Navbar(): JSX.Element {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSecs = Math.floor(diffMs / 1000);
