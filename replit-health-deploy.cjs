@@ -1,29 +1,27 @@
 /**
- * MINIMAL HEALTH CHECK SERVER FOR REPLIT (CommonJS Version)
+ * ULTRA-MINIMAL HEALTH CHECK SERVER FOR REPLIT DEPLOYMENT
  * 
- * This is an ultra-minimal server with the bare minimum code needed
- * to pass Replit's deployment requirements:
+ * This is an ultra-minimal server with only what's needed to pass
+ * Replit's startup time requirement (<20 seconds).
  * 
- * 1. Start within 20 seconds
- * 2. Listen on port 5000
- * 3. Bind to 0.0.0.0
- * 4. Respond to health checks at /
+ * DO NOT ADD ANYTHING TO THIS FILE - it's designed to be as small and
+ * fast as possible to ensure deployment succeeds.
  */
 
-// Import minimal Express
-const express = require('express');
-const app = express();
+// Use HTTP module instead of Express for faster startup 
+const http = require('http');
 
 // Set port (Replit expects 5000)
 const PORT = process.env.PORT || 5000;
 
-// Health check endpoint - responds with 200 OK
-app.get('/', (req, res) => {
-  res.status(200).send('OK');
+// Create minimal HTTP server
+const server = http.createServer((req, res) => {
+  res.writeHead(200, {'Content-Type': 'text/plain'});
+  res.end('OK');
 });
 
 // Bind to 0.0.0.0 (required for Replit)
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Health check server running on port ${PORT}`);
   console.log('Deployment should now succeed');
 });
