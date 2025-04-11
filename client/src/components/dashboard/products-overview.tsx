@@ -33,7 +33,7 @@ export function ProductsOverview() {
             <div className="w-full md:w-1/2 flex flex-col">
               <div className="flex items-baseline mb-2">
                 <span className="text-5xl font-bold text-gray-900">
-                  {isLoading ? "..." : stats?.productCount.toLocaleString()}
+                  {isLoading ? "..." : stats?.safeToLocaleString(productCount)}
                 </span>
                 <span className="text-2xl font-medium text-gray-700 ml-3 tracking-tight">
                   total products
@@ -53,7 +53,7 @@ export function ProductsOverview() {
                       <span>Active listings</span>
                     </div>
                     <div className="text-sm font-medium">
-                      {isLoading ? "..." : stats?.activeProductCount.toLocaleString()} ({activePercentage}%)
+                      {isLoading ? "..." : stats?.safeToLocaleString(activeProductCount)} ({activePercentage}%)
                     </div>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
@@ -122,7 +122,7 @@ export function ProductsOverview() {
                   {isLoading ? "..." : stats?.activeProductCount || 0}
                 </div>
                 <div className="mt-1 text-xs text-purple-500">
-                  Last sync: {isLoading ? "..." : stats?.lastShopifySync ? new Date(stats.lastShopifySync).toLocaleString() : "Never"}
+                  Last sync: {isLoading ? "..." : stats?.lastShopifySync ? safeToLocaleString(new Date(stats.lastShopifySync)) : "Never"}
                 </div>
               </div>
             </div>
