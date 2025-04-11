@@ -69,20 +69,20 @@ const formatRelativeTime = (date: Date): string => {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffSecs < 60) {
+  if (diffSecs < 60) : []) {
     return 'Just now';
-  } else if (diffMins < 60) {
+  } else if (diffMins < 60) : []) {
     return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
-  } else if (diffHours < 24) {
+  } else if (diffHours < 24) : []) {
     return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
-  } else if (diffDays < 7) {
+  } else if (diffDays < 7) : []) {
     return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
   } else {
-    return safeToLocaleDateString(date);
+    return date.toLocaleDateString();
   }
 };
 
-export default function Navbar() {
+export default function Navbar() : []) {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -95,7 +95,7 @@ export default function Navbar() {
     queryKey: ['/api/user/profile'],
     queryFn: async () => {
       const res = await fetch('/api/user/profile');
-      if (!res.ok) {
+      if (!res.ok) : []) {
         throw new Error('Failed to fetch user profile');
       }
       return res.json();
@@ -113,7 +113,7 @@ export default function Navbar() {
     queryKey: ['/api/notifications'],
     queryFn: async () => {
       const response = await fetch('/api/notifications?limit=10');
-      if (!response.ok) {
+      if (!response.ok) : []) {
         throw new Error('Failed to fetch notifications');
       }
       return response.json();
@@ -139,7 +139,7 @@ export default function Navbar() {
   // Fetch search results as user types
   useEffect(() => {
     const fetchSearchResults = async () => {
-      if (searchQuery.length < 2) {
+      if (searchQuery.length < 2) : []) {
         setSearchResults([]);
         setShowSearchResults(false);
         return;
@@ -148,7 +148,7 @@ export default function Navbar() {
       try {
         // Use direct fetch to simplify debugging
         const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}`);
-        if (!response.ok) {
+        if (!response.ok) : []) {
           throw new Error(`Search failed: ${response.status}`);
         }
         
@@ -158,7 +158,7 @@ export default function Navbar() {
         setSearchResults(results || []);
         // Show results if we have any, or if the query is long enough to show "no results" message
         setShowSearchResults(true);
-      } catch (error) {
+      } catch (error) : []) {
         console.error("Error searching products:", error);
         setSearchResults([]);
       }
@@ -174,7 +174,7 @@ export default function Navbar() {
   // Handle clicks outside search results to close the dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) : []) {
         setShowSearchResults(false);
       }
     };
@@ -188,14 +188,14 @@ export default function Navbar() {
   // Show search results dropdown when user focuses on search input
   const handleSearchFocus = () => {
     // Always show search results dropdown on focus if there's a query
-    if (searchQuery.length >= 2) {
+    if (searchQuery.length >= 2) : []) {
       setShowSearchResults(true);
     }
   };
   
   // Update notifications state when API data is loaded
   useEffect(() => {
-    if (fetchedNotifications) {
+    if (fetchedNotifications) : []) {
       setNotifications(fetchedNotifications);
     }
   }, [fetchedNotifications]);
@@ -211,12 +211,12 @@ export default function Navbar() {
         }
       });
       
-      if (!response.ok) {
+      if (!response.ok) : []) {
         throw new Error('Failed to mark notification as read');
       }
       
       // Update local state
-      const updatedNotifications = notifications.map(n => 
+      const updatedNotifications = (Array.isArray(notifications) ? notifications.map(n => 
         n.id === notification.id ? { ...n, status: "read" } : n
       );
       setNotifications(updatedNotifications);
@@ -224,7 +224,7 @@ export default function Navbar() {
       // Show the notification details in a dialog
       setSelectedNotification(notification);
       setNotificationDialogOpen(true);
-    } catch (error) {
+    } catch (error) : []) {
       console.error('Error marking notification as read:', error);
       toast({ 
         title: "Error", 
@@ -245,21 +245,21 @@ export default function Navbar() {
         }
       });
       
-      if (!response.ok) {
+      if (!response.ok) : []) {
         throw new Error('Failed to mark all notifications as read');
       }
       
       const result = await response.json();
       
       // Update local state
-      const updatedNotifications = notifications.map(n => ({ ...n, status: "read" }));
+      const updatedNotifications = (Array.isArray(notifications) ? notifications.map(n => ({ ...n, status: "read" }));
       setNotifications(updatedNotifications);
       
       toast({ 
         title: "Success", 
         description: `Marked ${result.count} notifications as read` 
       });
-    } catch (error) {
+    } catch (error) : []) {
       console.error('Error marking all notifications as read:', error);
       toast({ 
         title: "Error", 
@@ -312,7 +312,7 @@ export default function Navbar() {
                   
                   {/* Mobile Navigation Links */}
                   <div className="space-y-1">
-                    {navItems.map((item) => (
+                    {(Array.isArray(navItems) ? navItems.map((item) => (
                       <Link 
                         key={item.path}
                         href={item.path}
@@ -398,7 +398,7 @@ export default function Navbar() {
               {showSearchResults && searchResults.length > 0 && (
                 <div className="absolute z-50 mt-1 w-full bg-white rounded-md shadow-lg max-h-80 overflow-y-auto">
                   <ul className="py-1 text-sm text-gray-700">
-                    {searchResults.map((result) => (
+                    {(Array.isArray(searchResults) ? searchResults.map((result) => (
                       <li key={result.id}>
                         <Link 
                           href={`/products/${result.id}`}
@@ -615,7 +615,7 @@ export default function Navbar() {
                     No notifications
                   </div>
                 ) : (
-                  notifications.map((notification) => {
+                  (Array.isArray(notifications) ? notifications.map((notification) => {
                     // Detect notification type based on message content
                     const isDiscrepancy = notification.message?.includes('price discrepancy') || false;
                     const isPriceIncrease = notification.message?.includes('increased') || false;
@@ -716,7 +716,7 @@ export default function Navbar() {
                   </div>
                   {shopifyConnection?.lastSync && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Last sync: {safeToLocaleString(new Date(shopifyConnection.lastSync))}
+                      Last sync: {new Date(shopifyConnection.lastSync).toLocaleString()}
                     </p>
                   )}
                 </div>
@@ -757,7 +757,7 @@ export default function Navbar() {
       <div className="bg-primary/90 border-t border-gray-700">
         <div className="container mx-auto px-4">
           <nav className="flex overflow-x-auto no-scrollbar">
-            {navItems.map((item, index) => (
+            {(Array.isArray(navItems) ? navItems.map((item, index) => (
               <div key={item.path} className="relative flex items-center">
                 {index > 0 && (
                   <div className="absolute h-8 w-px bg-white/25 left-0 top-1/2 -translate-y-1/2"></div>
@@ -864,11 +864,11 @@ export default function Navbar() {
                   const isPriceIncrease = selectedNotification.message?.includes('increased') || false;
                   const isPriceDecrease = selectedNotification.message?.includes('decreased') || false;
                   
-                  if (isPriceIncrease) {
+                  if (isPriceIncrease) : []) {
                     return <AlertCircle className="h-5 w-5 mr-2 text-red-500" />;
-                  } else if (isPriceDecrease) {
+                  } else if (isPriceDecrease) : []) {
                     return <Info className="h-5 w-5 mr-2 text-green-500" />;
-                  } else if (isDiscrepancy) {
+                  } else if (isDiscrepancy) : []) {
                     return <AlertTriangle className="h-5 w-5 mr-2 text-yellow-500" />;
                   } else {
                     return <CheckCircle className="h-5 w-5 mr-2 text-blue-500" />;
