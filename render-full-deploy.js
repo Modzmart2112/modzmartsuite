@@ -16,7 +16,9 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { Pool } from 'pg';
+// Fix for pg import
+import pkg from 'pg';
+const { Pool } = pkg;
 
 // Get current directory name (ES module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -44,15 +46,15 @@ app.get('/api/debug/database', async (req, res) => {
     if (!process.env.DATABASE_URL) {
       return res.status(500).json({ error: 'DATABASE_URL not set' });
     }
-
+    
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false }
     });
-
+    
     // Test connection
     const result = await pool.query('SELECT NOW() as time');
-
+    
     // Get tables
     const tables = await pool.query(`
       SELECT table_name, 
@@ -61,7 +63,7 @@ app.get('/api/debug/database', async (req, res) => {
       WHERE table_schema = 'public'
       ORDER BY table_name;
     `);
-
+    
     // Sample product data
     let productSample = { error: 'No products table' };
     try {
@@ -70,7 +72,7 @@ app.get('/api/debug/database', async (req, res) => {
         count: productQuery.rows[0].count,
         message: 'Found products in database'
       };
-
+      
       // Get a sample product
       if (productQuery.rows[0].count > 0) {
         const sample = await pool.query('SELECT * FROM products LIMIT 1');
@@ -79,9 +81,9 @@ app.get('/api/debug/database', async (req, res) => {
     } catch (e) {
       productSample = { error: e.message };
     }
-
+    
     await pool.end();
-
+    
     res.json({
       success: true,
       time: result.rows[0].time,
@@ -105,11 +107,11 @@ async function loadServerRoutes() {
     './dist/server/routes.cjs',
     './server/routes.cjs'
   ];
-
+  
   for (const routeFile of possibleRouteFiles) {
     try {
       console.log(`Attempting to load routes from ${routeFile}...`);
-
+      
       if (routeFile.endsWith('.js')) {
         // ESM approach
         const routes = await import(routeFile);
@@ -135,7 +137,7 @@ async function loadServerRoutes() {
       console.log(`Could not load routes from ${routeFile}:`, err.message);
     }
   }
-
+  
   return false;
 }
 
@@ -144,23 +146,23 @@ loadServerRoutes().then(success => {
   if (!success) {
     console.warn('WARNING: Could not load server routes from any expected location');
   }
-
+  
   // Serve static files AFTER routes to avoid conflicts
   const publicPath = path.join(__dirname, 'dist', 'public');
   console.log(`Serving static files from: ${publicPath}`);
   app.use(express.static(publicPath));
-
+  
   // Handle SPA routing - this should be the last middleware
   app.get('*', (req, res) => {
     // API routes should 404 if they weren't handled by the routes module
     if (req.path.startsWith('/api/')) {
       return res.status(404).json({ error: 'API endpoint not found' });
     }
-
+    
     // Serve index.html for client-side routes
     res.sendFile(path.join(publicPath, 'index.html'));
   });
-
+  
   // Start the server
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
