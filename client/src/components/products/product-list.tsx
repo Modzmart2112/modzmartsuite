@@ -481,7 +481,7 @@ export function ProductList({
                       </TableCell>
                       <TableCell>
                         {product.updatedAt 
-                          ? new Date(product.updatedAt).toLocaleString()
+                          ? safeToLocaleString(new Date(product.updatedAt))
                           : '-'
                         }
                       </TableCell>
