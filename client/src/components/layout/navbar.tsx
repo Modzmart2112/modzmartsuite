@@ -82,7 +82,7 @@ const formatRelativeTime = (date: Date): string => {
   }
 };
 
-export default function Navbar() : []) {
+export default function Navbar(): JSX.Element {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -158,7 +158,7 @@ export default function Navbar() : []) {
         setSearchResults(results || []);
         // Show results if we have any, or if the query is long enough to show "no results" message
         setShowSearchResults(true);
-      } catch (error) : []) {
+export default function Navbar(): JSX.Element {
         console.error("Error searching products:", error);
         setSearchResults([]);
       }
@@ -224,7 +224,7 @@ export default function Navbar() : []) {
       // Show the notification details in a dialog
       setSelectedNotification(notification);
       setNotificationDialogOpen(true);
-    } catch (error) : []) {
+export default function Navbar(): JSX.Element {
       console.error('Error marking notification as read:', error);
       toast({ 
         title: "Error", 
@@ -259,7 +259,7 @@ export default function Navbar() : []) {
         title: "Success", 
         description: `Marked ${result.count} notifications as read` 
       });
-    } catch (error) : []) {
+export default function Navbar(): JSX.Element {
       console.error('Error marking all notifications as read:', error);
       toast({ 
         title: "Error", 
