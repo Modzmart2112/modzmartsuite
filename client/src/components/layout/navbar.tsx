@@ -138,37 +138,42 @@ const formatRelativeTime = (date: Date): string => {
   ];
   
   // Fetch search results as user types
-  useEffect(() => {
-    const fetchSearchResults = async () => {
-      if (searchQuery.length < 2) {
-        setSearchResults([]);
-        setShowSearchResults(false);
-        return;
-      }
-      
-      try {
-        // Use direct fetch to simplify debugging
-        const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}`);
-        if (!response.ok) {
-          throw new Error(`Search failed: ${response.status}`);
-        }
-        
-        const results = await response.json();
-        console.log('Search results:', results);
-        
-        setSearchResults(results || []);
-        // Show results if we have any, or if the query is long enough to show "no results" message
-        setShowSearchResults(true);
-        console.error("Error searching products:", error);
-        setSearchResults([]);
-      }
+ useEffect(() => {
+  const fetchSearchResults = async () => {
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
     }
-    const debounce = setTimeout(() => {
-      fetchSearchResults();
-    }, 300); // Debounce search requests
     
-    return () => clearTimeout(debounce);
-  }, [searchQuery]);
+    try {
+      // SUCCESS PATH
+      const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!response.ok) {
+        throw new Error(`Search failed: ${response.status}`);
+      }
+
+      const results = await response.json();
+      console.log('Search results:', results);
+      
+      // Set your successful states
+      setSearchResults(results || []);
+      setShowSearchResults(true);
+
+    } catch (error) {
+      // ERROR PATH
+      console.error("Error searching products:", error);
+      setSearchResults([]);
+    }
+  };
+
+  const debounce = setTimeout(() => {
+    fetchSearchResults();
+  }, 300);
+
+  return () => clearTimeout(debounce);
+}, [searchQuery]);
+
   
   // Handle clicks outside search results to close the dropdown
   useEffect(() => {
