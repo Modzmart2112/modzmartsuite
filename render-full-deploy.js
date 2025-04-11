@@ -45,24 +45,112 @@ import apiRoutes from './render-api-routes.js';
 const routesConfigured = apiRoutes(app);
 console.log('API routes configured:', routesConfigured ? 'YES' : 'NO');
 
-// Serve static files AFTER routes to avoid conflicts
+// Intercept the JS bundle to add date protection
+app.use((req, res, next) => {
+  // Only intercept the main JS bundle
+  if (req.path.includes('index-') && req.path.includes('.js')) {
+    console.log('Intercepting JS bundle:', req.path);
+    
+    // Get the original path
+    const originalPath = path.join(__dirname, 'dist', 'public', req.path);
+    
+    // Function to serve the patched bundle
+    const servePatched = () => {
+      // Read the file
+      fs.readFile(originalPath, 'utf8', (err, data) => {
+        if (err) {
+          console.error('Error reading JS bundle:', err);
+          return next(); // Continue to normal handling
+        }
+        
+        try {
+          // Create a patch function at the beginning of the file
+          const patch = `
+// ==== START EMERGENCY DATE PATCH ====
+(function() {
+  console.log('Applying emergency date patches');
+  
+  // Create fallback Date methods
+  var originalToLocaleString = Date.prototype.toLocaleString;
+  Date.prototype.toLocaleString = function() {
+    try {
+      if (!this || this === undefined || this === null) {
+        console.warn('toLocaleString called on undefined/null date');
+        return 'N/A';
+      }
+      return originalToLocaleString.apply(this, arguments);
+    } catch (e) {
+      console.warn('Date.toLocaleString error:', e);
+      return 'N/A';
+    }
+  };
+  
+  var originalToLocaleDateString = Date.prototype.toLocaleDateString;
+  Date.prototype.toLocaleDateString = function() {
+    try {
+      if (!this || this === undefined || this === null) {
+        console.warn('toLocaleDateString called on undefined/null date');
+        return 'N/A';
+      }
+      return originalToLocaleDateString.apply(this, arguments);
+    } catch (e) {
+      console.warn('Date.toLocaleDateString error:', e);
+      return 'N/A';
+    }
+  };
+  
+  var originalToLocaleTimeString = Date.prototype.toLocaleTimeString;
+  Date.prototype.toLocaleTimeString = function() {
+    try {
+      if (!this || this === undefined || this === null) {
+        console.warn('toLocaleTimeString called on undefined/null date');
+        return 'N/A';
+      }
+      return originalToLocaleTimeString.apply(this, arguments);
+    } catch (e) {
+      console.warn('Date.toLocaleTimeString error:', e);
+      return 'N/A';
+    }
+  };
+  
+  // Add global error handler for unhandled exceptions
+  window.addEventListener('error', function(event) {
+    if (event && event.error && event.error.toString().includes('toLocaleString')) {
+      console.warn('Caught date formatting error:', event.error);
+      event.preventDefault();
+      return true;
+    }
+  });
+  
+  console.log('Date patches applied successfully');
+})();
+// ==== END EMERGENCY DATE PATCH ====
+`;
+          
+          // Add the patch at the beginning of the file
+          const patchedData = patch + data;
+          
+          // Send the modified bundle
+          res.set('Content-Type', 'application/javascript');
+          res.send(patchedData);
+          console.log('Served patched JS bundle');
+        } catch (error) {
+          console.error('Error patching bundle:', error);
+          next(); // Continue to normal handling
+        }
+      });
+    };
+    
+    // Serve the patched version
+    servePatched();
+  } else {
+    next(); // Continue to normal handling for other files
+  }
+});
+
+// Serve static files
 const publicPath = path.join(__dirname, 'dist', 'public');
 console.log(`Serving static files from: ${publicPath}`);
 app.use(express.static(publicPath));
 
-// Handle SPA routing - this should be the last middleware
-app.get('*', (req, res) => {
-  // API routes should 404 if they weren't handled by the routes module
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
-  }
-
-  // Serve index.html for client-side routes
-  res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-// Start the server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API routes configured: ${routesConfigured ? 'YES' : 'NO'}`);
-});
+// Handle
