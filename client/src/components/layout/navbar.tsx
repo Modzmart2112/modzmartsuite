@@ -62,6 +62,8 @@ type ConnectionStatus = {
 
 // Format relative time (e.g., "2 hours ago", "5 minutes ago", etc.)
 const formatRelativeTime = (date: Date): string => {
+
+export default function Navbar(): JSX.Element {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSecs = Math.floor(diffMs / 1000);
@@ -82,7 +84,6 @@ const formatRelativeTime = (date: Date): string => {
   }
 };
 
-export default function Navbar(): JSX.Element {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -158,7 +159,6 @@ export default function Navbar(): JSX.Element {
         setSearchResults(results || []);
         // Show results if we have any, or if the query is long enough to show "no results" message
         setShowSearchResults(true);
-export default function Navbar(): JSX.Element {
         console.error("Error searching products:", error);
         setSearchResults([]);
       }
@@ -224,7 +224,6 @@ export default function Navbar(): JSX.Element {
       // Show the notification details in a dialog
       setSelectedNotification(notification);
       setNotificationDialogOpen(true);
-export default function Navbar(): JSX.Element {
       console.error('Error marking notification as read:', error);
       toast({ 
         title: "Error", 
@@ -259,7 +258,6 @@ export default function Navbar(): JSX.Element {
         title: "Success", 
         description: `Marked ${result.count} notifications as read` 
       });
-export default function Navbar(): JSX.Element {
       console.error('Error marking all notifications as read:', error);
       toast({ 
         title: "Error", 
