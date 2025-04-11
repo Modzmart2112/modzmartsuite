@@ -45,134 +45,157 @@ import apiRoutes from './render-api-routes.js';
 const routesConfigured = apiRoutes(app);
 console.log('API routes configured:', routesConfigured ? 'YES' : 'NO');
 
-// Intercept the JS bundle to add date protection
-app.use((req, res, next) => {
-  // Only intercept the main JS bundle
-  if (req.path.includes('index-') && req.path.includes('.js')) {
-    console.log('Intercepting JS bundle:', req.path);
-    
-    // Get the original path
-    const originalPath = path.join(__dirname, 'dist', 'public', req.path);
-    
-    // Function to serve the patched bundle
-    const servePatched = () => {
-      // Read the file
-      fs.readFile(originalPath, 'utf8', (err, data) => {
-        if (err) {
-          console.error('Error reading JS bundle:', err);
-          return next(); // Continue to normal handling
-        }
-        
-        try {
-          // Create a patch function at the beginning of the file
-          const patch = `
-// ==== START EMERGENCY DATE PATCH ====
-(function() {
-  console.log('Applying emergency date patches');
+// The emergency patch - directly modify the index.html file
+// Create the patch script directly in the render-full-deploy.js file
+// This is more reliable than importing from another file
+
+// Patch the HTML directly
+try {
+  const publicPath = path.join(__dirname, 'dist', 'public');
+  const indexHtmlPath = path.join(publicPath, 'index.html');
   
-  // Create fallback Date methods
-  var originalToLocaleString = Date.prototype.toLocaleString;
+  console.log('Setting up direct HTML patching for date issues');
+  
+  // Read the original HTML file
+  let htmlContent = fs.readFileSync(indexHtmlPath, 'utf8');
+  
+  // Create a script to inject at the beginning of the HTML
+  const injectScript = `
+<script>
+  // Emergency Date patch - must run BEFORE any other scripts
+  console.log('⚠️ Applying emergency date fix');
+  
+  // Store original methods
+  var _originalDateToLocaleString = Date.prototype.toLocaleString;
+  var _originalDateToLocaleDateString = Date.prototype.toLocaleDateString;
+  var _originalDateToLocaleTimeString = Date.prototype.toLocaleTimeString;
+  
+  // Replace with safe versions
   Date.prototype.toLocaleString = function() {
     try {
-      if (!this || this === undefined || this === null) {
-        console.warn('toLocaleString called on undefined/null date');
-        return 'N/A';
-      }
-      return originalToLocaleString.apply(this, arguments);
+      // Check if 'this' is valid
+      if (this === undefined || this === null) return 'N/A';
+      return _originalDateToLocaleString.apply(this, arguments);
     } catch (e) {
-      console.warn('Date.toLocaleString error:', e);
+      console.warn('Safe toLocaleString caught error:', e);
       return 'N/A';
     }
   };
   
-  var originalToLocaleDateString = Date.prototype.toLocaleDateString;
   Date.prototype.toLocaleDateString = function() {
     try {
-      if (!this || this === undefined || this === null) {
-        console.warn('toLocaleDateString called on undefined/null date');
-        return 'N/A';
-      }
-      return originalToLocaleDateString.apply(this, arguments);
+      // Check if 'this' is valid
+      if (this === undefined || this === null) return 'N/A';
+      return _originalDateToLocaleDateString.apply(this, arguments);
     } catch (e) {
-      console.warn('Date.toLocaleDateString error:', e);
+      console.warn('Safe toLocaleDateString caught error:', e);
       return 'N/A';
     }
   };
   
-  var originalToLocaleTimeString = Date.prototype.toLocaleTimeString;
   Date.prototype.toLocaleTimeString = function() {
     try {
-      if (!this || this === undefined || this === null) {
-        console.warn('toLocaleTimeString called on undefined/null date');
-        return 'N/A';
-      }
-      return originalToLocaleTimeString.apply(this, arguments);
+      // Check if 'this' is valid
+      if (this === undefined || this === null) return 'N/A';
+      return _originalDateToLocaleTimeString.apply(this, arguments);
     } catch (e) {
-      console.warn('Date.toLocaleTimeString error:', e);
+      console.warn('Safe toLocaleTimeString caught error:', e);
       return 'N/A';
     }
   };
   
-  // Add global error handler for unhandled exceptions
-  window.addEventListener('error', function(event) {
-    if (event && event.error && event.error.toString().includes('toLocaleString')) {
-      console.warn('Caught date formatting error:', event.error);
-      event.preventDefault();
-      return true;
+  // Also patch the constructor
+  var OriginalDate = Date;
+  window.Date = function() {
+    try {
+      if (arguments.length === 0) {
+        return new OriginalDate();
+      } else if (arguments.length === 1) {
+        // Handle potentially invalid dates
+        var arg = arguments[0];
+        if (arg === null || arg === undefined) {
+          console.warn('Date constructor received null/undefined');
+          return new OriginalDate();
+        }
+        return new OriginalDate(arg);
+      } else {
+        return new OriginalDate(...arguments);
+      }
+    } catch (e) {
+      console.warn('Date constructor error:', e);
+      return new OriginalDate();
     }
+  };
+  
+  // Maintain prototype chain and statics
+  window.Date.prototype = OriginalDate.prototype;
+  window.Date.now = OriginalDate.now;
+  window.Date.parse = OriginalDate.parse;
+  window.Date.UTC = OriginalDate.UTC;
+  
+  console.log('✅ Emergency date fix applied');
+</script>`;
+  
+  // Insert it right after the opening <head> tag
+  htmlContent = htmlContent.replace('<head>', '<head>' + injectScript);
+  
+  // Create a patched version of index.html
+  const patchedHtmlPath = path.join(__dirname, 'patched-index.html');
+  fs.writeFileSync(patchedHtmlPath, htmlContent);
+  console.log('Created patched HTML file at:', patchedHtmlPath);
+  
+  // Serve static files AFTER routes to avoid conflicts
+  console.log(`Serving static files from: ${publicPath}`);
+  app.use(express.static(publicPath));
+  
+  // Replace the default index.html route to serve our patched version
+  app.get('/', (req, res) => {
+    console.log('Serving patched index.html');
+    res.sendFile(patchedHtmlPath);
   });
   
-  console.log('Date patches applied successfully');
-})();
-// ==== END EMERGENCY DATE PATCH ====
-`;
-          
-          // Add the patch at the beginning of the file
-          const patchedData = patch + data;
-          
-          // Send the modified bundle
-          res.set('Content-Type', 'application/javascript');
-          res.send(patchedData);
-          console.log('Served patched JS bundle');
-        } catch (error) {
-          console.error('Error patching bundle:', error);
-          next(); // Continue to normal handling
-        }
-      });
-    };
+  // Also serve it for the SPA routing
+  app.get('*', (req, res) => {
+    // Skip API routes 
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
     
-    // Serve the patched version
-    servePatched();
-  } else {
-    next(); // Continue to normal handling for other files
-  }
-});
-
-// Serve static files
-const publicPath = path.join(__dirname, 'dist', 'public');
-console.log(`Serving static files from: ${publicPath}`);
-app.use(express.static(publicPath));
-
-// Handle SPA routing - this should be the last middleware
-app.get('*', (req, res) => {
-  // API routes should 404 if they weren't handled by the routes module
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
-  }
+    // Serve the patched index.html for client-side routes
+    console.log('Serving patched index.html for route:', req.path);
+    res.sendFile(patchedHtmlPath);
+  });
   
-  // Serve index.html for client-side routes
-  res.sendFile(path.join(publicPath, 'index.html'));
-});
+  console.log('✅ Direct HTML patching setup complete');
+} catch (err) {
+  console.error('❌ Error setting up HTML patching:', err);
+  
+  // Fallback to normal static file serving if patching fails
+  const publicPath = path.join(__dirname, 'dist', 'public');
+  console.log(`Falling back to normal static file serving from: ${publicPath}`);
+  app.use(express.static(publicPath));
+  
+  // Handle SPA routing - this should be the last middleware
+  app.get('*', (req, res) => {
+    // API routes should 404 if they weren't handled by the routes module
+    if (req.path.startsWith('/api/')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    // Serve index.html for client-side routes
+    res.sendFile(path.join(publicPath, 'index.html'));
+  });
+}
 
 // CRITICAL: Explicitly listen on the PORT provided by Render
 // This is the port binding that Render expects
 const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API routes configured: ${routesConfigured ? 'YES' : 'NO'}`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`✅ API routes configured: ${routesConfigured ? 'YES' : 'NO'}`);
 });
 
 // Log that we're listening
-console.log(`Listening on PORT ${PORT}`);
+console.log(`✅ Listening on PORT ${PORT}`);
 
 // Optional: Add graceful shutdown handling
 process.on('SIGTERM', () => {
