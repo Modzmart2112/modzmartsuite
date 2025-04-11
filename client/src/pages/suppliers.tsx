@@ -275,7 +275,7 @@ export default function Suppliers() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString();
+    return safeToLocaleString(date);
   };
 
   // Get dashboard stats for accurate supplier data counts
