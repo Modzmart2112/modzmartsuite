@@ -38,7 +38,7 @@ export function GeoDistribution() {
                       <div className="w-4 h-4 bg-red-500 rounded-full"></div>
                     </div>
                     <div className="absolute top-7 left-1/2 transform -translate-x-1/2 bg-white rounded px-2 py-0.5 text-xs font-medium shadow">
-                      {geo.customers.toLocaleString()}
+                      {safeToLocaleString(geo.customers)}
                     </div>
                   </div>
                 </div>

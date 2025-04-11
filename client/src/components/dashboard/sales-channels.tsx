@@ -65,7 +65,7 @@ export function SalesChannels() {
                 </div>
                 
                 <div className="text-xs text-gray-500">
-                  {channel.orders.toLocaleString()} orders • {channel.shipments.toLocaleString()} shipments
+                  {safeToLocaleString(channel.orders)} orders • {safeToLocaleString(channel.shipments)} shipments
                 </div>
               </div>
             ))}
