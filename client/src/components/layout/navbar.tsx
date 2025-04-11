@@ -162,7 +162,6 @@ const formatRelativeTime = (date: Date): string => {
         console.error("Error searching products:", error);
         setSearchResults([]);
       }
-    };
     
     const debounce = setTimeout(() => {
       fetchSearchResults();
