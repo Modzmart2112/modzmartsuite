@@ -31,7 +31,7 @@ app.use(express.json());
 // Log environment info
 console.log('Environment check:');
 console.log('- NODE_ENV:', process.env.NODE_ENV);
-console.log('- PORT:', process.env.PORT);
+console.log('- PORT:', PORT);
 console.log('- DATABASE_URL:', process.env.DATABASE_URL ? 'Set (masked)' : 'Not set');
 console.log('- SHOPIFY_STORE_URL:', process.env.SHOPIFY_STORE_URL || 'Not set');
 
@@ -153,4 +153,32 @@ const publicPath = path.join(__dirname, 'dist', 'public');
 console.log(`Serving static files from: ${publicPath}`);
 app.use(express.static(publicPath));
 
-// Handle
+// Handle SPA routing - this should be the last middleware
+app.get('*', (req, res) => {
+  // API routes should 404 if they weren't handled by the routes module
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  // Serve index.html for client-side routes
+  res.sendFile(path.join(publicPath, 'index.html'));
+});
+
+// CRITICAL: Explicitly listen on the PORT provided by Render
+// This is the port binding that Render expects
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`API routes configured: ${routesConfigured ? 'YES' : 'NO'}`);
+});
+
+// Log that we're listening
+console.log(`Listening on PORT ${PORT}`);
+
+// Optional: Add graceful shutdown handling
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
