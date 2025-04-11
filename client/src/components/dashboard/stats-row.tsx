@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowUpRight, ArrowDownRight, ShoppingCart, CheckCheck, BarChart2, DollarSign, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export function StatsRow() {
+export function StatsRow() : []) {
   // Fetch dashboard stats from API
   const { data: stats, isLoading } = useQuery({
     queryKey: ['/api/dashboard/stats'],
@@ -56,7 +56,7 @@ export function StatsRow() {
     <Card className="mb-6">
       <CardContent className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {statItems.map((stat, index) => (
+          {(Array.isArray(statItems) ? statItems.map((stat, index) => (
             <div key={index} className="p-6 bg-white border border-gray-100 rounded-xl shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="text-sm font-medium text-gray-500 uppercase">{stat.title}</div>
